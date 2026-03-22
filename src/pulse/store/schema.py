@@ -15,4 +15,23 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS connector_sync_state (
+            source TEXT PRIMARY KEY,
+            cursor TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS corrections (
+            id TEXT PRIMARY KEY,
+            context_id TEXT NOT NULL,
+            message_text TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
     await db.commit()
