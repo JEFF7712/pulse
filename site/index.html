@@ -315,6 +315,307 @@
             text-transform: uppercase;
             color: var(--dim);
         }
+        /* Data sources section */
+        .sources {
+            position: relative;
+            padding: 8rem 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .sources::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 80px;
+            background: linear-gradient(to bottom, var(--dim), transparent);
+        }
+
+        .section-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--dim);
+            margin-bottom: 1.5rem;
+        }
+
+        .section-heading {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(1.4rem, 3vw, 2rem);
+            color: var(--white);
+            font-weight: 400;
+            margin-bottom: 4rem;
+            max-width: 500px;
+            line-height: 1.4;
+        }
+
+        .source-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 1px;
+            background: var(--dim);
+            border: 1px solid var(--dim);
+        }
+
+        .source-item {
+            background: var(--black);
+            padding: 2rem 1.2rem;
+            text-align: center;
+            transition: background 0.3s ease;
+        }
+
+        .source-item:hover {
+            background: #0e0d0b;
+        }
+
+        .source-icon {
+            font-size: 1.6rem;
+            margin-bottom: 0.8rem;
+            display: block;
+            opacity: 0.85;
+        }
+
+        .source-name {
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--cream);
+        }
+
+        .source-item.coming-soon .source-icon {
+            opacity: 0.25;
+        }
+
+        .source-item.coming-soon .source-name {
+            color: var(--dim);
+        }
+
+        .sources-note {
+            margin-top: 2rem;
+            font-size: 0.6rem;
+            letter-spacing: 0.15em;
+            color: var(--dim);
+        }
+
+        .sources-note span {
+            color: var(--accent);
+        }
+
+        /* Philosophy section */
+        .philosophy {
+            position: relative;
+            padding: 10rem 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .philosophy::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 80px;
+            background: linear-gradient(to bottom, var(--dim), transparent);
+        }
+
+        .manifesto-quote {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-style: italic;
+            color: var(--white);
+            line-height: 1.4;
+            margin-bottom: 4rem;
+            position: relative;
+            padding-left: 2rem;
+            border-left: 2px solid var(--accent);
+        }
+
+        .manifesto-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .manifesto-point {
+            border-top: 1px solid var(--dim);
+            padding-top: 1.5rem;
+        }
+
+        .manifesto-point h3 {
+            font-family: 'Geist Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 400;
+            margin-bottom: 1rem;
+        }
+
+        .manifesto-point p {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: var(--cream);
+        }
+
+        /* Signup section */
+        .signup {
+            position: relative;
+            padding: 10rem 2rem 8rem;
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .signup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 80px;
+            background: linear-gradient(to bottom, var(--dim), transparent);
+        }
+
+        .signup-heading {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            color: var(--white);
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+            line-height: 1.3;
+        }
+
+        .signup-sub {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.05rem;
+            color: var(--cream);
+            margin-bottom: 3rem;
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        .signup-form {
+            display: flex;
+            gap: 0;
+            max-width: 440px;
+            margin: 0 auto 2rem;
+        }
+
+        .signup-form input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid var(--dim);
+            border-right: none;
+            padding: 0.9rem 1.2rem;
+            font-family: 'Geist Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--white);
+            letter-spacing: 0.05em;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .signup-form input::placeholder {
+            color: var(--dim);
+            letter-spacing: 0.1em;
+        }
+
+        .signup-form input:focus {
+            border-color: var(--accent);
+        }
+
+        .signup-form button {
+            background: var(--accent);
+            color: var(--black);
+            border: 1px solid var(--accent);
+            padding: 0.9rem 1.8rem;
+            font-family: 'Geist Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 400;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .signup-form button:hover {
+            background: transparent;
+            color: var(--accent);
+        }
+
+        .signup-form button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .signup-note {
+            font-size: 0.55rem;
+            letter-spacing: 0.15em;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+
+        .signup-success {
+            display: none;
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.1rem;
+            color: var(--accent);
+            font-style: italic;
+        }
+
+        .signup-error {
+            display: none;
+            margin: -1rem auto 1.2rem;
+            max-width: 440px;
+            font-size: 0.65rem;
+            letter-spacing: 0.12em;
+            color: #d6a698;
+            text-transform: uppercase;
+        }
+
+        /* Footer */
+        .page-footer {
+            padding: 4rem 2rem;
+            text-align: center;
+            border-top: 1px solid var(--dim);
+        }
+
+        .page-footer p {
+            font-size: 0.55rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--dim);
+        }
+
+        @media (max-width: 600px) {
+            .manifesto-body {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .signup-form {
+                flex-direction: column;
+            }
+
+            .signup-form input {
+                border-right: 1px solid var(--dim);
+                border-bottom: none;
+            }
+
+            .signup-form input:focus {
+                border-color: var(--accent);
+            }
+
+            .corner { display: none; }
+            .meta, .version { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -344,30 +645,181 @@
     <section class="about">
         <p class="about-label">What is Pulse</p>
         <p>
-            Every day, your <strong>location, emails, calendar, spending, browsing, 
-            and health data</strong> are collected by companies who use them to sell 
-            you things. You never see the full picture they build. 
+            Every day, your <strong>location, emails, calendar, spending, browsing,
+            and health data</strong> are collected by companies who use them to sell
+            you things. You never see the full picture they build.
         </p>
         <p>
-            Pulse is a self-hosted agent that connects to <em>your</em> data sources, 
-            runs quietly in the background, and surfaces the patterns and insights 
+            Pulse is a self-hosted agent that connects to <em>your</em> data sources,
+            runs quietly in the background, and surfaces the patterns and insights
             that actually matter to your life.
         </p>
         <p>
-            It tells you things like <strong>why you keep ordering takeout on 
-            Tuesdays</strong>, or that <strong>you're more productive after morning 
-            workouts</strong>, or that <strong>a recurring charge just doubled</strong>. 
+            It tells you things like <strong>why you keep ordering takeout on
+            Tuesdays</strong>, or that <strong>you're more productive after morning
+            workouts</strong>, or that <strong>a recurring charge just doubled</strong>.
             No dashboards to check. No apps to open. It comes to you.
         </p>
         <p>
-            Everything the agent knows is stored as readable notes in an 
-            <strong>Obsidian vault</strong> you fully control. You can see, edit, 
-            and correct anything it remembers. Nothing leaves your machine unless 
+            Everything the agent knows is stored as readable notes in an
+            <strong>Obsidian vault</strong> you fully control. You can see, edit,
+            and correct anything it remembers. Nothing leaves your machine unless
             you want it to.
         </p>
         <div class="about-footer">
             <span>Your data. Your infrastructure. Your intelligence.</span>
         </div>
     </section>
+
+    <section class="sources">
+        <p class="section-label">Connectors</p>
+        <h2 class="section-heading">One agent. Every signal in your life.</h2>
+        <div class="source-grid">
+            <div class="source-item">
+                <span class="source-icon">&#9993;</span>
+                <span class="source-name">Gmail</span>
+            </div>
+            <div class="source-item">
+                <span class="source-icon">&#128197;</span>
+                <span class="source-name">Calendar</span>
+            </div>
+            <div class="source-item">
+                <span class="source-icon">&#128205;</span>
+                <span class="source-name">Location</span>
+            </div>
+            <div class="source-item">
+                <span class="source-icon">&#127899;</span>
+                <span class="source-name">Browsing</span>
+            </div>
+            <div class="source-item">
+                <span class="source-icon">&#128179;</span>
+                <span class="source-name">Spending</span>
+            </div>
+            <div class="source-item">
+                <span class="source-icon">&#9829;</span>
+                <span class="source-name">Health</span>
+            </div>
+            <div class="source-item coming-soon">
+                <span class="source-icon">&#9835;</span>
+                <span class="source-name">Spotify</span>
+            </div>
+            <div class="source-item coming-soon">
+                <span class="source-icon">&#9654;</span>
+                <span class="source-name">YouTube</span>
+            </div>
+        </div>
+        <p class="sources-note"><span>&#9632;</span> Dimmed connectors are coming post-launch. The plugin system lets anyone build new ones.</p>
+    </section>
+
+    <section class="philosophy">
+        <p class="section-label">Philosophy</p>
+        <p class="manifesto-quote">
+            You generate gigabytes of personal data every month.
+            You've never seen any of it work in your favor.
+        </p>
+        <div class="manifesto-body">
+            <div class="manifesto-point">
+                <h3>The Problem</h3>
+                <p>
+                    Google knows where you go. Your bank knows what you buy.
+                    Spotify knows your mood. Apple knows how you sleep.
+                    Each company holds a fragment of your life and uses it
+                    to sell you things. You never get to see the whole picture.
+                </p>
+            </div>
+            <div class="manifesto-point">
+                <h3>The Reclamation</h3>
+                <p>
+                    Pulse doesn't ask you to stop using these services.
+                    It connects to them, pulls your data home, and runs it
+                    through an AI that works for you, not for advertisers.
+                    Same data. Different agenda.
+                </p>
+            </div>
+            <div class="manifesto-point">
+                <h3>Transparency</h3>
+                <p>
+                    Every insight, every memory, every piece of data the agent
+                    touches is stored as plain text in an Obsidian vault on your
+                    machine. There is no black box. You can read, edit, or
+                    delete anything the agent knows.
+                </p>
+            </div>
+            <div class="manifesto-point">
+                <h3>Sovereignty</h3>
+                <p>
+                    No cloud. No subscriptions. No company sitting between
+                    you and your data. Pulse runs on your hardware, on your
+                    network, under your control. If you unplug it, it's gone.
+                    That's the point.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="signup">
+        <h2 class="signup-heading">This is being built in the open.</h2>
+        <p class="signup-sub">
+            Leave your email to get notified when Pulse launches.
+        </p>
+        <form class="signup-form" id="signupForm" method="POST" action="https://formspree.io/f/mreywkbd">
+            <input type="email" id="emailInput" name="email" placeholder="you@email.com" required>
+            <button type="submit">Notify Me</button>
+        </form>
+        <p class="signup-error" id="signupError">Something went wrong. Please try again.</p>
+        <p class="signup-success" id="signupSuccess">You're on the list. We'll be in touch.</p>
+        <p class="signup-note">No spam. Just a single email when it's ready.</p>
+    </section>
+
+    <footer class="page-footer">
+        <p>Pulse &middot; 2026 &middot; Your data, your intelligence</p>
+    </footer>
+
+    <script>
+        const signupForm = document.getElementById('signupForm');
+        const signupSuccess = document.getElementById('signupSuccess');
+        const signupError = document.getElementById('signupError');
+        const signupNote = document.querySelector('.signup-note');
+        const signupButton = signupForm.querySelector('button');
+        const canEnhanceSignup = typeof window.fetch === 'function' && typeof window.FormData === 'function';
+
+        signupForm.addEventListener('submit', async function(event) {
+            if (!canEnhanceSignup) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (signupButton.disabled) {
+                return;
+            }
+
+            signupError.style.display = 'none';
+            signupButton.disabled = true;
+
+            try {
+                const response = await fetch(signupForm.action, {
+                    method: 'POST',
+                    body: new FormData(signupForm),
+                    headers: {
+                        Accept: 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    signupError.style.display = 'block';
+                    signupButton.disabled = false;
+                    return;
+                }
+
+                signupForm.style.display = 'none';
+                signupSuccess.style.display = 'block';
+                signupNote.style.display = 'none';
+            } catch (error) {
+                signupButton.disabled = false;
+                signupForm.submit();
+            }
+        });
+    </script>
 </body>
 </html>
