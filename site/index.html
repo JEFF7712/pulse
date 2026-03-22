@@ -352,6 +352,15 @@
             line-height: 1.4;
         }
 
+        .section-intro {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--cream);
+            max-width: 560px;
+            margin: -2rem 0 3rem;
+        }
+
         .source-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -631,11 +640,11 @@
         <div class="corner corner--br"></div>
 
         <div class="content">
-            <p class="label">Personal Intelligence Agent</p>
+            <p class="label">Self-Hosted Personal Intelligence Agent</p>
             <h1 class="title"><span>Pulse</span></h1>
-            <p class="tagline">Your data already works against you.<br>Make it work for you.</p>
+            <p class="tagline">Turns your life data into useful observations,<br>so you can see what matters and act on it.</p>
             <div class="divider"></div>
-            <p class="status">Status: <span>■</span> In Development</p>
+            <p class="status">Status: <span>■</span> Early Access</p>
         </div>
 
         <p class="meta">Self-hosted &middot; Open Source</p>
@@ -645,26 +654,23 @@
     <section class="about">
         <p class="about-label">What is Pulse</p>
         <p>
-            Every day, your <strong>location, emails, calendar, spending, browsing,
-            and health data</strong> are collected by companies who use them to sell
-            you things. You never see the full picture they build.
+            Pulse connects the tools you already use, watches for patterns across
+            them, and writes useful observations to your vault.
         </p>
         <p>
-            Pulse is a self-hosted agent that connects to <em>your</em> data sources,
-            runs quietly in the background, and surfaces the patterns and insights
-            that actually matter to your life.
+            It explains what is changing in plain English, so you can understand
+            your routines without stitching the story together yourself.
         </p>
         <p>
-            It tells you things like <strong>why you keep ordering takeout on
-            Tuesdays</strong>, or that <strong>you're more productive after morning
-            workouts</strong>, or that <strong>a recurring charge just doubled</strong>.
-            No dashboards to check. No apps to open. It comes to you.
+            That might mean noticing that <strong>late meetings are pushing dinner
+            later and sleep shorter</strong>, that <strong>errands across town keep
+            leading to extra spending</strong>, or that <strong>weeks with two
+            strength workouts are your most focused workweeks</strong>.
         </p>
         <p>
-            Everything the agent knows is stored as readable notes in an
-            <strong>Obsidian vault</strong> you fully control. You can see, edit,
-            and correct anything it remembers. Nothing leaves your machine unless
-            you want it to.
+            Every observation lands as readable notes in your <strong>Obsidian
+            vault</strong>, so you can inspect, edit, or delete what Pulse
+            remembers. Your memory stays portable and under your control.
         </p>
         <div class="about-footer">
             <span>Your data. Your infrastructure. Your intelligence.</span>
@@ -674,6 +680,7 @@
     <section class="sources">
         <p class="section-label">Connectors</p>
         <h2 class="section-heading">One agent. Every signal in your life.</h2>
+        <p class="section-intro">Together they turn scattered signals into one readable picture of your life.</p>
         <div class="source-grid">
             <div class="source-item">
                 <span class="source-icon">&#9993;</span>
@@ -714,61 +721,45 @@
     <section class="philosophy">
         <p class="section-label">Philosophy</p>
         <p class="manifesto-quote">
-            You generate gigabytes of personal data every month.
-            You've never seen any of it work in your favor.
+            Self-hosted, readable, and under your control.
         </p>
         <div class="manifesto-body">
             <div class="manifesto-point">
-                <h3>The Problem</h3>
+                <h3>Self-Hosted</h3>
                 <p>
-                    Google knows where you go. Your bank knows what you buy.
-                    Spotify knows your mood. Apple knows how you sleep.
-                    Each company holds a fragment of your life and uses it
-                    to sell you things. You never get to see the whole picture.
+                    Pulse runs on your hardware, on your network, so your data
+                    stays where you decide it lives.
                 </p>
             </div>
             <div class="manifesto-point">
-                <h3>The Reclamation</h3>
+                <h3>Readable Notes</h3>
                 <p>
-                    Pulse doesn't ask you to stop using these services.
-                    It connects to them, pulls your data home, and runs it
-                    through an AI that works for you, not for advertisers.
-                    Same data. Different agenda.
+                    Pulse writes plain-language notes to your Obsidian vault,
+                    so you can actually read what it noticed and why it matters.
                 </p>
             </div>
             <div class="manifesto-point">
-                <h3>Transparency</h3>
+                <h3>User Control</h3>
                 <p>
-                    Every insight, every memory, every piece of data the agent
-                    touches is stored as plain text in an Obsidian vault on your
-                    machine. There is no black box. You can read, edit, or
-                    delete anything the agent knows.
-                </p>
-            </div>
-            <div class="manifesto-point">
-                <h3>Sovereignty</h3>
-                <p>
-                    No cloud. No subscriptions. No company sitting between
-                    you and your data. Pulse runs on your hardware, on your
-                    network, under your control. If you unplug it, it's gone.
-                    That's the point.
+                    You can inspect, edit, or delete what it keeps, and your
+                    memory stays portable instead of locked in a service.
                 </p>
             </div>
         </div>
     </section>
 
     <section class="signup">
-        <h2 class="signup-heading">This is being built in the open.</h2>
+        <h2 class="signup-heading">Join the first Pulse early access cohort.</h2>
         <p class="signup-sub">
-            Leave your email to get notified when Pulse launches.
+            If you care about self-hosting, personal knowledge systems, and quantified-self style tools, Pulse is for you.
         </p>
         <form class="signup-form" id="signupForm" method="POST" action="https://formspree.io/f/mreywkbd">
             <input type="email" id="emailInput" name="email" placeholder="you@email.com" required>
-            <button type="submit">Notify Me</button>
+            <button type="submit">Request Early Access</button>
         </form>
         <p class="signup-error" id="signupError">Something went wrong. Please try again.</p>
         <p class="signup-success" id="signupSuccess">You're on the list. We'll be in touch.</p>
-        <p class="signup-note">No spam. Just a single email when it's ready.</p>
+        <p class="signup-note">No spam. Just early access updates when there is something worth trying.</p>
     </section>
 
     <footer class="page-footer">
