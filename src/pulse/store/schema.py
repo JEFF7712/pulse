@@ -34,4 +34,16 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS oauth_tokens (
+            provider TEXT PRIMARY KEY,
+            access_token TEXT NOT NULL,
+            refresh_token TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            scopes TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     await db.commit()
