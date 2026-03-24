@@ -18,6 +18,14 @@ _DB_PATH = os.environ.get("PULSE_DB_PATH", "data/pulse.db")
 _VAULT_PATH = os.environ.get("PULSE_VAULT_PATH", "Pulse-Vault")
 
 
+def _parse_day(day: str) -> date | str:
+    """Parse an ISO date string, returning a date or an error string."""
+    try:
+        return date.fromisoformat(day)
+    except ValueError:
+        return f"Invalid date '{day}'. Expected ISO format YYYY-MM-DD."
+
+
 @asynccontextmanager
 async def pulse_lifespan(server: FastMCP) -> AsyncIterator[PulseContext]:
     async with open_pulse_context(db_path=_DB_PATH, vault_path=_VAULT_PATH) as ctx:
@@ -44,6 +52,10 @@ async def pulse_events_for_day(
     """
     if day is None:
         day = date.today().isoformat()
+
+    parsed = _parse_day(day)
+    if isinstance(parsed, str):
+        return parsed
 
     pulse_ctx = _get_pulse_ctx(ctx)
     events = await pulse_ctx.events.list_events_for_day(day)
@@ -85,7 +97,10 @@ async def pulse_ingest_event(
         data: JSON string of event data.
         event_id: Optional custom ID. Auto-generated if omitted.
     """
-    parsed_data = json.loads(data)
+    try:
+        parsed_data = json.loads(data)
+    except json.JSONDecodeError as exc:
+        return f"Invalid JSON in 'data': {exc}"
     eid = event_id or f"{source}:{uuid4()}"
 
     event = Event(
@@ -130,7 +145,9 @@ async def pulse_digest(day: str | None = None, ctx: Context = None) -> str:
     if day is None:
         day = date.today().isoformat()
 
-    target_date = date.fromisoformat(day)
+    target_date = _parse_day(day)
+    if isinstance(target_date, str):
+        return target_date
     pulse_ctx = _get_pulse_ctx(ctx)
 
     events = await pulse_ctx.events.list_events_for_day(day)
