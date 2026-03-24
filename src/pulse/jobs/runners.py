@@ -60,7 +60,7 @@ async def _build_daily_summary(
         repository = EventRepository(db)
         events = await repository.list_events_for_day(day.isoformat())
 
-    return DailySummarizer().summarize(day, events)
+    return await DailySummarizer().summarize(day, events)
 
 
 def _attach_reply_context(notification: Notification) -> Notification:

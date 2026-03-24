@@ -3,7 +3,8 @@ from datetime import UTC, date, datetime
 import pytest
 
 
-def test_daily_summarizer_renders_markdown_digest_from_events():
+@pytest.mark.asyncio
+async def test_daily_summarizer_renders_markdown_digest_from_events():
     from pulse.analysis.summarizer import DailySummarizer
     from pulse.domain.events import Event
 
@@ -32,7 +33,7 @@ def test_daily_summarizer_renders_markdown_digest_from_events():
         ),
     ]
 
-    summary = DailySummarizer().summarize(day, events)
+    summary = await DailySummarizer().summarize(day, events)
 
     expected = "\n".join(
         [
@@ -61,10 +62,3 @@ def test_daily_summarizer_renders_markdown_digest_from_events():
 
     assert summary.day == day
     assert summary.markdown == expected
-
-
-def test_daily_summarizer_does_not_accept_an_llm_dependency_yet():
-    from pulse.analysis.summarizer import DailySummarizer
-
-    with pytest.raises(TypeError):
-        DailySummarizer(llm=object())

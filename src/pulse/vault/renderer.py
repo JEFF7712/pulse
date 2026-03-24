@@ -7,6 +7,7 @@ def render_daily_digest(
     health_items: list[str],
     media_items: list[str],
     tags: list[str],
+    insights_items: list[str] | None = None,
 ) -> str:
     sections = [
         ("Timeline", timeline_items, "No timeline entries."),
@@ -14,8 +15,12 @@ def render_daily_digest(
         ("Spending", spending_items, "No spending recorded."),
         ("Health", health_items, "No health updates."),
         ("Media", media_items, "No media activity."),
-        ("Tags", tags, "No tags."),
     ]
+    if insights_items is not None:
+        sections.append(("Insights", insights_items, "No insights."))
+
+    sections.append(("Tags", tags, "No tags."))
+
     lines = [f"# {date_label}", ""]
 
     for index, (title, items, fallback) in enumerate(sections):
