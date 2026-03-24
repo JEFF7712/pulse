@@ -72,10 +72,10 @@ New `oauth_tokens` table in SQLite:
 
 ### Connector Changes
 
-- Add `async classmethod GoogleCalendarConnector.from_settings(settings: Settings, db: Database) -> GoogleCalendarConnector` — reads OAuth tokens from SQLite, constructs a real `GoogleCalendarClient`, returns a configured connector
-- Add `async classmethod GmailConnector.from_settings(settings: Settings, db: Database) -> GmailConnector` — same pattern
+- Add `async classmethod GoogleCalendarConnector.from_settings(settings: Settings, db: aiosqlite.Connection) -> GoogleCalendarConnector` — reads OAuth tokens from SQLite, constructs a real `GoogleCalendarClient`, returns a configured connector
+- Add `async classmethod GmailConnector.from_settings(settings: Settings, db: aiosqlite.Connection) -> GmailConnector` — same pattern
 - Both `from_settings` methods are async because they read tokens from SQLite via `aiosqlite`
-- `db` parameter is of type `pulse.store.db.Database`
+- `db` parameter is of type `aiosqlite.Connection` (returned by the existing `connect_db` context manager in `store/db.py`)
 - Both fall back gracefully if no tokens exist (log warning, return empty list on `pull()`)
 - Existing fake-client injection for tests stays untouched — constructor still accepts `client` param
 - After successful pull, connectors update `SyncStateRepository` with latest cursor
@@ -84,6 +84,8 @@ New `oauth_tokens` table in SQLite:
 
 - Modify: `src/pulse/connectors/calendar.py`
 - Modify: `src/pulse/connectors/gmail.py`
+
+Note: Wiring the connector factory methods into `runners.py` happens in Part 4 alongside the LLM integration, so both changes ship together.
 
 ## Part 3: LLM Provider & Claude Adapter
 
@@ -96,8 +98,7 @@ New `oauth_tokens` table in SQLite:
   ```
 - This is a **breaking change** from the existing sync protocol in `domain/llm.py` (which uses `def complete(self, prompt: str, *, system_prompt: str | None = None) -> str`). Migration: delete `src/pulse/domain/llm.py`, update all imports to `pulse.llm.base.LLMProvider`, update `FakeLLM` in tests to match the new async signature.
 - `ClaudeProvider` in `src/pulse/llm/claude.py` implements protocol using `anthropic` async SDK
-- Default model: `claude-sonnet-4-20250514`
-- New config fields: `PULSE_ANTHROPIC_API_KEY`, `PULSE_LLM_MODEL`
+- New config fields: `PULSE_ANTHROPIC_API_KEY`, `PULSE_LLM_MODEL` (default: `claude-sonnet-4-20250514` — set in Settings, used by ClaudeProvider)
 
 ### Testing
 
