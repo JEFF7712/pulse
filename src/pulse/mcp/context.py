@@ -1,0 +1,40 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+
+import aiosqlite
+
+from pulse.store.corrections import CorrectionRepository
+from pulse.store.events import EventRepository
+from pulse.store.schema import bootstrap_schema
+from pulse.store.sync_state import SyncStateRepository
+
+
+@dataclass
+class PulseContext:
+    events: EventRepository
+    corrections: CorrectionRepository
+    sync_state: SyncStateRepository
+    vault_path: str
+    _db: aiosqlite.Connection
+
+    async def close(self) -> None:
+        await self._db.close()
+
+
+@asynccontextmanager
+async def open_pulse_context(
+    *, db_path: str, vault_path: str
+) -> AsyncIterator[PulseContext]:
+    db = await aiosqlite.connect(db_path)
+    await bootstrap_schema(db)
+    try:
+        yield PulseContext(
+            events=EventRepository(db),
+            corrections=CorrectionRepository(db),
+            sync_state=SyncStateRepository(db),
+            vault_path=vault_path,
+            _db=db,
+        )
+    finally:
+        await db.close()
