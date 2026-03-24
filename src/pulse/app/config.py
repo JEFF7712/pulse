@@ -9,3 +9,4 @@ class Settings(BaseModel):
     telegram_chat_id: str | None = None
     google_client_id: str | None = None
     google_client_secret: str | None = None
+    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
