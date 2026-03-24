@@ -10,3 +10,5 @@ class Settings(BaseModel):
     google_client_id: str | None = None
     google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    anthropic_api_key: str | None = None
+    llm_model: str = "claude-sonnet-4-20250514"
