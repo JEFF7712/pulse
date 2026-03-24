@@ -20,9 +20,9 @@ class JobResult:
 
 
 async def run_daily_digest_job(
-    day: date, database_path: str | Path, vault_path: str | Path
+    day: date, database_path: str | Path, vault_path: str | Path, llm=None
 ) -> JobResult:
-    summary = await _build_daily_summary(day=day, database_path=database_path)
+    summary = await _build_daily_summary(day=day, database_path=database_path, llm=llm)
     output_path = write_daily_digest(
         vault_root=Path(vault_path),
         date_slug=day.isoformat(),
@@ -36,9 +36,10 @@ async def run_morning_briefing_job(
     database_path: str | Path,
     vault_path: str | Path,
     channel: NotificationChannel,
+    llm=None,
 ) -> JobResult:
-    summary = await _build_daily_summary(day=day, database_path=database_path)
-    notification = build_morning_briefing(day=day, digest_markdown=summary.markdown)
+    summary = await _build_daily_summary(day=day, database_path=database_path, llm=llm)
+    notification = await build_morning_briefing(day=day, digest_markdown=summary.markdown, llm=llm)
     notification = _attach_reply_context(notification)
     delivered = channel.send(notification)
     if not delivered:
@@ -54,13 +55,14 @@ async def run_morning_briefing_job(
 async def _build_daily_summary(
     day: date,
     database_path: str | Path,
+    llm=None,
 ):
     async with connect_db(database_path) as db:
         await bootstrap_schema(db)
         repository = EventRepository(db)
         events = await repository.list_events_for_day(day.isoformat())
 
-    return await DailySummarizer().summarize(day, events)
+    return await DailySummarizer(llm=llm).summarize(day, events)
 
 
 def _attach_reply_context(notification: Notification) -> Notification:
