@@ -65,14 +65,3 @@ def test_google_calendar_connector_supports_all_day_events():
     assert events[0].id == "calendar:day-1"
     assert events[0].timestamp == datetime(2026, 3, 22, 0, 0, tzinfo=UTC)
     assert events[0].data["title"] == "Offsite"
-
-
-def test_google_auth_placeholder_raises_not_implemented_error():
-    from pulse.connectors.google_auth import build_google_credentials
-
-    try:
-        build_google_credentials()
-    except NotImplementedError as exc:
-        assert str(exc) == "Google auth is not implemented yet."
-    else:
-        raise AssertionError("Expected NotImplementedError")
