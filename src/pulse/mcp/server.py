@@ -179,13 +179,40 @@ async def pulse_read_digest(day: str, ctx: Context = None) -> str:
 @mcp.tool()
 async def pulse_connector_status(ctx: Context = None) -> str:
     """Check the sync state of all configured connectors."""
-    sources = ["gmail", "calendar"]
     pulse_ctx = _get_pulse_ctx(ctx)
 
+    # Get all sources that have ever synced
+    db_cursor = await pulse_ctx._db.execute(
+        "SELECT source, cursor, updated_at FROM connector_sync_state ORDER BY source"
+    )
+    rows = await db_cursor.fetchall()
+    await db_cursor.close()
+
+    # Get event counts per source
+    count_cursor = await pulse_ctx._db.execute(
+        "SELECT source, COUNT(*) FROM events GROUP BY source"
+    )
+    count_rows = await count_cursor.fetchall()
+    await count_cursor.close()
+    event_counts = dict(count_rows)
+
     statuses = {}
-    for source in sources:
-        cursor = await pulse_ctx.sync_state.load(source)
-        statuses[source] = cursor or "never synced"
+    for source, cursor, updated_at in rows:
+        statuses[source] = {
+            "last_sync": cursor,
+            "updated_at": updated_at,
+            "event_count": event_counts.get(source, 0),
+        }
+
+    # Include known sources that haven't synced yet
+    known_sources = {"gmail", "calendar", "youtube"}
+    for source in known_sources:
+        if source not in statuses:
+            statuses[source] = {
+                "last_sync": "never",
+                "updated_at": None,
+                "event_count": event_counts.get(source, 0),
+            }
 
     return json.dumps(statuses, indent=2)
 

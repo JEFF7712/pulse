@@ -1,12 +1,14 @@
-import os
+from pulse.app.config import PulseConfig
+from pulse.app.config_loader import load_config
 
-from pulse.app.config import Settings
+# Keep backward compat
+from pulse.app.config import Settings  # noqa: F401
 
 
-def get_settings() -> Settings:
-    values = {
-        field_name: value
-        for field_name in Settings.model_fields
-        if (value := os.environ.get(f"PULSE_{field_name.upper()}")) is not None
-    }
-    return Settings(**values)
+def get_config() -> PulseConfig:
+    return load_config()
+
+
+# Backward compatibility alias
+def get_settings() -> PulseConfig:
+    return get_config()
