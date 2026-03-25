@@ -2140,7 +2140,7 @@ Expected: All tests PASS
 
 - [ ] **Step 2: Verify imports are clean**
 
-Run: `python -c "from pulse.connectors import register_all; from pulse.connectors.registry import ConnectorRegistry; r = ConnectorRegistry(); register_all(r); print('OK')"`
+Run: `python -c "from pulse.connectors import register_all; from pulse.connectors.registry import ConnectorRegistry; from pulse.app.config import PulseConfig; r = ConnectorRegistry(); register_all(r, PulseConfig()); print('OK')"`
 Expected: `OK`
 
 - [ ] **Step 3: Verify CLI entry point**
