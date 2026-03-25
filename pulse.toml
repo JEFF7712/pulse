@@ -1,0 +1,14 @@
+# Pulse connector configuration.
+# Secrets (API keys, tokens) go in .env, not here.
+
+[connectors.gmail]
+enabled = true
+poll_interval = "15m"
+
+[connectors.calendar]
+enabled = true
+poll_interval = "30m"
+
+[connectors.youtube]
+enabled = true
+poll_interval = "1h"
