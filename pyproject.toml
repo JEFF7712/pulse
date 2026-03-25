@@ -21,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 pulse-mcp = "pulse.mcp.server:main"
+pulse = "pulse.app.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
