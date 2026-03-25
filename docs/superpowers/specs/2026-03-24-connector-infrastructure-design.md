@@ -93,6 +93,8 @@ class PulseConfig(BaseModel):
     connectors: dict[str, ConnectorConfig] = {}
 ```
 
+`PulseConfig` replaces the existing `Settings` class in `app/config.py`. Existing fields are preserved; the `connectors` dict is the only addition. Env vars with `PULSE_` prefix continue to work for top-level settings.
+
 ### Config File (pulse.toml)
 
 ```toml
@@ -242,7 +244,7 @@ for push_conn, config in registry.get_push_connectors():
 ### Design Rationale
 
 - `_run_pull` is generic — works for any pull connector. No more per-connector job functions.
-- Sync state (cursor) management is centralized, not duplicated per connector.
+- Sync state (cursor) management is centralized, not duplicated per connector. `SyncStateRepository` already exists at `store/sync_state.py` with `load(source)` and `save(source, cursor)` methods.
 - Existing analysis/briefing jobs remain unchanged — they consume from the event store regardless of event origin.
 - APScheduler handles retry/error logging on pull failures.
 
@@ -263,9 +265,11 @@ Note: Google removed direct watch history API access in 2016. Full watch history
 
 | Event Type | Data Fields | Source |
 |-----------|-------------|--------|
-| `media.youtube.watch` | title, channel, video_id, duration, category | Activities API |
+| `media.youtube.activity` | title, channel, video_id, activity_type | Activities API |
 | `media.youtube.like` | title, channel, video_id | Liked videos playlist |
 | `media.youtube.subscription` | channel_name, channel_id | Subscriptions API |
+
+Note: `media.youtube.activity` captures what the Activities API actually returns (uploads, likes, favorites, comments, subscriptions by the authenticated user). It does not include passive watch history — that requires Google Takeout (future phase).
 
 ### Implementation
 
