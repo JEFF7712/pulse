@@ -15,6 +15,8 @@ class PulseConfig(BaseModel):
     telegram_chat_id: str | None = None
     google_client_id: str | None = None
     google_client_secret: str | None = None
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
     connectors: dict[str, ConnectorConfig] = {}
 
 

@@ -12,3 +12,13 @@ poll_interval = "30m"
 [connectors.youtube]
 enabled = true
 poll_interval = "1h"
+
+[connectors.spotify]
+enabled = true
+poll_interval = "30m"
+supplementary_interval = "6h"
+
+[connectors.browser]
+enabled = true
+poll_interval = "15m"
+browser = "chrome"
