@@ -5,6 +5,8 @@ from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+from pulse.connectors.oauth import OAuthManager
+
 logger = logging.getLogger(__name__)
 
 SCOPES_BY_CONNECTOR: dict[str, list[str]] = {
@@ -14,19 +16,39 @@ SCOPES_BY_CONNECTOR: dict[str, list[str]] = {
 }
 
 
-class GoogleAuthManager:
+class GoogleAuthManager(OAuthManager):
     def __init__(
         self, client_id: str, client_secret: str, token_path: Path
     ) -> None:
+        super().__init__(token_path)
         self._client_id = client_id
         self._client_secret = client_secret
-        self._token_path = token_path
 
     def get_required_scopes(self, active_connectors: list[str]) -> list[str]:
         scopes: list[str] = []
         for name in active_connectors:
             scopes.extend(SCOPES_BY_CONNECTOR.get(name, []))
         return scopes
+
+    # --- OAuthManager abstract methods (used by base class, but Google
+    #     overrides get_valid_token so these are only called if someone
+    #     uses the base class path directly) ---
+
+    def _get_auth_url(self, scopes: list[str], state: str) -> str:
+        # Not used — Google auth uses InstalledAppFlow.run_local_server
+        raise NotImplementedError("Use authorize() for Google OAuth")
+
+    def _exchange_code(self, code: str) -> dict:
+        raise NotImplementedError("Use authorize() for Google OAuth")
+
+    def _refresh_access_token(self, token_data: dict) -> dict:
+        raise NotImplementedError("Google refresh is handled in get_credentials()")
+
+    def _is_token_expired(self, token_data: dict) -> bool:
+        # Not used — Google credential expiry is checked via Credentials object
+        return False
+
+    # --- Google-specific API (preserved for backward compatibility) ---
 
     def is_authorized(self) -> bool:
         if not self._token_path.exists():

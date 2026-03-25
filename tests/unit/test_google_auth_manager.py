@@ -2,6 +2,12 @@ import json
 from pathlib import Path
 
 
+def test_google_auth_manager_is_oauth_manager_subclass():
+    from pulse.connectors.google_auth import GoogleAuthManager
+    from pulse.connectors.oauth import OAuthManager
+    assert issubclass(GoogleAuthManager, OAuthManager)
+
+
 def test_get_required_scopes_unions_enabled_connectors():
     from pulse.connectors.google_auth import GoogleAuthManager
     mgr = GoogleAuthManager(
