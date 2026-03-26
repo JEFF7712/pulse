@@ -131,7 +131,7 @@ def _cadence_instruction(cadence: str) -> str:
 class NewPattern:
     title: str
     observation: str
-    confidence: float
+    confidence: float | str
     evidence: list[str] = field(default_factory=list)
     trend: str = ""
 
@@ -140,7 +140,7 @@ class NewPattern:
 class UpdatedPattern:
     slug: str
     status: str
-    confidence: float
+    confidence: float | str
     update_note: str
     new_evidence: list[str] = field(default_factory=list)
     trend: str = ""
@@ -161,6 +161,16 @@ class DiscoveryResponse:
     baseline_updates: str | None = None
 
 
+def _parse_confidence(value: object) -> float | str:
+    """Return value as-is if it's already a string label, otherwise coerce to float."""
+    if isinstance(value, str):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def parse_discovery_response(raw: str) -> DiscoveryResponse:
     """Parse a raw LLM JSON response string into a DiscoveryResponse.
 
@@ -176,7 +186,7 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
         NewPattern(
             title=p.get("title", ""),
             observation=p.get("observation", ""),
-            confidence=float(p.get("confidence", 0.0)),
+            confidence=_parse_confidence(p.get("confidence", 0.0)),
             evidence=list(p.get("evidence", [])),
             trend=p.get("trend", ""),
         )
@@ -187,7 +197,7 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
         UpdatedPattern(
             slug=p.get("slug", ""),
             status=p.get("status", ""),
-            confidence=float(p.get("confidence", 0.0)),
+            confidence=_parse_confidence(p.get("confidence", 0.0)),
             update_note=p.get("update_note", ""),
             new_evidence=list(p.get("new_evidence", [])),
             trend=p.get("trend", ""),
