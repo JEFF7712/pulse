@@ -17,6 +17,7 @@ class PulseConfig(BaseModel):
     google_client_secret: str | None = None
     spotify_client_id: str | None = None
     spotify_client_secret: str | None = None
+    anthropic_api_key: str | None = None
     connectors: dict[str, ConnectorConfig] = {}
 
 
