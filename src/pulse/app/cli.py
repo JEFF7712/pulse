@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+import logging
 import secrets
 import sys
 import webbrowser
@@ -10,10 +12,17 @@ from pulse.app.config_loader import load_config
 from pulse.connectors.google_auth import GoogleAuthManager, SCOPES_BY_CONNECTOR
 from pulse.connectors.spotify_auth import SpotifyAuthManager, SPOTIFY_SCOPES, REDIRECT_URI
 
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="pulse", description="Pulse CLI")
     subparsers = parser.add_subparsers(dest="command")
+
+    run_parser = subparsers.add_parser("run", help="Start Pulse (API server + scheduler)")
+    run_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
+    run_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
+    run_parser.add_argument("--log-level", default="info", help="Log level (default: info)")
 
     auth_parser = subparsers.add_parser("auth", help="Manage authentication")
     auth_subparsers = auth_parser.add_subparsers(dest="provider")
@@ -22,13 +31,89 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.command == "auth" and args.provider == "google":
+    if args.command == "run":
+        _run(args)
+    elif args.command == "auth" and args.provider == "google":
         _auth_google()
     elif args.command == "auth" and args.provider == "spotify":
         _auth_spotify()
     else:
         parser.print_help()
         sys.exit(1)
+
+
+def _run(args) -> None:
+    import uvicorn
+
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    config = load_config()
+    logger.info("Loaded config: db=%s, vault=%s, tz=%s", config.database_path, config.vault_path, config.timezone)
+
+    # Ensure data directory exists
+    Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Bootstrap schema
+    async def _bootstrap():
+        from pulse.store.db import connect_db
+        from pulse.store.schema import bootstrap_schema
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+
+    asyncio.run(_bootstrap())
+    logger.info("Database schema ready")
+
+    # Build connector registry
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    registry = ConnectorRegistry()
+    register_all(registry, config)
+    asyncio.run(registry.build_active_connectors(config))
+
+    active_pull = registry.get_pull_connectors()
+    active_push = registry.get_push_connectors()
+    logger.info(
+        "Connectors: %d pull (%s), %d push (%s)",
+        len(active_pull),
+        ", ".join(c.get_source_name() for c, _ in active_pull),
+        len(active_push),
+        ", ".join(c.get_source_name() for c, _ in active_push),
+    )
+
+    # Build scheduler
+    from pulse.jobs.scheduler import build_scheduler
+
+    scheduler = build_scheduler(registry=registry, config=config)
+
+    # Create FastAPI app with lifecycle events
+    from pulse.app.main import create_app
+
+    app = create_app(settings=config, registry=registry)
+
+    @app.on_event("startup")
+    async def _start_scheduler():
+        scheduler.start()
+        jobs = scheduler.get_jobs()
+        logger.info("Scheduler started with %d jobs:", len(jobs))
+        for job in jobs:
+            logger.info("  - %s (trigger: %s)", job.id, job.trigger)
+
+    @app.on_event("shutdown")
+    async def _stop_scheduler():
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+    print(f"Starting Pulse on {args.host}:{args.port}")
+    print(f"  Pull connectors: {', '.join(c.get_source_name() for c, _ in active_pull) or 'none'}")
+    print(f"  Push connectors: {', '.join(c.get_source_name() for c, _ in active_push) or 'none'}")
+    print(f"  Vault: {config.vault_path}")
+    print(f"  Database: {config.database_path}")
+
+    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
 
 
 def _auth_google() -> None:
