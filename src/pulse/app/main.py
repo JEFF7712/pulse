@@ -1,10 +1,12 @@
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 
 from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.app.dependencies import get_settings
+from pulse.app.homepage import render_homepage
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import extract_reply_context
 from pulse.services.corrections import CorrectionService
@@ -39,6 +41,10 @@ def create_app(
             return settings
 
         settings_dependency = get_static_settings
+
+    @app.get("/", response_class=HTMLResponse)
+    def home() -> str:
+        return render_homepage()
 
     @app.get("/health")
     def health(
