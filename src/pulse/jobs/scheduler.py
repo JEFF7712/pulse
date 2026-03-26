@@ -45,6 +45,15 @@ def build_scheduler(
                 id=f"pull_{connector.get_source_name()}",
             )
 
+            # Supplementary jobs (if connector supports them)
+            if hasattr(connector, "get_supplementary_jobs"):
+                for suffix, supp_interval, job_fn in connector.get_supplementary_jobs(cc):
+                    scheduler.add_job(
+                        _make_supplementary_job(job_fn, config),
+                        trigger=IntervalTrigger(seconds=int(supp_interval.total_seconds())),
+                        id=f"pull_{connector.get_source_name()}_{suffix}",
+                    )
+
     # Analysis jobs (unchanged)
     scheduler.add_job(
         _make_daily_digest_job(config),
@@ -84,6 +93,22 @@ def _make_pull_job(connector, config):
                 await event_repo.upsert_events(events)
                 latest = max(e.timestamp for e in events)
                 await sync_state.save(source, latest.isoformat())
+
+    return job
+
+
+def _make_supplementary_job(job_fn, config):
+    async def job():
+        from pulse.store.db import connect_db
+        from pulse.store.events import EventRepository
+        from pulse.store.schema import bootstrap_schema
+
+        events = await job_fn()
+        if events:
+            async with connect_db(config.database_path) as db:
+                await bootstrap_schema(db)
+                event_repo = EventRepository(db)
+                await event_repo.upsert_events(events)
 
     return job
 

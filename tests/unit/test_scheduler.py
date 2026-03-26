@@ -78,3 +78,39 @@ def test_parse_interval_rejects_invalid_format():
     import pytest
     with pytest.raises(ValueError):
         parse_interval("invalid")
+
+
+from pulse.connectors.spotify import SupplementaryPullMixin
+
+
+class FakeSupplementaryConnector(Connector, SupplementaryPullMixin):
+    async def pull(self, since=None):
+        return []
+    def get_source_name(self):
+        return "supplementary_fake"
+    def get_default_interval(self):
+        return timedelta(minutes=30)
+    def get_supplementary_jobs(self, config):
+        return [("extra", timedelta(hours=2), self._extra_pull)]
+    async def _extra_pull(self):
+        return []
+
+
+def test_build_scheduler_creates_supplementary_jobs():
+    from pulse.jobs.scheduler import build_scheduler
+
+    registry = ConnectorRegistry()
+    registry.register_pull("supplementary_fake", lambda: FakeSupplementaryConnector())
+    config = PulseConfig(connectors={
+        "supplementary_fake": ConnectorConfig(enabled=True, poll_interval="30m"),
+    })
+    asyncio.run(registry.build_active_connectors(config))
+
+    scheduler = build_scheduler(registry=registry, config=config)
+    jobs = {job.id: job for job in scheduler.get_jobs()}
+
+    assert "pull_supplementary_fake" in jobs
+    assert "pull_supplementary_fake_extra" in jobs
+    supp_job = jobs["pull_supplementary_fake_extra"]
+    assert isinstance(supp_job.trigger, IntervalTrigger)
+    assert supp_job.trigger.interval.total_seconds() == 7200
