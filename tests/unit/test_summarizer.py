@@ -54,6 +54,9 @@ def test_daily_summarizer_renders_markdown_digest_from_events():
             "## Media",
             "- No media activity.",
             "",
+            "## Browsing",
+            "- No browsing activity.",
+            "",
             "## Tags",
             "- No tags.",
         ]
@@ -68,3 +71,30 @@ def test_daily_summarizer_does_not_accept_an_llm_dependency_yet():
 
     with pytest.raises(TypeError):
         DailySummarizer(llm=object())
+
+
+def test_summarizer_routes_spotify_play_to_media_section():
+    from pulse.analysis.summarizer import DailySummarizer
+    from pulse.domain.events import Event
+
+    events = [Event(
+        id="sp:1", timestamp=datetime(2026, 3, 25, 10, 0, tzinfo=UTC),
+        source="spotify", event_type="media.spotify.play",
+        data={"track_name": "Cool Song", "artist": "Artist A"},
+    )]
+    result = DailySummarizer().summarize(date(2026, 3, 25), events)
+    assert "Listened to Cool Song by Artist A" in result.markdown
+
+
+def test_summarizer_routes_browsing_visit_to_browsing_section():
+    from pulse.analysis.summarizer import DailySummarizer
+    from pulse.domain.events import Event
+
+    events = [Event(
+        id="br:1", timestamp=datetime(2026, 3, 25, 10, 0, tzinfo=UTC),
+        source="browser", event_type="browsing.visit",
+        data={"url": "https://example.com", "title": "Example Site"},
+    )]
+    result = DailySummarizer().summarize(date(2026, 3, 25), events)
+    assert "Example Site" in result.markdown
+    assert "## Browsing" in result.markdown

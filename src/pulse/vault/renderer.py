@@ -6,14 +6,18 @@ def render_daily_digest(
     spending_items: list[str],
     health_items: list[str],
     media_items: list[str],
+    browsing_items: list[str] | None = None,
     tags: list[str],
 ) -> str:
+    if browsing_items is None:
+        browsing_items = []
     sections = [
         ("Timeline", timeline_items, "No timeline entries."),
         ("Email Highlights", email_highlights, "No email highlights."),
         ("Spending", spending_items, "No spending recorded."),
         ("Health", health_items, "No health updates."),
         ("Media", media_items, "No media activity."),
+        ("Browsing", browsing_items, "No browsing activity."),
         ("Tags", tags, "No tags."),
     ]
     lines = [f"# {date_label}", ""]

@@ -72,6 +72,9 @@ def test_run_daily_digest_job_writes_digest_for_requested_day(tmp_path):
                 "## Media",
                 "- No media activity.",
                 "",
+                "## Browsing",
+                "- No browsing activity.",
+                "",
                 "## Tags",
                 "- No tags.",
             ]
