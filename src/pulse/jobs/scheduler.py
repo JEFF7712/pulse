@@ -69,6 +69,36 @@ def build_scheduler(
         id="morning_briefing",
     )
 
+    # Aggregation job — hourly
+    scheduler.add_job(
+        _make_aggregation_job(config),
+        "interval",
+        hours=1,
+        id="aggregation",
+    )
+
+    # Discovery jobs
+    scheduler.add_job(
+        _make_discovery_job("daily", config),
+        "cron",
+        hour=23,
+        id="discovery_daily",
+    )
+    scheduler.add_job(
+        _make_discovery_job("weekly", config),
+        "cron",
+        day_of_week="sun",
+        hour=20,
+        id="discovery_weekly",
+    )
+    scheduler.add_job(
+        _make_discovery_job("monthly", config),
+        "cron",
+        day=1,
+        hour=10,
+        id="discovery_monthly",
+    )
+
     return scheduler
 
 
@@ -138,6 +168,42 @@ def _make_morning_briefing_job(config):
             database_path=config.database_path,
             vault_path=config.vault_path,
             channel=channel,
+        )
+    return job
+
+
+def _make_aggregation_job(config):
+    async def job():
+        from pulse.jobs.runners import run_aggregation_job
+        day = _resolve_current_day(config)
+        return await run_aggregation_job(day=day, database_path=config.database_path)
+    return job
+
+
+def _make_discovery_job(cadence, config):
+    async def job():
+        from pulse.jobs.runners import run_discovery_job
+        from pulse.llm.anthropic import AnthropicProvider
+
+        day = _resolve_current_day(config)
+        llm = None
+        if config.anthropic_api_key:
+            llm = AnthropicProvider(api_key=config.anthropic_api_key)
+
+        if llm is None:
+            return JobResult(
+                status="skipped",
+                detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
+            )
+
+        channel = _build_telegram_channel(config)
+        return await run_discovery_job(
+            cadence=cadence,
+            target_date=day,
+            database_path=config.database_path,
+            vault_path=config.vault_path,
+            llm=llm,
+            notification_channel=channel,
         )
     return job
 

@@ -7,6 +7,7 @@ from pulse.domain.notifications import Notification
 from pulse.domain.notifications import append_reply_context
 from pulse.domain.notifications import NotificationChannel
 from pulse.analysis.summarizer import DailySummarizer
+from pulse.store.analytics import AnalyticsRepository
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
@@ -61,6 +62,40 @@ async def _build_daily_summary(
         events = await repository.list_events_for_day(day.isoformat())
 
     return DailySummarizer().summarize(day, events)
+
+
+async def run_aggregation_job(day: date, database_path: str | Path) -> JobResult:
+    async with connect_db(database_path) as db:
+        await bootstrap_schema(db)
+        analytics = AnalyticsRepository(db)
+        await analytics.aggregate_day(day.isoformat())
+    return JobResult(status="success", detail=f"Aggregated stats for {day.isoformat()}")
+
+
+async def run_discovery_job(
+    cadence: str,
+    target_date: date,
+    database_path: str | Path,
+    vault_path: str | Path,
+    llm,
+    notification_channel=None,
+) -> JobResult:
+    from pulse.analysis.discovery import DiscoveryEngine
+
+    engine = DiscoveryEngine(
+        database_path=database_path,
+        vault_root=Path(vault_path),
+        llm=llm,
+        notification_channel=notification_channel,
+    )
+    result = await engine.run_discovery(cadence=cadence, target_date=target_date)
+    return JobResult(
+        status="success",
+        detail=(
+            f"Discovery ({cadence}): {result.new_patterns} new patterns, "
+            f"{result.updated_patterns} updated, {result.notifications_sent} notifications"
+        ),
+    )
 
 
 def _attach_reply_context(notification: Notification) -> Notification:

@@ -1,6 +1,38 @@
 import asyncio
 
 
+def test_run_aggregation_job(tmp_path):
+    async def exercise():
+        from datetime import UTC, datetime, date
+        from pulse.store.db import connect_db
+        from pulse.store.schema import bootstrap_schema
+        from pulse.store.events import EventRepository
+        from pulse.store.analytics import AnalyticsRepository
+        from pulse.jobs.runners import run_aggregation_job
+        from pulse.domain.events import Event
+
+        db_path = tmp_path / "test.db"
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            repo = EventRepository(db)
+            await repo.upsert_events([
+                Event(id="e1", timestamp=datetime(2026, 3, 25, 9, 0, tzinfo=UTC), source="gmail", event_type="email.received", data={}),
+                Event(id="e2", timestamp=datetime(2026, 3, 25, 14, 0, tzinfo=UTC), source="gmail", event_type="email.received", data={}),
+            ])
+
+        result = await run_aggregation_job(day=date(2026, 3, 25), database_path=db_path)
+        assert result.status == "success"
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            stats = await analytics.get_daily_stats("2026-03-25")
+            assert len(stats) == 1
+            assert stats[0]["count"] == 2
+
+    asyncio.run(exercise())
+
+
 def test_schema_creates_analytics_tables(tmp_path):
     async def exercise():
         from pulse.store.db import connect_db
