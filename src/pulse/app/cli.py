@@ -91,6 +91,12 @@ def main() -> None:
         sys.exit(1)
 
 
+def _quiet_noisy_loggers() -> None:
+    """Suppress chatty third-party loggers."""
+    logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
+    logging.getLogger("google_auth_httplib2").setLevel(logging.WARNING)
+
+
 def _run(args) -> None:
     import uvicorn
 
@@ -98,6 +104,7 @@ def _run(args) -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+    _quiet_noisy_loggers()
 
     config = load_config()
     logger.info("Loaded config: db=%s, vault=%s, tz=%s", config.database_path, config.vault_path, config.timezone)
@@ -174,6 +181,7 @@ def _pull(args) -> None:
     from pulse.store.schema import bootstrap_schema
     from pulse.store.sync_state import SyncStateRepository
 
+    _quiet_noisy_loggers()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -430,6 +438,7 @@ def _init() -> None:
     from pulse.store.sync_state import SyncStateRepository
     from pulse.jobs.runners import run_aggregation_job
 
+    _quiet_noisy_loggers()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
