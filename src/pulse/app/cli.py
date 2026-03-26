@@ -34,8 +34,18 @@ def main() -> None:
     discover_parser.add_argument("--cadence", default="daily", choices=["daily", "weekly", "monthly"])
     discover_parser.add_argument("--date", default=None, help="Target date (YYYY-MM-DD, default: today)")
 
+    subparsers.add_parser("configure", help="Interactive setup for .env, connectors, and auth")
+    subparsers.add_parser("init", help="Set up profile and run initial data collection")
     subparsers.add_parser("status", help="Show database stats")
+    subparsers.add_parser("insights", help="List discovered patterns")
     subparsers.add_parser("test-telegram", help="Send a test message via Telegram")
+
+    reset_parser = subparsers.add_parser("reset", help="Clear sync cursor to re-pull from scratch")
+    reset_parser.add_argument("source", help="Connector source name (e.g., gmail, browser)")
+
+    logs_parser = subparsers.add_parser("logs", help="Show recent events from the database")
+    logs_parser.add_argument("--source", default=None, help="Filter by source")
+    logs_parser.add_argument("-n", type=int, default=20, help="Number of events (default: 20)")
 
     auth_parser = subparsers.add_parser("auth", help="Manage authentication")
     auth_subparsers = auth_parser.add_subparsers(dest="provider")
@@ -52,8 +62,18 @@ def main() -> None:
         _digest(args)
     elif args.command == "discover":
         _discover(args)
+    elif args.command == "configure":
+        _configure()
+    elif args.command == "init":
+        _init()
     elif args.command == "status":
         _status()
+    elif args.command == "insights":
+        _insights()
+    elif args.command == "logs":
+        _logs(args)
+    elif args.command == "reset":
+        _reset(args)
     elif args.command == "test-telegram":
         _test_telegram()
     elif args.command == "auth" and args.provider == "google":
@@ -199,6 +219,334 @@ def _pull(args) -> None:
     asyncio.run(_run_pulls())
 
 
+def _mask(value: str) -> str:
+    """Show first 8 chars of a secret, mask the rest."""
+    if len(value) > 12:
+        return f"{value[:8]}..."
+    return value
+
+
+def _prompt_env_field(key: str, label: str, current: str, is_secret: bool = False) -> str:
+    """Prompt for an env field. If it already has a value, ask to keep or change."""
+    if current:
+        display = _mask(current) if is_secret else current
+        answer = input(f"  {label}: {display} — keep? [Y/n] ").strip().lower()
+        if answer in ("n", "no"):
+            new_val = input(f"  {label}: ").strip()
+            return new_val if new_val else current
+        return current
+    else:
+        value = input(f"  {label}: ").strip()
+        return value
+
+
+def _configure() -> None:
+    import tomllib
+
+    env_path = Path(".env")
+    toml_path = Path("pulse.toml")
+
+    print("=== Pulse Configuration ===\n")
+
+    # Load existing .env
+    existing_env: dict[str, str] = {}
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                existing_env[key.strip()] = val.strip()
+
+    # --- Step 1: Core settings ---
+    print("--- Step 1: Core Settings ---\n")
+
+    env_values: dict[str, str] = {}
+    core_fields = [
+        ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
+        ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
+        ("PULSE_TIMEZONE", "Timezone (e.g., America/Chicago)", "UTC", False),
+    ]
+    for key, label, default, is_secret in core_fields:
+        current = existing_env.get(key, "") or default
+        env_values[key] = _prompt_env_field(key, label, current, is_secret)
+
+    # --- Step 2: Service credentials ---
+    print("\n--- Step 2: Service Credentials ---")
+    print("Leave blank to skip a service.\n")
+
+    credential_fields = [
+        ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
+        ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
+        ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
+        ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
+        ("PULSE_ANTHROPIC_API_KEY", "Anthropic API Key", True),
+        ("PULSE_TELEGRAM_BOT_TOKEN", "Telegram Bot Token", True),
+        ("PULSE_TELEGRAM_CHAT_ID", "Telegram Chat ID", False),
+    ]
+    for key, label, is_secret in credential_fields:
+        current = existing_env.get(key, "")
+        env_values[key] = _prompt_env_field(key, label, current, is_secret)
+
+    # Write .env
+    env_lines = [f"{key}={val}" for key, val in env_values.items()]
+    env_path.write_text("\n".join(env_lines) + "\n")
+    print(f"\n  Saved {env_path}")
+
+    # --- Step 3: Connector config (pulse.toml) ---
+    print("\n--- Step 3: Connector Configuration ---\n")
+
+    existing_toml: dict = {}
+    if toml_path.exists():
+        with open(toml_path, "rb") as f:
+            existing_toml = tomllib.load(f)
+
+    connectors_config = existing_toml.get("connectors", {})
+
+    connector_defs = [
+        ("gmail", "15m", "Gmail (email)"),
+        ("calendar", "30m", "Google Calendar"),
+        ("youtube", "1h", "YouTube"),
+        ("spotify", "30m", "Spotify"),
+        ("browser", "15m", "Browser history"),
+    ]
+
+    enabled_connectors: list[str] = []
+    toml_lines = [
+        "# Pulse connector configuration.",
+        "# Secrets (API keys, tokens) go in .env, not here.",
+        "",
+    ]
+
+    for name, default_interval, label in connector_defs:
+        existing = connectors_config.get(name, {})
+        was_enabled = existing.get("enabled", True) if existing else False
+        interval = existing.get("poll_interval", default_interval)
+
+        if existing:
+            status = "enabled" if was_enabled else "disabled"
+            answer = input(f"  {label}: {status}, poll {interval} — keep? [Y/n] ").strip().lower()
+            if answer in ("n", "no"):
+                yn = input(f"    Enable {label}? [Y/n] ").strip().lower()
+                enabled = yn not in ("n", "no")
+                new_interval = input(f"    Poll interval [{interval}]: ").strip()
+                if new_interval:
+                    interval = new_interval
+            else:
+                enabled = was_enabled
+        else:
+            yn = input(f"  Enable {label}? [Y/n] ").strip().lower()
+            enabled = yn not in ("n", "no")
+            if enabled:
+                new_interval = input(f"    Poll interval [{interval}]: ").strip()
+                if new_interval:
+                    interval = new_interval
+
+        toml_lines.append(f"[connectors.{name}]")
+        toml_lines.append(f"enabled = {'true' if enabled else 'false'}")
+        toml_lines.append(f'poll_interval = "{interval}"')
+
+        if name == "spotify":
+            supp = existing.get("supplementary_interval", "6h")
+            toml_lines.append(f'supplementary_interval = "{supp}"')
+        if name == "browser":
+            browser_type = existing.get("browser", "chrome")
+            if existing:
+                answer = input(f"    Browser: {browser_type} — keep? [Y/n] ").strip().lower()
+                if answer in ("n", "no"):
+                    choice = input(f"    Browser type (chrome/firefox): ").strip()
+                    browser_type = choice if choice else browser_type
+            else:
+                choice = input(f"    Browser type [{browser_type}]: ").strip()
+                browser_type = choice if choice else browser_type
+            toml_lines.append(f'browser = "{browser_type}"')
+
+        toml_lines.append("")
+        if enabled:
+            enabled_connectors.append(name)
+
+    toml_path.write_text("\n".join(toml_lines))
+    print(f"\n  Saved {toml_path}")
+    print(f"  Enabled: {', '.join(enabled_connectors) or 'none'}")
+
+    # --- Step 4: OAuth flows ---
+    google_connectors = [c for c in enabled_connectors if c in ("gmail", "calendar", "youtube")]
+    has_google_creds = env_values.get("PULSE_GOOGLE_CLIENT_ID") and env_values.get("PULSE_GOOGLE_CLIENT_SECRET")
+    has_spotify_creds = env_values.get("PULSE_SPOTIFY_CLIENT_ID") and env_values.get("PULSE_SPOTIFY_CLIENT_SECRET")
+
+    # Check if tokens already exist
+    data_dir = Path(env_values.get("PULSE_DATABASE_PATH", "data/pulse.db")).parent
+    google_tokens = data_dir / "google_tokens.json"
+    spotify_tokens = data_dir / "spotify_tokens.json"
+
+    if google_connectors and has_google_creds:
+        if google_tokens.exists():
+            print(f"\n  Google: already authorized ({google_tokens})")
+            answer = input("  Re-authorize? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_google()
+        else:
+            print(f"\n--- Google Authorization ---")
+            print(f"  Connectors: {', '.join(google_connectors)}")
+            answer = input("  Run Google OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_google()
+
+    if "spotify" in enabled_connectors and has_spotify_creds:
+        if spotify_tokens.exists():
+            print(f"\n  Spotify: already authorized ({spotify_tokens})")
+            answer = input("  Re-authorize? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_spotify()
+        else:
+            print(f"\n--- Spotify Authorization ---")
+            answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_spotify()
+
+    # --- Done ---
+    print("\n=== Configuration Complete ===")
+    print("Next steps:")
+    print("  pulse init     — set up your profile and pull initial data")
+    print("  pulse run      — start the server and scheduler")
+
+
+def _init() -> None:
+    from datetime import date, datetime
+    from pulse.analysis.vault_memory import VaultMemory
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+    from pulse.store.sync_state import SyncStateRepository
+    from pulse.jobs.runners import run_aggregation_job
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    config = load_config()
+    vault = VaultMemory(config.vault_path)
+
+    # --- Step 1: User profile ---
+    profile_path = Path(config.vault_path) / "04-Config" / "profile.md"
+    if profile_path.exists():
+        print(f"Profile already exists at {profile_path}")
+        overwrite = input("Overwrite? [y/N] ").strip().lower()
+        if overwrite != "y":
+            print("Keeping existing profile.")
+        else:
+            _collect_profile(vault)
+    else:
+        _collect_profile(vault)
+
+    # --- Step 2: Initial data pull ---
+    print("\n--- Initial Data Pull ---")
+    Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
+
+    registry = ConnectorRegistry()
+    register_all(registry, config)
+    asyncio.run(registry.build_active_connectors(config))
+
+    active = registry.get_pull_connectors()
+    if not active:
+        print("No active connectors. Run 'pulse auth' first to set up credentials.")
+    else:
+        async def _run_pulls():
+            async with connect_db(config.database_path) as db:
+                await bootstrap_schema(db)
+                event_repo = EventRepository(db)
+                sync_state = SyncStateRepository(db)
+                total_new = 0
+
+                for connector, _cc in active:
+                    source = connector.get_source_name()
+                    print(f"  Pulling {source}...", end=" ", flush=True)
+                    try:
+                        events = await connector.pull(since=None)
+                        if events:
+                            new_count = await event_repo.upsert_events(events)
+                            latest = max(e.timestamp for e in events)
+                            await sync_state.save(source, latest.isoformat())
+                            total_new += new_count
+                            print(f"{new_count} new events")
+                        else:
+                            print("0 events")
+                    except Exception as e:
+                        print(f"ERROR: {e}")
+
+                return total_new
+
+        total = asyncio.run(_run_pulls())
+        print(f"  Total: {total} new events collected")
+
+    # --- Step 3: Aggregate ---
+    print("\n--- Aggregating Stats ---")
+    today = date.today()
+    result = asyncio.run(run_aggregation_job(day=today, database_path=config.database_path))
+    print(f"  {result.detail}")
+
+    # --- Step 4: Initial discovery (if LLM available) ---
+    if config.anthropic_api_key:
+        print("\n--- Running Initial Discovery ---")
+        from pulse.jobs.runners import run_discovery_job
+        from pulse.llm.anthropic import AnthropicProvider
+
+        llm = AnthropicProvider(api_key=config.anthropic_api_key)
+        channel = None
+        if config.telegram_bot_token and config.telegram_chat_id:
+            from pulse.notifications.telegram import TelegramChannel
+            channel = TelegramChannel(
+                bot_token=config.telegram_bot_token,
+                chat_id=config.telegram_chat_id,
+            )
+
+        result = asyncio.run(run_discovery_job(
+            cadence="weekly",
+            target_date=today,
+            database_path=config.database_path,
+            vault_path=config.vault_path,
+            llm=llm,
+            notification_channel=channel,
+        ))
+        print(f"  {result.detail}")
+    else:
+        print("\nSkipping discovery (no PULSE_ANTHROPIC_API_KEY set)")
+
+    print("\nPulse initialized! Run 'pulse run' to start the server and scheduler.")
+
+
+def _collect_profile(vault) -> None:
+    print("\n--- User Profile Setup ---")
+    print("This helps Pulse find patterns relevant to you.")
+    print("Press Enter to skip any question.\n")
+
+    name = input("Your name: ").strip()
+    occupation = input("What do you do? (e.g., student, engineer, designer): ").strip()
+    interests = input("Key interests (comma-separated): ").strip()
+    goals = input("What patterns would you like Pulse to find? ").strip()
+    context = input("Anything else Pulse should know about you? ").strip()
+
+    lines = ["# User Profile", ""]
+    if name:
+        lines.append(f"**Name:** {name}")
+    if occupation:
+        lines.append(f"**Occupation:** {occupation}")
+    if interests:
+        lines.append(f"**Interests:** {interests}")
+    lines.append("")
+
+    if goals:
+        lines.extend(["## Discovery Goals", goals, ""])
+    if context:
+        lines.extend(["## Additional Context", context, ""])
+
+    profile_content = "\n".join(lines)
+    vault.write_config_file("profile.md", profile_content)
+    print(f"\nProfile saved!")
+
+
 def _digest(args) -> None:
     from datetime import date
     from pulse.jobs.runners import run_daily_digest_job, run_aggregation_job
@@ -289,6 +637,126 @@ def _status() -> None:
                 print(f"  {source:10} {cursor[:30]:30} (updated {updated_at})")
 
     asyncio.run(_show())
+
+
+def _insights() -> None:
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+    from pulse.store.analytics import AnalyticsRepository
+
+    config = load_config()
+
+    if not Path(config.database_path).exists():
+        print("No database found. Run 'pulse pull' first.")
+        sys.exit(1)
+
+    async def _show():
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            insights = await analytics.list_insights()
+
+            if not insights:
+                print("No patterns discovered yet. Run 'pulse discover' first.")
+                return
+
+            print(f"Discovered patterns ({len(insights)}):\n")
+            for i in insights:
+                conf = i["confidence"]
+                status = i["status"]
+                print(f"  [{status:12}] {i['title']}")
+                print(f"               confidence: {conf}, seen: {i['first_seen']} to {i['last_seen']}")
+                print(f"               vault: {i['vault_path']}")
+                print()
+
+    asyncio.run(_show())
+
+
+def _logs(args) -> None:
+    import json as json_mod
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    config = load_config()
+
+    if not Path(config.database_path).exists():
+        print("No database found. Run 'pulse pull' first.")
+        sys.exit(1)
+
+    async def _show():
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+
+            query = "SELECT timestamp, source, event_type, data FROM events"
+            params: list = []
+
+            if args.source:
+                query += " WHERE source = ?"
+                params.append(args.source)
+
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(args.n)
+
+            cur = await db.execute(query, params)
+            rows = await cur.fetchall()
+
+            if not rows:
+                print("No events found.")
+                return
+
+            for ts, source, etype, data_str in reversed(rows):
+                data = json_mod.loads(data_str)
+                # Pick the most useful field to show
+                detail = (
+                    data.get("subject")
+                    or data.get("title")
+                    or data.get("track_name")
+                    or data.get("url", "")[:60]
+                    or ""
+                )
+                ts_short = ts[:19] if len(ts) > 19 else ts
+                print(f"  {ts_short}  {source:10} {etype:28} {detail}")
+
+    asyncio.run(_show())
+
+
+def _reset(args) -> None:
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+    from pulse.store.sync_state import SyncStateRepository
+
+    config = load_config()
+
+    if not Path(config.database_path).exists():
+        print("No database found.")
+        sys.exit(1)
+
+    source = args.source
+
+    async def _do_reset():
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+            sync_state = SyncStateRepository(db)
+            cursor = await sync_state.load(source)
+
+            if not cursor:
+                print(f"No sync cursor found for '{source}'.")
+                return
+
+            print(f"Current cursor for '{source}': {cursor}")
+            confirm = input(f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] ").strip().lower()
+            if confirm not in ("y", "yes"):
+                print("Cancelled.")
+                return
+
+            await db.execute(
+                "DELETE FROM connector_sync_state WHERE source = ?",
+                (source,),
+            )
+            await db.commit()
+            print(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
+
+    asyncio.run(_do_reset())
 
 
 def _test_telegram() -> None:

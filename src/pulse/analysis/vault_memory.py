@@ -153,6 +153,13 @@ class VaultMemory:
             return ""
         return path.read_text(encoding="utf-8")
 
+    def write_config_file(self, filename: str, content: str) -> Path:
+        """Write content to ``04-Config/{filename}`` and return the path."""
+        path = self._root / "04-Config" / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
