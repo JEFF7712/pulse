@@ -1,4 +1,5 @@
 # Pulse connector configuration.
+# Copy to pulse.toml and adjust to your setup.
 # Secrets (API keys, tokens) go in .env, not here.
 
 [connectors.gmail]
@@ -14,11 +15,11 @@ enabled = true
 poll_interval = "1h"
 
 [connectors.spotify]
-enabled = true
+enabled = false
 poll_interval = "30m"
 supplementary_interval = "6h"
 
 [connectors.browser]
 enabled = true
 poll_interval = "15m"
-browser = "chrome"
+browser = "chrome"  # or "firefox"

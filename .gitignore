@@ -7,6 +7,7 @@ __pycache__/
 .claude/
 .ruff_cache/
 .env
+pulse.toml
 data/
 .envrc
 .direnv
