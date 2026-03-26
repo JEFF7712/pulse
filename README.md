@@ -128,5 +128,3 @@ src/pulse/
 3. **Full transparency** — all data stored as human-readable markdown in Obsidian
 4. **Extensible** — clean interfaces for connectors, LLM providers, and notification channels
 5. **Self-hosted** — runs on your hardware, data stays local
-
-See [DESIGN.md](DESIGN.md) for the full architecture document.
