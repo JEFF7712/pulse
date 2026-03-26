@@ -12,9 +12,24 @@ class GoogleCalendarConnector(Connector):
         self._client = client
 
     async def pull(self, since: datetime | None = None) -> list[Event]:
-        client = self._get_client()
-        rows = await client.list_events(since=since)
-        return [self._to_event(row) for row in rows]
+        service = self._get_client()
+
+        kwargs: dict[str, Any] = {
+            "calendarId": "primary",
+            "maxResults": 250,
+            "singleEvents": True,
+            "orderBy": "startTime",
+        }
+        if since is not None:
+            kwargs["timeMin"] = since.isoformat()
+        else:
+            # Default: last 7 days
+            kwargs["timeMin"] = (datetime.now(UTC) - timedelta(days=7)).isoformat()
+
+        results = service.events().list(**kwargs).execute()
+        items = results.get("items", [])
+
+        return [self._to_event(item) for item in items]
 
     def get_source_name(self) -> str:
         return "calendar"

@@ -6,3 +6,9 @@ __pycache__/
 .worktrees/
 .claude/
 .ruff_cache/
+.env
+data/
+.envrc
+.direnv
+Pulse-Vault/
+DESIGN.md

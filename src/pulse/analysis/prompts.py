@@ -171,6 +171,18 @@ def _parse_confidence(value: object) -> float | str:
         return 0.0
 
 
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences (```json ... ```) from LLM output."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        # Remove opening fence (```json or ```)
+        first_newline = stripped.index("\n") if "\n" in stripped else len(stripped)
+        stripped = stripped[first_newline + 1:]
+    if stripped.endswith("```"):
+        stripped = stripped[:-3]
+    return stripped.strip()
+
+
 def parse_discovery_response(raw: str) -> DiscoveryResponse:
     """Parse a raw LLM JSON response string into a DiscoveryResponse.
 
@@ -178,7 +190,8 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
     than raising.
     """
     try:
-        data = json.loads(raw)
+        cleaned = _strip_code_fences(raw)
+        data = json.loads(cleaned)
     except (json.JSONDecodeError, ValueError):
         return DiscoveryResponse()
 

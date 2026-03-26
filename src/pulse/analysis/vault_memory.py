@@ -81,21 +81,45 @@ class VaultMemory:
         evidence_log: list[str],
         trend: str,
     ) -> Path:
-        """Re-write a pattern file, preserving any user-edited notes."""
-        existing_notes: str | None = None
+        """Re-write a pattern file, preserving existing observation, evidence, and user notes."""
         path = self._root / "02-Insights" / "patterns" / f"{slug}.md"
+        existing_notes: str | None = None
+        existing_observation: str | None = None
+        existing_evidence: list[str] = []
+        existing_first_seen: str | None = None
+
         if path.exists():
-            existing_notes = self._extract_user_notes(path.read_text(encoding="utf-8"))
+            content = path.read_text(encoding="utf-8")
+            existing_notes = self._extract_user_notes(content)
+            existing_observation = self._extract_section(content, "## Observation")
+            existing_evidence = self._extract_evidence(content)
+            existing_first_seen = self._extract_field(content, "First seen")
+
+        # Append new observation as an update entry, keep original
+        if existing_observation:
+            combined_observation = (
+                f"{existing_observation}\n\n"
+                f"**Update ({last_updated}):** {observation}"
+            )
+        else:
+            combined_observation = observation
+
+        # Append new evidence to existing, dedup
+        existing_set = set(existing_evidence)
+        combined_evidence = list(existing_evidence)
+        for item in evidence_log:
+            if item not in existing_set:
+                combined_evidence.append(item)
 
         return self.write_pattern(
             slug=slug,
             title=title,
             status=status,
             confidence=confidence,
-            first_seen=first_seen,
+            first_seen=existing_first_seen or first_seen,
             last_updated=last_updated,
-            observation=observation,
-            evidence_log=evidence_log,
+            observation=combined_observation,
+            evidence_log=combined_evidence,
             trend=trend,
             user_notes=existing_notes,
         )
@@ -144,3 +168,44 @@ class VaultMemory:
         if notes == _DEFAULT_NOTES:
             return None
         return notes
+
+    @staticmethod
+    def _extract_section(content: str, heading: str) -> str | None:
+        """Extract text between a heading and the next heading."""
+        marker = heading + "\n"
+        idx = content.find(marker)
+        if idx == -1:
+            return None
+        start = idx + len(marker)
+        # Find next ## heading
+        next_heading = content.find("\n## ", start)
+        if next_heading == -1:
+            return content[start:].strip()
+        return content[start:next_heading].strip()
+
+    @staticmethod
+    def _extract_evidence(content: str) -> list[str]:
+        """Extract bullet items from the Evidence Log section."""
+        marker = "## Evidence Log\n"
+        idx = content.find(marker)
+        if idx == -1:
+            return []
+        start = idx + len(marker)
+        next_heading = content.find("\n## ", start)
+        section = content[start:next_heading] if next_heading != -1 else content[start:]
+        return [
+            line.lstrip("- ").strip()
+            for line in section.strip().splitlines()
+            if line.strip().startswith("- ")
+        ]
+
+    @staticmethod
+    def _extract_field(content: str, field_name: str) -> str | None:
+        """Extract a **Field:** value from pattern frontmatter."""
+        marker = f"**{field_name}:** "
+        idx = content.find(marker)
+        if idx == -1:
+            return None
+        start = idx + len(marker)
+        end = content.find("\n", start)
+        return content[start:end].strip() if end != -1 else content[start:].strip()

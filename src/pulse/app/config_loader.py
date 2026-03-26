@@ -2,10 +2,14 @@ import os
 import tomllib
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from pulse.app.config import PulseConfig
 
 
 def load_config(config_path: Path | None = None) -> PulseConfig:
+    load_dotenv()
+
     if config_path is None:
         config_path = Path("pulse.toml")
 

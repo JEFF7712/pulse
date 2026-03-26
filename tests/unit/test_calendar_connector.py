@@ -1,27 +1,39 @@
 from datetime import UTC, datetime
 
 
+def _make_fake_service(items):
+    """Mimics: service.events().list(...).execute()"""
+    class FakeListRequest:
+        def execute(self):
+            return {"items": items}
+
+    class FakeEvents:
+        def list(self, **kwargs):
+            return FakeListRequest()
+
+    class FakeService:
+        def events(self):
+            return FakeEvents()
+
+    return FakeService()
+
+
 def test_google_calendar_connector_normalizes_events():
     from pulse.connectors.calendar import GoogleCalendarConnector
 
-    class FakeCalendarClient:
-        async def list_events(self, since=None):
-            assert since == datetime(2026, 3, 20, 0, 0, tzinfo=UTC)
-            return [
-                {
-                    "id": "abc123",
-                    "summary": "Team sync",
-                    "start": {"dateTime": "2026-03-21T09:30:00+00:00"},
-                },
-                {
-                    "id": "def456",
-                    "start": {"dateTime": "2026-03-21T11:00:00+00:00"},
-                },
-            ]
+    items = [
+        {
+            "id": "abc123",
+            "summary": "Team sync",
+            "start": {"dateTime": "2026-03-21T09:30:00+00:00"},
+        },
+        {
+            "id": "def456",
+            "start": {"dateTime": "2026-03-21T11:00:00+00:00"},
+        },
+    ]
 
-    connector = GoogleCalendarConnector(
-        client=FakeCalendarClient(),
-    )
+    connector = GoogleCalendarConnector(client=_make_fake_service(items))
 
     events = __import__("asyncio").run(
         connector.pull(datetime(2026, 3, 20, 0, 0, tzinfo=UTC))
@@ -46,18 +58,15 @@ def test_google_calendar_connector_normalizes_events():
 def test_google_calendar_connector_supports_all_day_events():
     from pulse.connectors.calendar import GoogleCalendarConnector
 
-    class FakeCalendarClient:
-        async def list_events(self, since=None):
-            assert since is None
-            return [
-                {
-                    "id": "day-1",
-                    "summary": "Offsite",
-                    "start": {"date": "2026-03-22"},
-                }
-            ]
+    items = [
+        {
+            "id": "day-1",
+            "summary": "Offsite",
+            "start": {"date": "2026-03-22"},
+        }
+    ]
 
-    connector = GoogleCalendarConnector(client=FakeCalendarClient())
+    connector = GoogleCalendarConnector(client=_make_fake_service(items))
 
     events = __import__("asyncio").run(connector.pull())
 

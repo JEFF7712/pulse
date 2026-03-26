@@ -12,17 +12,52 @@ class YouTubeConnector(Connector):
         self._client = client
 
     async def pull(self, since: datetime | None = None) -> list[Event]:
-        client = self._get_client()
+        service = self._get_client()
         events: list[Event] = []
-        activities = await client.list_activities(since=since)
-        for item in activities:
-            events.append(self._activity_to_event(item))
-        liked = await client.list_liked_videos(since=since)
-        for item in liked:
-            events.append(self._liked_to_event(item))
-        subs = await client.list_subscriptions(since=since)
-        for item in subs:
-            events.append(self._subscription_to_event(item))
+
+        # Activities (uploads, likes, etc.)
+        kwargs: dict[str, Any] = {
+            "part": "snippet,contentDetails",
+            "mine": True,
+            "maxResults": 50,
+        }
+        if since is not None:
+            kwargs["publishedAfter"] = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        try:
+            results = service.activities().list(**kwargs).execute()
+            for item in results.get("items", []):
+                events.append(self._activity_to_event(item))
+        except Exception:
+            pass  # activities endpoint can fail if channel has no content
+
+        # Liked videos
+        try:
+            liked_kwargs: dict[str, Any] = {
+                "part": "snippet,contentDetails",
+                "myRating": "like",
+                "maxResults": 50,
+            }
+            results = service.videos().list(**liked_kwargs).execute()
+            for item in results.get("items", []):
+                events.append(self._liked_to_event(item))
+        except Exception:
+            pass
+
+        # Subscriptions
+        try:
+            sub_kwargs: dict[str, Any] = {
+                "part": "snippet",
+                "mine": True,
+                "maxResults": 50,
+                "order": "relevance",
+            }
+            results = service.subscriptions().list(**sub_kwargs).execute()
+            for item in results.get("items", []):
+                events.append(self._subscription_to_event(item))
+        except Exception:
+            pass
+
         return events
 
     def get_source_name(self) -> str:
@@ -62,13 +97,12 @@ class YouTubeConnector(Connector):
 
     def _liked_to_event(self, item: dict[str, Any]) -> Event:
         snippet = item.get("snippet", {})
-        content = item.get("contentDetails", {})
         return Event(
-            id=f"youtube:like:{content.get('videoId', item['id'])}",
+            id=f"youtube:like:{item['id']}",
             timestamp=datetime.fromisoformat(snippet["publishedAt"].replace("Z", "+00:00")),
             source="youtube",
             event_type="media.youtube.like",
-            data={"title": snippet.get("title", ""), "channel": snippet.get("videoOwnerChannelTitle", ""), "video_id": content.get("videoId", "")},
+            data={"title": snippet.get("title", ""), "channel": snippet.get("channelOwnerChannelTitle", ""), "video_id": item["id"]},
         )
 
     def _subscription_to_event(self, item: dict[str, Any]) -> Event:

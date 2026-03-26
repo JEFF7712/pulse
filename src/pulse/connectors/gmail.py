@@ -12,9 +12,33 @@ class GmailConnector(Connector):
         self._client = client
 
     async def pull(self, since: datetime | None = None) -> list[Event]:
-        client = self._get_client()
-        rows = await client.list_messages(since=since)
-        return [self._to_event(row) for row in rows]
+        service = self._get_client()
+
+        query = ""
+        if since is not None:
+            # Gmail uses epoch seconds for after: filter
+            epoch = int(since.timestamp())
+            query = f"after:{epoch}"
+
+        results = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=100)
+            .execute()
+        )
+        message_ids = results.get("messages", [])
+
+        events = []
+        for msg_stub in message_ids:
+            msg = (
+                service.users()
+                .messages()
+                .get(userId="me", id=msg_stub["id"], format="metadata", metadataHeaders=["Subject", "From"])
+                .execute()
+            )
+            events.append(self._to_event(msg))
+
+        return events
 
     def get_source_name(self) -> str:
         return "gmail"

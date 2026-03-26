@@ -11,9 +11,18 @@ class EventRepository:
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
-    async def upsert_events(self, events: list[Event]) -> None:
+    async def upsert_events(self, events: list[Event]) -> int:
+        """Upsert events and return the number of genuinely new rows inserted."""
         if not events:
-            return
+            return 0
+
+        ids = [e.id for e in events]
+        placeholders = ",".join("?" for _ in ids)
+        cursor = await self._db.execute(
+            f"SELECT id FROM events WHERE id IN ({placeholders})", ids
+        )
+        existing = {row[0] for row in await cursor.fetchall()}
+        await cursor.close()
 
         await self._db.executemany(
             """
@@ -45,6 +54,7 @@ class EventRepository:
             ],
         )
         await self._db.commit()
+        return len(events) - len(existing)
 
     async def list_events_for_day(self, day: str) -> list[Event]:
         start = date.fromisoformat(day).isoformat()
