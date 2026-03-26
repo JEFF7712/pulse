@@ -9,11 +9,15 @@ def _make_fake_service(items):
 
     class FakeEvents:
         def list(self, **kwargs):
+            self.last_kwargs = kwargs
             return FakeListRequest()
 
     class FakeService:
+        def __init__(self):
+            self._events = FakeEvents()
+
         def events(self):
-            return FakeEvents()
+            return self._events
 
     return FakeService()
 
@@ -74,3 +78,51 @@ def test_google_calendar_connector_supports_all_day_events():
     assert events[0].id == "calendar:day-1"
     assert events[0].timestamp == datetime(2026, 3, 22, 0, 0, tzinfo=UTC)
     assert events[0].data["title"] == "Offsite"
+
+
+def test_google_calendar_uses_updated_min_not_time_min():
+    """Verify that pull uses updatedMin (not timeMin) to avoid cursor drift from future events."""
+    from pulse.connectors.calendar import GoogleCalendarConnector
+
+    items = [
+        {
+            "id": "future-1",
+            "summary": "Recurring 2055",
+            "start": {"dateTime": "2055-11-10T00:00:00+00:00"},
+        },
+    ]
+
+    service = _make_fake_service(items)
+    connector = GoogleCalendarConnector(client=service)
+
+    since = datetime(2026, 3, 25, 12, 0, tzinfo=UTC)
+    events = __import__("asyncio").run(connector.pull(since=since))
+
+    # Should use updatedMin, not timeMin
+    kwargs = service._events.last_kwargs
+    assert "updatedMin" in kwargs
+    assert "timeMin" not in kwargs
+    assert kwargs["orderBy"] == "updated"
+
+
+def test_get_sync_timestamp_returns_pull_time_not_event_time():
+    """The sync cursor should be the pull timestamp, not max event timestamp."""
+    from pulse.connectors.calendar import GoogleCalendarConnector
+
+    items = [
+        {
+            "id": "future-2",
+            "summary": "Far future event",
+            "start": {"dateTime": "2055-11-10T00:00:00+00:00"},
+        },
+    ]
+
+    connector = GoogleCalendarConnector(client=_make_fake_service(items))
+
+    before = datetime.now(UTC)
+    __import__("asyncio").run(connector.pull())
+    after = datetime.now(UTC)
+
+    sync_ts = connector.get_sync_timestamp()
+    # Sync timestamp should be around "now", not 2055
+    assert before <= sync_ts <= after

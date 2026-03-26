@@ -14,22 +14,32 @@ class GoogleCalendarConnector(Connector):
     async def pull(self, since: datetime | None = None) -> list[Event]:
         service = self._get_client()
 
+        # Use updatedMin for incremental sync (tracks when events were
+        # created/modified, not when they occur). This avoids the cursor
+        # jumping to far-future recurring events.
         kwargs: dict[str, Any] = {
             "calendarId": "primary",
             "maxResults": 250,
             "singleEvents": True,
-            "orderBy": "startTime",
+            "orderBy": "updated",
         }
         if since is not None:
-            kwargs["timeMin"] = since.isoformat()
+            kwargs["updatedMin"] = since.isoformat()
         else:
-            # Default: last 7 days
-            kwargs["timeMin"] = (datetime.now(UTC) - timedelta(days=7)).isoformat()
+            # Default: events updated in the last 30 days
+            kwargs["updatedMin"] = (datetime.now(UTC) - timedelta(days=30)).isoformat()
 
         results = service.events().list(**kwargs).execute()
         items = results.get("items", [])
 
-        return [self._to_event(item) for item in items]
+        events = [self._to_event(item) for item in items]
+        # Store the pull timestamp as the cursor (not max event start time)
+        self._last_pull_time = datetime.now(UTC)
+        return events
+
+    def get_sync_timestamp(self) -> datetime:
+        """Return the time of the last pull, for use as the sync cursor."""
+        return getattr(self, "_last_pull_time", datetime.now(UTC))
 
     def get_source_name(self) -> str:
         return "calendar"

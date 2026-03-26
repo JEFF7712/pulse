@@ -46,6 +46,10 @@ def main() -> None:
     logs_parser = subparsers.add_parser("logs", help="Show recent events from the database")
     logs_parser.add_argument("--source", default=None, help="Filter by source")
     logs_parser.add_argument("-n", type=int, default=20, help="Number of events (default: 20)")
+    logs_parser.add_argument("--all", action="store_true", help="Include future events (excluded by default)")
+
+    cleanup_parser = subparsers.add_parser("cleanup", help="Remove events with timestamps in the future")
+    cleanup_parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted without deleting")
 
     auth_parser = subparsers.add_parser("auth", help="Manage authentication")
     auth_subparsers = auth_parser.add_subparsers(dest="provider")
@@ -74,6 +78,8 @@ def main() -> None:
         _logs(args)
     elif args.command == "reset":
         _reset(args)
+    elif args.command == "cleanup":
+        _cleanup(args)
     elif args.command == "test-telegram":
         _test_telegram()
     elif args.command == "auth" and args.provider == "google":
@@ -208,8 +214,11 @@ def _pull(args) -> None:
                     events = await connector.pull(since=since)
                     if events:
                         new_count = await event_repo.upsert_events(events)
-                        latest = max(e.timestamp for e in events)
-                        await sync_state.save(source, latest.isoformat())
+                        if hasattr(connector, "get_sync_timestamp"):
+                            ts = connector.get_sync_timestamp()
+                        else:
+                            ts = max(e.timestamp for e in events)
+                        await sync_state.save(source, ts.isoformat())
                         print(f"{new_count} new, {len(events) - new_count} updated")
                     else:
                         print("0 events")
@@ -467,8 +476,11 @@ def _init() -> None:
                         events = await connector.pull(since=None)
                         if events:
                             new_count = await event_repo.upsert_events(events)
-                            latest = max(e.timestamp for e in events)
-                            await sync_state.save(source, latest.isoformat())
+                            if hasattr(connector, "get_sync_timestamp"):
+                                ts = connector.get_sync_timestamp()
+                            else:
+                                ts = max(e.timestamp for e in events)
+                            await sync_state.save(source, ts.isoformat())
                             total_new += new_count
                             print(f"{new_count} new events")
                         else:
@@ -674,6 +686,7 @@ def _insights() -> None:
 
 def _logs(args) -> None:
     import json as json_mod
+    from datetime import UTC, datetime
     from pulse.store.db import connect_db
     from pulse.store.schema import bootstrap_schema
 
@@ -688,11 +701,20 @@ def _logs(args) -> None:
             await bootstrap_schema(db)
 
             query = "SELECT timestamp, source, event_type, data FROM events"
+            conditions: list[str] = []
             params: list = []
 
             if args.source:
-                query += " WHERE source = ?"
+                conditions.append("source = ?")
                 params.append(args.source)
+
+            if not args.all:
+                now_iso = datetime.now(UTC).isoformat()
+                conditions.append("timestamp <= ?")
+                params.append(now_iso)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
             query += " ORDER BY timestamp DESC LIMIT ?"
             params.append(args.n)
@@ -757,6 +779,58 @@ def _reset(args) -> None:
             print(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
 
     asyncio.run(_do_reset())
+
+
+def _cleanup(args) -> None:
+    from datetime import UTC, datetime
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    config = load_config()
+
+    if not Path(config.database_path).exists():
+        print("No database found.")
+        sys.exit(1)
+
+    async def _do_cleanup():
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+
+            now_iso = datetime.now(UTC).isoformat()
+
+            cur = await db.execute(
+                "SELECT source, event_type, COUNT(*) FROM events "
+                "WHERE timestamp > ? "
+                "GROUP BY source, event_type ORDER BY COUNT(*) DESC",
+                (now_iso,),
+            )
+            rows = await cur.fetchall()
+
+            if not rows:
+                print("No future-dated events found.")
+                return
+
+            total = sum(r[2] for r in rows)
+            print(f"Found {total} events with timestamps in the future:")
+            for source, etype, count in rows:
+                print(f"  {source:10} {etype:28} {count:>6}")
+
+            if args.dry_run:
+                print("\nDry run — no changes made.")
+                return
+
+            confirm = input(f"\nDelete {total} future events? [y/N] ").strip().lower()
+            if confirm not in ("y", "yes"):
+                print("Cancelled.")
+                return
+
+            await db.execute(
+                "DELETE FROM events WHERE timestamp > ?", (now_iso,)
+            )
+            await db.commit()
+            print(f"Deleted {total} future-dated events.")
+
+    asyncio.run(_do_cleanup())
 
 
 def _test_telegram() -> None:

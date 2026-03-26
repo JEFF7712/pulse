@@ -121,8 +121,13 @@ def _make_pull_job(connector, config):
             events = await connector.pull(since=since)
             if events:
                 await event_repo.upsert_events(events)
-                latest = max(e.timestamp for e in events)
-                await sync_state.save(source, latest.isoformat())
+                # Prefer connector-provided sync timestamp (e.g. calendar
+                # uses pull time to avoid future-event cursor drift).
+                if hasattr(connector, "get_sync_timestamp"):
+                    ts = connector.get_sync_timestamp()
+                else:
+                    ts = max(e.timestamp for e in events)
+                await sync_state.save(source, ts.isoformat())
 
     return job
 
