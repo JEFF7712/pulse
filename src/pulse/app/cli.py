@@ -41,7 +41,7 @@ def main() -> None:
     subparsers.add_parser("test-telegram", help="Send a test message via Telegram")
 
     reset_parser = subparsers.add_parser("reset", help="Clear sync cursor to re-pull from scratch")
-    reset_parser.add_argument("source", help="Connector source name (e.g., gmail, browser)")
+    reset_parser.add_argument("source", nargs="?", default=None, help="Connector source name (e.g., gmail, browser), or omit for all")
 
     logs_parser = subparsers.add_parser("logs", help="Show recent events from the database")
     logs_parser.add_argument("--source", default=None, help="Filter by source")
@@ -759,24 +759,45 @@ def _reset(args) -> None:
         async with connect_db(config.database_path) as db:
             await bootstrap_schema(db)
             sync_state = SyncStateRepository(db)
-            cursor = await sync_state.load(source)
 
-            if not cursor:
-                print(f"No sync cursor found for '{source}'.")
-                return
+            if source is None:
+                # Reset all cursors
+                cur = await db.execute("SELECT source, cursor FROM connector_sync_state ORDER BY source")
+                rows = await cur.fetchall()
+                if not rows:
+                    print("No sync cursors found.")
+                    return
 
-            print(f"Current cursor for '{source}': {cursor}")
-            confirm = input(f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] ").strip().lower()
-            if confirm not in ("y", "yes"):
-                print("Cancelled.")
-                return
+                print("Current cursors:")
+                for s, c in rows:
+                    print(f"  {s:10} {c}")
 
-            await db.execute(
-                "DELETE FROM connector_sync_state WHERE source = ?",
-                (source,),
-            )
-            await db.commit()
-            print(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
+                confirm = input("\nReset ALL sync cursors? This will re-pull all data. [y/N] ").strip().lower()
+                if confirm not in ("y", "yes"):
+                    print("Cancelled.")
+                    return
+
+                await db.execute("DELETE FROM connector_sync_state")
+                await db.commit()
+                print(f"All {len(rows)} cursors cleared.")
+            else:
+                cursor = await sync_state.load(source)
+                if not cursor:
+                    print(f"No sync cursor found for '{source}'.")
+                    return
+
+                print(f"Current cursor for '{source}': {cursor}")
+                confirm = input(f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] ").strip().lower()
+                if confirm not in ("y", "yes"):
+                    print("Cancelled.")
+                    return
+
+                await db.execute(
+                    "DELETE FROM connector_sync_state WHERE source = ?",
+                    (source,),
+                )
+                await db.commit()
+                print(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
 
     asyncio.run(_do_reset())
 
