@@ -459,6 +459,7 @@ def _configure(*, offer_oauth: bool = True) -> None:
         ("youtube", "1h", "YouTube"),
         ("spotify", "30m", "Spotify"),
         ("browser", "15m", "Browser history"),
+        ("feeds", "1h", "RSS/Atom feeds (URLs in pulse.toml)"),
     ]
 
     enabled_connectors: list[str] = []
@@ -510,6 +511,27 @@ def _configure(*, offer_oauth: bool = True) -> None:
                 choice = input(f"    Browser type [{browser_type}]: ").strip()
                 browser_type = choice if choice else browser_type
             toml_lines.append(f'browser = "{browser_type}"')
+
+        if name == "feeds":
+            prev_urls: list = list(existing.get("urls", [])) if existing else []
+            if isinstance(prev_urls, str):
+                prev_urls = [prev_urls] if prev_urls else []
+            if enabled:
+                if prev_urls:
+                    preview = ", ".join(prev_urls[:2]) + ("…" if len(prev_urls) > 2 else "")
+                    keep = input(f"    Keep feed URLs ({preview})? [Y/n] ").strip().lower()
+                    if keep in ("n", "no"):
+                        prev_urls = []
+                if not prev_urls:
+                    line = input(
+                        "    Feed URLs (comma-separated RSS/Atom URLs; leave empty to add later): "
+                    ).strip()
+                    prev_urls = [u.strip() for u in line.split(",") if u.strip()]
+            escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_urls]
+            if escaped:
+                toml_lines.append("urls = [" + ", ".join(f'"{u}"' for u in escaped) + "]")
+            else:
+                toml_lines.append("urls = []")
 
         toml_lines.append("")
         if enabled:

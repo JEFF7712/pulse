@@ -58,9 +58,14 @@ supplementary_interval = "6h"
 enabled = true
 poll_interval = "15m"
 browser = "chrome"  # or "firefox"
+
+[connectors.feeds]
+enabled = false
+poll_interval = "1h"
+urls = []
 ```
 
-Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
+Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. For RSS/Atom feeds, set `[connectors.feeds] enabled = true` and list URLs in `urls` (see [Connectors Index](../connectors/index.md)). `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
 
 Each connector entry is parsed into a `ConnectorConfig` model with:
 
@@ -68,7 +73,7 @@ Each connector entry is parsed into a `ConnectorConfig` model with:
 - `poll_interval` defaulting to `15m`
 - extra connector-specific keys preserved as-is
 
-That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
+That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, `urls` for feeds, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
 
 ## Secret and token files
 

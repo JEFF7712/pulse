@@ -28,11 +28,14 @@ CONNECTOR_REQUIRED_SNIPPETS = [
     "Google",
     "Spotify",
     "browser history",
+    "RSS",
     "pulse auth google",
     "pulse auth spotify",
     "db_path",
     "[connectors.browser]",
     'db_path = "/path/to/browser-history.sqlite"',
+    "[connectors.feeds]",
+    "urls",
 ]
 
 QUICKSTART_OPTIONAL_AUTH_SNIPPETS = [

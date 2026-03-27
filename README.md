@@ -33,12 +33,17 @@ Data Sources (Gmail, Calendar, ...)
 
 ## Setup
 
+**With [uv](https://docs.astral.sh/uv/) (recommended)**
+
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
-pip install pytest uvicorn  # for dev
+uv sync
 ```
+
+Include dev tools (pytest): `uv sync --group dev`.
+
+**With Nix** — from the repo root, `nix develop` drops you into a shell with Python, uv, and a `.venv` kept in sync via `uv sync --group dev`.
+
+**Classic venv** — `python3 -m venv .venv`, activate, then `pip install -e .` (and `pip install pytest` if you run tests). The [self-hosting quickstart](docs/self-hosting/quickstart.md) still documents a pip-oriented path for operators who prefer it.
 
 Copy `.env.example` and set any values you need:
 
@@ -86,7 +91,7 @@ Continuous integration (`.github/workflows/ci.yml`) runs `uv sync --group dev --
 ## Start the standalone server
 
 ```bash
-uvicorn --app-dir src pulse.app.main:create_app --factory
+uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 ```
 
 ## Use as an MCP server
@@ -99,8 +104,8 @@ This example uses the MCP server's own env surface, which differs slightly from 
 {
   "mcpServers": {
     "pulse": {
-      "command": "python",
-      "args": ["-m", "pulse.mcp.server"],
+      "command": "uv",
+      "args": ["run", "python", "-m", "pulse.mcp.server"],
       "env": {
         "PULSE_DB_PATH": "/absolute/path/to/pulse.db",
         "PULSE_VAULT_PATH": "/absolute/path/to/Pulse-Vault"
@@ -109,6 +114,8 @@ This example uses the MCP server's own env surface, which differs slightly from 
   }
 }
 ```
+
+If `pulse-mcp` is on your `PATH` (after `uv sync`), you can use `"command": "pulse-mcp"` with empty `args` instead.
 
 ### Available tools
 
@@ -134,7 +141,7 @@ This example uses the MCP server's own env surface, which differs slightly from 
 src/pulse/
 ├── app/            # FastAPI server, config, dependencies
 ├── analysis/       # Summarizer, morning briefing builder
-├── connectors/     # Data source integrations (Gmail, Calendar)
+├── connectors/     # Gmail, Calendar, YouTube, Spotify, browser, RSS/Atom feeds, …
 ├── domain/         # Core types and protocols
 ├── jobs/           # Scheduled tasks (daily digest, morning briefing)
 ├── mcp/            # MCP server for agent integration

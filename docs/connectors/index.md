@@ -1,6 +1,6 @@
 # Connectors Index
 
-Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Spotify, and local browser history. There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure` (the example enables Google sources and browser history but leaves Spotify disabled until you turn it on). This page gives the setup path for each connector.
+Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Spotify, local browser history, and RSS/Atom feeds (no API keys). There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure` (the example enables Google sources and browser history but leaves Spotify and feeds disabled until you turn them on). This page gives the setup path for each connector.
 
 If you want the overall operator flow first, start from [Pulse Docs](../index.md).
 
@@ -83,6 +83,32 @@ db_path = "/path/to/browser-history.sqlite"
 ### Caveat
 
 The browser history connector returns no events when it cannot find or read the local history SQLite database.
+
+## RSS and Atom feeds
+
+The feeds connector polls HTTP URLs that return RSS 2.0 or Atom XML. No OAuth or API keys are required.
+
+### Prerequisites
+
+- set `[connectors.feeds] enabled = true` in `pulse.toml`
+- add at least one URL to the `urls` array (comma-separated strings in TOML)
+
+```toml
+[connectors.feeds]
+enabled = true
+poll_interval = "1h"
+urls = ["https://example.com/news.xml"]
+```
+
+You can list multiple feeds; Pulse merges items from all of them. `pulse configure` can prompt for URLs when you enable this connector.
+
+### What Pulse pulls
+
+- each feed entry as a `feed.item` event with title, link, feed URL, and feed title
+
+### Caveat
+
+Sites that block non-browser user agents or require authentication may return errors; failed fetches are logged and other feeds still run. Entries without a parseable publication date are skipped.
 
 ## Setup order
 

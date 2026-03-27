@@ -23,3 +23,10 @@ supplementary_interval = "6h"
 enabled = true
 poll_interval = "15m"
 browser = "chrome"  # or "firefox"
+
+[connectors.feeds]
+enabled = false
+poll_interval = "1h"
+# List RSS or Atom feed URLs (no API keys). Example:
+# urls = ["https://hnrss.org/newest"]
+urls = []

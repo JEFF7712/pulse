@@ -1,8 +1,19 @@
 from pathlib import Path
 
-from pulse.app.config import PulseConfig
+from pulse.app.config import ConnectorConfig, PulseConfig
 from pulse.connectors.google_auth import GoogleAuthManager
 from pulse.connectors.registry import ConnectorRegistry
+
+
+def _urls_from_connector_config(cc: ConnectorConfig | None) -> list[str]:
+    if cc is None:
+        return []
+    raw = cc.model_dump(mode="python").get("urls")
+    if isinstance(raw, str) and raw.strip():
+        return [raw.strip()]
+    if isinstance(raw, list):
+        return [str(u).strip() for u in raw if u and str(u).strip()]
+    return []
 
 
 def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
@@ -12,6 +23,7 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
     from pulse.connectors.spotify import SpotifyConnector
     from pulse.connectors.spotify_auth import SpotifyAuthManager
     from pulse.connectors.browser import BrowserHistoryConnector
+    from pulse.connectors.feeds import FeedConnector
 
     # Build shared Google auth manager if credentials are configured
     auth_manager: GoogleAuthManager | None = None
@@ -45,3 +57,10 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
     registry.register_pull("browser", lambda: BrowserHistoryConnector(
         browser=browser_type, db_path=db_path,
     ))
+
+    feeds_cfg = config.connectors.get("feeds")
+    feed_urls = _urls_from_connector_config(feeds_cfg)
+    registry.register_pull(
+        "feeds",
+        lambda u=feed_urls: FeedConnector(urls=u),
+    )
