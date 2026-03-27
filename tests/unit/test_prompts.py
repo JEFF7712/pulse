@@ -159,3 +159,19 @@ def test_parse_discovery_response_handles_empty_lists():
     assert response.updated_patterns == []
     assert response.notifications == []
     assert response.baseline_updates is None
+
+
+def test_discovery_prompt_includes_rejection_criteria():
+    result = build_discovery_prompt(
+        cadence="weekly",
+        date_range="2026-03-20 to 2026-03-26",
+        event_summary="some events",
+        active_patterns="",
+        baselines="",
+        user_profile="",
+    )
+
+    system = result["system_prompt"]
+    assert "do not report" in system.lower() or "do not" in system.lower()
+    assert "cross-source" in system.lower()
+    assert "baseline" in system.lower()
