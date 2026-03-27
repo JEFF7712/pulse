@@ -1,14 +1,21 @@
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from pulse.app.config import PulseConfig
-from pulse.app.config_loader import load_config
 from pulse.app.dependencies import get_settings
-from pulse.app.homepage import render_homepage
+from pulse.app.home_actions import (
+    ActionResult,
+    run_digest_action,
+    run_discovery_action,
+    run_pull_action,
+    run_test_telegram_action,
+)
+from pulse.app.homepage import HomepageNotice, HomepageStatus, render_homepage
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import extract_reply_context
+from pulse.jobs.scheduler import build_scheduler
 from pulse.services.corrections import CorrectionService
 from pulse.store.corrections import CorrectionRepository
 from pulse.store.db import connect_db
@@ -17,6 +24,23 @@ from pulse.store.schema import bootstrap_schema
 
 # Backward compat alias
 Settings = PulseConfig
+
+_NOTICE_MESSAGES = {
+    "pull-skipped": "pull skipped",
+    "pull-complete": "pull complete",
+    "digest-complete": "digest complete",
+    "discovery-complete": "discovery complete",
+    "telegram-test-sent": "telegram test sent",
+}
+
+_ERROR_MESSAGES = {
+    "pull-failed": "pull failed",
+    "digest-failed": "digest failed",
+    "discovery-not-configured": "discovery not configured",
+    "discovery-failed": "discovery failed",
+    "telegram-not-configured": "telegram not configured",
+    "telegram-test-failed": "telegram test failed",
+}
 
 
 def _extract_context_id(reply_to_message: dict[str, Any]) -> str | None:
@@ -43,8 +67,42 @@ def create_app(
         settings_dependency = get_static_settings
 
     @app.get("/", response_class=HTMLResponse)
-    def home() -> str:
-        return render_homepage()
+    def home(
+        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
+        notice: str | None = None,
+        error: str | None = None,
+    ) -> str:
+        homepage_status = _build_homepage_status(current_settings, registry)
+        homepage_notice = _build_homepage_notice(notice=notice, error=error)
+        return render_homepage(homepage_status, notice=homepage_notice)
+
+    @app.post("/actions/pull")
+    async def run_pull(
+        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
+    ) -> RedirectResponse:
+        result = await run_pull_action(current_settings, registry)
+        return _redirect_home(result)
+
+    @app.post("/actions/digest")
+    async def run_digest(
+        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
+    ) -> RedirectResponse:
+        result = await run_digest_action(current_settings)
+        return _redirect_home(result)
+
+    @app.post("/actions/discover")
+    async def run_discover(
+        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
+    ) -> RedirectResponse:
+        result = await run_discovery_action(current_settings)
+        return _redirect_home(result)
+
+    @app.post("/actions/test-telegram")
+    def test_telegram(
+        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
+    ) -> RedirectResponse:
+        result = run_test_telegram_action(current_settings)
+        return _redirect_home(result)
 
     @app.get("/health")
     def health(
@@ -111,3 +169,33 @@ def _register_push_route(
         return {"status": "ok", "events_received": len(events)}
 
     app.add_api_route(path, handler, methods=["POST"])
+
+
+def _build_homepage_status(
+    settings: PulseConfig,
+    registry: ConnectorRegistry | None,
+) -> HomepageStatus:
+    scheduler = build_scheduler(registry=registry, config=settings)
+
+    return HomepageStatus(
+        database_path=settings.database_path,
+        vault_path=settings.vault_path,
+        timezone=settings.timezone,
+        scheduler_job_count=len(scheduler.get_jobs()),
+        pull_connectors=len(registry.get_pull_connectors()) if registry else 0,
+        push_connectors=len(registry.get_push_connectors()) if registry else 0,
+    )
+
+
+def _redirect_home(result: ActionResult) -> RedirectResponse:
+    return RedirectResponse(url=f"/?{result.query_key}={result.token}", status_code=303)
+
+
+def _build_homepage_notice(*, notice: str | None, error: str | None):
+    if error is not None and error in _ERROR_MESSAGES:
+        return HomepageNotice(tone="error", message=_ERROR_MESSAGES[error])
+
+    if notice is not None and notice in _NOTICE_MESSAGES:
+        return HomepageNotice(tone="success", message=_NOTICE_MESSAGES[notice])
+
+    return None
