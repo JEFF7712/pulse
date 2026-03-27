@@ -24,6 +24,17 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | Keep in `.env`, never in `pulse.toml`. |
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
 | `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | Keep in `.env`, never in `pulse.toml`. |
+| `microsoft_client_id` | `PULSE_MICROSOFT_CLIENT_ID` | unset | Microsoft Graph OAuth (mail/calendar). |
+| `microsoft_client_secret` | `PULSE_MICROSOFT_CLIENT_SECRET` | unset | Keep in `.env`. |
+| `microsoft_tenant_id` | `PULSE_MICROSOFT_TENANT_ID` | unset | Tenant id or `common` when unset. |
+| `github_client_id` | `PULSE_GITHUB_CLIENT_ID` | unset | GitHub OAuth. |
+| `github_client_secret` | `PULSE_GITHUB_CLIENT_SECRET` | unset | Keep in `.env`. |
+| `gitlab_client_id` | `PULSE_GITLAB_CLIENT_ID` | unset | GitLab OAuth (optional if using PAT). |
+| `gitlab_client_secret` | `PULSE_GITLAB_CLIENT_SECRET` | unset | Keep in `.env`. |
+| `gitlab_token` | `PULSE_GITLAB_TOKEN` | unset | PAT; when set, OAuth is not used. |
+| `plaid_client_id` | `PULSE_PLAID_CLIENT_ID` | unset | Plaid Link + transactions. |
+| `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Keep in `.env`. |
+| `plaid_env` | `PULSE_PLAID_ENV` | unset | `sandbox`, `development`, or `production`. |
 | `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Optional; discovery jobs skip themselves when this is missing. |
 | `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model id for daily digests, profile structuring, and parts of discovery when an LLM is used. |
 | `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Anthropic model id for the main discovery pass. |
@@ -54,6 +65,29 @@ enabled = false
 poll_interval = "30m"
 supplementary_interval = "6h"
 
+[connectors.microsoft_mail]
+enabled = false
+poll_interval = "15m"
+
+[connectors.microsoft_calendar]
+enabled = false
+poll_interval = "30m"
+calendar_id = "primary"
+
+[connectors.github]
+enabled = false
+poll_interval = "30m"
+
+[connectors.gitlab]
+enabled = false
+poll_interval = "30m"
+gitlab_base_url = "https://gitlab.com"
+
+[connectors.plaid]
+enabled = false
+poll_interval = "6h"
+omit_amounts_in_digest = false
+
 [connectors.browser]
 enabled = true
 poll_interval = "15m"
@@ -65,7 +99,7 @@ poll_interval = "1h"
 urls = []
 ```
 
-Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. For RSS/Atom feeds, set `[connectors.feeds] enabled = true` and list URLs in `urls` (see [Connectors Index](../connectors/index.md)). `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
+The full checked-in template is [`pulse.toml.example`](../../pulse.toml.example). Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. For RSS/Atom feeds, set `[connectors.feeds] enabled = true` and list URLs in `urls` (see [Connectors Index](../connectors/index.md)). `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
 
 Each connector entry is parsed into a `ConnectorConfig` model with:
 
@@ -73,17 +107,16 @@ Each connector entry is parsed into a `ConnectorConfig` model with:
 - `poll_interval` defaulting to `15m`
 - extra connector-specific keys preserved as-is
 
-That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, `urls` for feeds, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
+That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, `urls` for feeds, `calendar_id` / `gitlab_base_url` / `omit_amounts_in_digest`, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
 
 ## Secret and token files
 
 The runtime keeps secrets and refresh tokens in different places:
 
-- client credentials stay in `.env` as `PULSE_GOOGLE_CLIENT_ID`, `PULSE_GOOGLE_CLIENT_SECRET`, `PULSE_SPOTIFY_CLIENT_ID`, `PULSE_SPOTIFY_CLIENT_SECRET`, and `PULSE_ANTHROPIC_API_KEY`
-- Google OAuth tokens are persisted beside the database as `google_tokens.json`
-- Spotify OAuth tokens are persisted beside the database as `spotify_tokens.json`
+- client credentials stay in `.env` (Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, Telegram) — never commit `.env`
+- OAuth-style token files beside the database: `google_tokens.json`, `spotify_tokens.json`, `microsoft_tokens.json`, `github_tokens.json`, `gitlab_tokens.json`, `plaid_tokens.json` (Plaid stores `access_token` and transaction sync cursor; treat like other secrets)
 
-Because the token paths are derived from `Path(config.database_path).parent`, changing `PULSE_DATABASE_PATH` also changes where `google_tokens.json` and `spotify_tokens.json` are written.
+Because the token paths are derived from `Path(config.database_path).parent`, changing `PULSE_DATABASE_PATH` also changes where those `*.json` token files are written.
 
 ## MCP server vs standalone app
 
@@ -114,6 +147,17 @@ PULSE_GOOGLE_CLIENT_ID=
 PULSE_GOOGLE_CLIENT_SECRET=
 PULSE_SPOTIFY_CLIENT_ID=
 PULSE_SPOTIFY_CLIENT_SECRET=
+PULSE_MICROSOFT_CLIENT_ID=
+PULSE_MICROSOFT_CLIENT_SECRET=
+PULSE_MICROSOFT_TENANT_ID=
+PULSE_GITHUB_CLIENT_ID=
+PULSE_GITHUB_CLIENT_SECRET=
+PULSE_GITLAB_CLIENT_ID=
+PULSE_GITLAB_CLIENT_SECRET=
+PULSE_GITLAB_TOKEN=
+PULSE_PLAID_CLIENT_ID=
+PULSE_PLAID_SECRET=
+PULSE_PLAID_ENV=
 PULSE_ANTHROPIC_API_KEY=
 # Optional overrides:
 # PULSE_SUMMARIZATION_MODEL=claude-haiku-4-5-20251001

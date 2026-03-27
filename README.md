@@ -62,6 +62,13 @@ cp .env.example .env
 | `PULSE_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | _(optional)_ |
 | `PULSE_SPOTIFY_CLIENT_ID` | Spotify OAuth client ID for the Spotify connector | _(optional)_ |
 | `PULSE_SPOTIFY_CLIENT_SECRET` | Spotify OAuth client secret | _(optional)_ |
+| `PULSE_MICROSOFT_CLIENT_ID` / `PULSE_MICROSOFT_CLIENT_SECRET` | Microsoft Graph (Outlook mail / calendar) OAuth | _(optional)_ |
+| `PULSE_MICROSOFT_TENANT_ID` | Azure AD tenant (`common` if omitted) | _(optional)_ |
+| `PULSE_GITHUB_CLIENT_ID` / `PULSE_GITHUB_CLIENT_SECRET` | GitHub OAuth for the GitHub connector | _(optional)_ |
+| `PULSE_GITLAB_CLIENT_ID` / `PULSE_GITLAB_CLIENT_SECRET` | GitLab OAuth (or set `PULSE_GITLAB_TOKEN` for a PAT) | _(optional)_ |
+| `PULSE_GITLAB_TOKEN` | GitLab personal access token (skips OAuth when set) | _(optional)_ |
+| `PULSE_PLAID_CLIENT_ID` / `PULSE_PLAID_SECRET` | Plaid API credentials for bank transactions | _(optional)_ |
+| `PULSE_PLAID_ENV` | `sandbox`, `development`, or `production` | _(optional)_ |
 | `PULSE_ANTHROPIC_API_KEY` | Enables discovery jobs instead of skipping them | _(optional)_ |
 
 Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`. The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
@@ -141,7 +148,7 @@ If `pulse-mcp` is on your `PATH` (after `uv sync`), you can use `"command": "pul
 src/pulse/
 ├── app/            # FastAPI server, config, dependencies
 ├── analysis/       # Summarizer, morning briefing builder
-├── connectors/     # Gmail, Calendar, YouTube, Spotify, browser, RSS/Atom feeds, …
+├── connectors/     # Gmail, Calendar, YouTube, Spotify, M365, GitHub, GitLab, Plaid, browser, feeds, …
 ├── domain/         # Core types and protocols
 ├── jobs/           # Scheduled tasks (daily digest, morning briefing)
 ├── mcp/            # MCP server for agent integration

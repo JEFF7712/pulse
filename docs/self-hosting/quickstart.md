@@ -19,7 +19,7 @@ or, if you use [uv](https://github.com/astral-sh/uv):
 uv sync
 ```
 
-- If you plan to use Google or Spotify, create those OAuth apps first so you have client credentials ready for `.env`.
+- If you plan to use Google, Spotify, Microsoft 365, GitHub, or GitLab, create those OAuth apps first so you have client credentials ready for `.env`. For Plaid, create a Plaid developer application.
 
 ## One-command onboard (optional)
 
@@ -29,11 +29,11 @@ You can run the same path as steps 1–4 in one command:
 pulse onboard
 ```
 
-Before `pulse configure`, the CLI prints a short checklist (working directory, install, OAuth prep, Spotify callback on `localhost:8888`). After `pulse init`, it reminds you to open the app and use `pulse status` / `pulse insights` in another terminal.
+Before `pulse configure`, the CLI prints a short checklist (working directory, install, OAuth prep, Spotify callback on `localhost:8888`, and other localhost ports for Microsoft, GitHub, GitLab, and Plaid). After `pulse init`, it reminds you to open the app and use `pulse status` / `pulse insights` in another terminal.
 
-By default, `pulse onboard` runs `pulse auth google` only when Google client credentials are in `.env` and at least one of Gmail, Calendar, or YouTube is enabled. It runs `pulse auth spotify` only when Spotify credentials are set and the Spotify connector is enabled in `pulse.toml` — the same idea as skipping auth for services you did not enable.
+By default, `pulse onboard` runs each `pulse auth …` flow only when that service’s credentials are in `.env` and the matching connector is enabled in `pulse.toml` (GitLab skips OAuth when `PULSE_GITLAB_TOKEN` is set; Plaid Link runs only when `plaid_tokens.json` does not exist yet).
 
-To always run both auth flows (and exit with an error if a flow cannot run), use:
+To always run **all** configured auth and link steps (and exit with an error if a required step fails), use:
 
 ```bash
 pulse onboard --strict
@@ -59,7 +59,7 @@ pulse configure
 `pulse configure` is the real entry point for self-hosting. It walks through:
 
 - core settings such as `PULSE_DATABASE_PATH`, `PULSE_VAULT_PATH`, and `PULSE_TIMEZONE`
-- service credentials for Google, Spotify, Anthropic, and Telegram
+- service credentials for Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, and Telegram
 - connector settings in `pulse.toml`
 
 There is no committed `pulse.toml` in the repo (it is gitignored). Copy `pulse.toml.example` to `pulse.toml` or run `pulse configure`, which writes `pulse.toml` from your answers. The example enables Gmail, Calendar, YouTube, and browser history; Spotify is disabled there so you opt in explicitly. Typical intervals when everything is enabled:
@@ -87,6 +87,38 @@ pulse auth spotify
 ```
 
 Spotify opens a browser-based OAuth flow and saves tokens beside your Pulse database.
+
+If you enabled **Microsoft 365** (`microsoft_mail` / `microsoft_calendar`), run:
+
+```bash
+pulse auth microsoft
+```
+
+(Register `http://localhost:8890/callback` on your Azure app.)
+
+If you enabled **GitHub**, run:
+
+```bash
+pulse auth github
+```
+
+(Register `http://localhost:8891/callback` on the GitHub OAuth app.)
+
+If you enabled **GitLab** without a PAT, run:
+
+```bash
+pulse auth gitlab
+```
+
+(Register `http://localhost:8892/callback` on your GitLab OAuth app, matching `gitlab_base_url`.)
+
+If you enabled **Plaid**, run:
+
+```bash
+pulse auth plaid
+```
+
+This opens Plaid Link on `http://localhost:8893/` and writes `plaid_tokens.json` beside your database.
 
 ## 3. Initialize your profile and first data pull
 
@@ -151,13 +183,15 @@ For a normal first-time setup, the happy path is:
 pulse configure
 pulse auth google
 pulse auth spotify
+pulse auth microsoft
+pulse auth github
+pulse auth gitlab
+pulse auth plaid
 pulse init
 pulse run
 ```
 
-If you enabled Google-backed connectors, run `pulse auth google` before `pulse init`.
-
-If you enabled Spotify, run `pulse auth spotify` before `pulse init`.
+Run only the `pulse auth …` lines for services you enabled. Complete them before `pulse init` so the first pull can reach those APIs.
 
 Skip the auth commands for services you did not enable.
 

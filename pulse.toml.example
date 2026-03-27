@@ -19,6 +19,29 @@ enabled = false
 poll_interval = "30m"
 supplementary_interval = "6h"
 
+[connectors.microsoft_mail]
+enabled = false
+poll_interval = "15m"
+
+[connectors.microsoft_calendar]
+enabled = false
+poll_interval = "30m"
+calendar_id = "primary"
+
+[connectors.github]
+enabled = false
+poll_interval = "30m"
+
+[connectors.gitlab]
+enabled = false
+poll_interval = "30m"
+gitlab_base_url = "https://gitlab.com"
+
+[connectors.plaid]
+enabled = false
+poll_interval = "6h"
+omit_amounts_in_digest = false
+
 [connectors.browser]
 enabled = true
 poll_interval = "15m"

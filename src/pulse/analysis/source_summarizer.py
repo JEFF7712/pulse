@@ -23,6 +23,10 @@ class SourceSummarizer:
             tasks.append(("calendar", self._summarize_calendar(day)))
         if day.media_sessions:
             tasks.append(("media", self._summarize_media(day)))
+        if day.dev_activities:
+            tasks.append(("dev", self._summarize_dev(day)))
+        if day.finance_summary is not None:
+            tasks.append(("finance", self._summarize_finance(day)))
 
         if not tasks:
             return {}
@@ -103,5 +107,38 @@ class SourceSummarizer:
             "Summarize this person's media consumption into 1-2 paragraphs. "
             "Note what they listened to or watched and any themes.\n\n"
             + "\n".join(lines)
+        )
+        return await self._llm.complete(prompt, model=self._model)
+
+    async def _summarize_dev(self, day: PreprocessedDay) -> str:
+        lines = []
+        for act in day.dev_activities[:20]:
+            lines.append(f"- [{act.provider}] {act.title}")
+        prompt = (
+            "Summarize this person's development activity (GitHub/GitLab) in 1-2 paragraphs. "
+            "Focus on what they shipped, reviewed, or discussed.\n\n"
+            + "\n".join(lines)
+        )
+        return await self._llm.complete(prompt, model=self._model)
+
+    async def _summarize_finance(self, day: PreprocessedDay) -> str:
+        fs = day.finance_summary
+        if fs is None:
+            return ""
+        if fs.omit_amounts:
+            body = (
+                f"{fs.transaction_count} transactions; top merchants by count: "
+                + ", ".join(f"{n} ({c})" for n, c in fs.merchant_counts[:6])
+            )
+        else:
+            body = (
+                f"Total outflow ${fs.total_outflow:,.2f} over {fs.transaction_count} transactions. "
+                "Top merchants by spend: "
+                + ", ".join(f"{n} (${s:,.2f})" for n, s in fs.merchant_spend[:6])
+            )
+        prompt = (
+            "Summarize this person's spending day in 1-2 short paragraphs. "
+            "Do not moralize; stay factual.\n\n"
+            f"{body}"
         )
         return await self._llm.complete(prompt, model=self._model)

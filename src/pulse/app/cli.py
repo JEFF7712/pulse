@@ -17,6 +17,18 @@ from pulse.app.config_loader import load_config
 from pulse.connectors.google_auth import GoogleAuthManager, SCOPES_BY_CONNECTOR
 from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 from pulse.connectors.spotify_auth import SpotifyAuthManager, SPOTIFY_SCOPES, REDIRECT_URI
+from pulse.connectors.microsoft_auth import MicrosoftAuthManager, MICROSOFT_AUTH_PORT
+from pulse.connectors.github_auth import (
+    GitHubAuthManager,
+    GITHUB_AUTH_PORT,
+    GITHUB_SCOPES,
+)
+from pulse.connectors.gitlab_auth import (
+    GitLabAuthManager,
+    GITLAB_AUTH_PORT,
+    GITLAB_SCOPES,
+)
+from pulse.connectors.plaid_link import run_plaid_link_flow
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +51,57 @@ def _onboard_should_run_spotify_auth(config: PulseConfig) -> bool:
     return spot is not None and spot.enabled
 
 
+def _onboard_should_run_microsoft_auth(config: PulseConfig) -> bool:
+    if not config.microsoft_client_id or not config.microsoft_client_secret:
+        return False
+    for name in ("microsoft_mail", "microsoft_calendar"):
+        cc = config.connectors.get(name)
+        if cc is not None and cc.enabled:
+            return True
+    return False
+
+
+def _onboard_should_run_github_auth(config: PulseConfig) -> bool:
+    if not config.github_client_id or not config.github_client_secret:
+        return False
+    gh = config.connectors.get("github")
+    return gh is not None and gh.enabled
+
+
+def _onboard_should_run_gitlab_auth(config: PulseConfig) -> bool:
+    gl = config.connectors.get("gitlab")
+    if gl is None or not gl.enabled:
+        return False
+    if config.gitlab_token:
+        return False
+    return bool(config.gitlab_client_id and config.gitlab_client_secret)
+
+
+def _onboard_should_run_plaid_link(config: PulseConfig) -> bool:
+    if not config.plaid_client_id or not config.plaid_secret:
+        return False
+    pl = config.connectors.get("plaid")
+    return pl is not None and pl.enabled
+
+
+def _gitlab_base_url(config: PulseConfig) -> str:
+    cc = config.connectors.get("gitlab")
+    if cc is None:
+        return "https://gitlab.com"
+    u = cc.model_dump(mode="python").get("gitlab_base_url")
+    if isinstance(u, str) and u.strip():
+        return u.strip().rstrip("/")
+    return "https://gitlab.com"
+
+
 def _onboard_print_prerequisites() -> None:
     ui.rule("Before you start")
     ui.muted_line("Run from the directory where .env and pulse.toml should live (usually the repo root).")
     ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
-    ui.muted_line("For Google or Spotify, create OAuth apps and have client IDs/secrets ready for .env.")
-    ui.muted_line("Spotify OAuth uses a callback on localhost:8888 — keep that port free during auth.")
+    ui.muted_line("For Google, Spotify, Microsoft, GitHub, or GitLab, create OAuth apps as needed.")
+    ui.muted_line(
+        "Local callbacks: Spotify :8888, Microsoft :8890, GitHub :8891, GitLab :8892, Plaid Link :8893."
+    )
 
 
 def _onboard_print_next_steps(host: str, port: int) -> None:
@@ -143,6 +200,10 @@ def main() -> None:
     auth_subparsers = auth_parser.add_subparsers(dest="provider")
     auth_subparsers.add_parser("google", help="Authorize Google services")
     auth_subparsers.add_parser("spotify", help="Authorize Spotify")
+    auth_subparsers.add_parser("microsoft", help="Authorize Microsoft 365 (Graph)")
+    auth_subparsers.add_parser("github", help="Authorize GitHub")
+    auth_subparsers.add_parser("gitlab", help="Authorize GitLab (or use PAT in .env)")
+    auth_subparsers.add_parser("plaid", help="Link a bank account via Plaid")
 
     args = parser.parse_args()
 
@@ -179,6 +240,14 @@ def main() -> None:
         _auth_google()
     elif args.command == "auth" and args.provider == "spotify":
         _auth_spotify()
+    elif args.command == "auth" and args.provider == "microsoft":
+        _auth_microsoft()
+    elif args.command == "auth" and args.provider == "github":
+        _auth_github()
+    elif args.command == "auth" and args.provider == "gitlab":
+        _auth_gitlab()
+    elif args.command == "auth" and args.provider == "plaid":
+        _auth_plaid()
     else:
         parser.print_help()
         sys.exit(1)
@@ -208,6 +277,39 @@ def _onboard(args) -> None:
         ui.muted_line(
             "Skipping — Spotify client secrets missing, connector disabled, or spotify not in pulse.toml."
         )
+
+    ui.onboard_phase("auth microsoft")
+    if strict or _onboard_should_run_microsoft_auth(config):
+        _auth_microsoft(show_rule=False)
+    else:
+        ui.muted_line("Skipping — Microsoft 365 OAuth not needed or not configured.")
+
+    ui.onboard_phase("auth github")
+    if strict or _onboard_should_run_github_auth(config):
+        _auth_github(show_rule=False)
+    else:
+        ui.muted_line("Skipping — GitHub OAuth not needed or not configured.")
+
+    ui.onboard_phase("auth gitlab")
+    if strict or _onboard_should_run_gitlab_auth(config):
+        _auth_gitlab(show_rule=False)
+    else:
+        ui.muted_line("Skipping — GitLab OAuth not needed, PAT in use, or not configured.")
+
+    ui.onboard_phase("plaid link")
+    if strict or _onboard_should_run_plaid_link(config):
+        token_path = Path(config.database_path).parent / "plaid_tokens.json"
+        if not token_path.exists():
+            try:
+                _auth_plaid(show_rule=False)
+            except RuntimeError as e:
+                ui.error(str(e))
+                if strict:
+                    sys.exit(1)
+        else:
+            ui.muted_line(f"Plaid already linked ({token_path}); skipping Link.")
+    else:
+        ui.muted_line("Skipping — Plaid not enabled or credentials missing.")
 
     ui.onboard_phase("init")
     _init(
@@ -430,6 +532,17 @@ def _configure(*, offer_oauth: bool = True) -> None:
         ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
         ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
         ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
+        ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
+        ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
+        ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
+        ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
+        ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
+        ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
+        ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
+        ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
+        ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
+        ("PULSE_PLAID_SECRET", "Plaid secret", True),
+        ("PULSE_PLAID_ENV", "Plaid environment (sandbox or production)", False),
         ("PULSE_ANTHROPIC_API_KEY", "Anthropic API Key", True),
         ("PULSE_TELEGRAM_BOT_TOKEN", "Telegram Bot Token", True),
         ("PULSE_TELEGRAM_CHAT_ID", "Telegram Chat ID", False),
@@ -458,6 +571,11 @@ def _configure(*, offer_oauth: bool = True) -> None:
         ("calendar", "30m", "Google Calendar"),
         ("youtube", "1h", "YouTube"),
         ("spotify", "30m", "Spotify"),
+        ("microsoft_mail", "15m", "Microsoft 365 mail (Outlook)"),
+        ("microsoft_calendar", "30m", "Microsoft 365 calendar"),
+        ("github", "30m", "GitHub activity"),
+        ("gitlab", "30m", "GitLab activity"),
+        ("plaid", "6h", "Plaid bank transactions"),
         ("browser", "15m", "Browser history"),
         ("feeds", "1h", "RSS/Atom feeds (URLs in pulse.toml)"),
     ]
@@ -511,6 +629,43 @@ def _configure(*, offer_oauth: bool = True) -> None:
                 choice = input(f"    Browser type [{browser_type}]: ").strip()
                 browser_type = choice if choice else browser_type
             toml_lines.append(f'browser = "{browser_type}"')
+
+        if name == "microsoft_calendar":
+            cal_id = (existing.get("calendar_id") if existing else None) or "primary"
+            if enabled:
+                if existing:
+                    answer = input(f"    Calendar ID [{cal_id}] — keep? [Y/n] ").strip().lower()
+                    if answer in ("n", "no"):
+                        cal_id = (
+                            input("    Graph calendar id (primary or calendar UUID): ").strip()
+                            or cal_id
+                        )
+                else:
+                    cal_id = input("    Graph calendar id [primary]: ").strip() or "primary"
+            safe_cal = cal_id.replace("\\", "\\\\").replace('"', '\\"')
+            toml_lines.append(f'calendar_id = "{safe_cal}"')
+
+        if name == "gitlab":
+            base_url = (existing.get("gitlab_base_url") if existing else None) or "https://gitlab.com"
+            if enabled:
+                if existing:
+                    answer = input(f"    GitLab base URL [{base_url}] — keep? [Y/n] ").strip().lower()
+                    if answer in ("n", "no"):
+                        base_url = input("    GitLab base URL: ").strip() or base_url
+                else:
+                    base_url = (
+                        input("    GitLab base URL [https://gitlab.com]: ").strip() or base_url
+                    )
+            escaped = base_url.replace("\\", "\\\\").replace('"', '\\"')
+            toml_lines.append(f'gitlab_base_url = "{escaped}"')
+
+        if name == "plaid":
+            omit = bool((existing or {}).get("omit_amounts_in_digest", False))
+            if enabled:
+                yn = input("    Omit transaction amounts from digest markdown? [y/N] ").strip().lower()
+                if yn in ("y", "yes"):
+                    omit = True
+            toml_lines.append(f"omit_amounts_in_digest = {'true' if omit else 'false'}")
 
         if name == "feeds":
             prev_urls: list = list(existing.get("urls", [])) if existing else []
@@ -580,6 +735,80 @@ def _configure(*, offer_oauth: bool = True) -> None:
                 answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
                 if answer not in ("n", "no"):
                     _auth_spotify()
+
+        ms_connectors = [
+            c for c in enabled_connectors if c in ("microsoft_mail", "microsoft_calendar")
+        ]
+        has_ms_creds = env_values.get("PULSE_MICROSOFT_CLIENT_ID") and env_values.get(
+            "PULSE_MICROSOFT_CLIENT_SECRET"
+        )
+        microsoft_tokens = data_dir / "microsoft_tokens.json"
+        if ms_connectors and has_ms_creds:
+            if microsoft_tokens.exists():
+                ui.muted_line(f"Microsoft 365: already authorized ({microsoft_tokens})")
+                answer = input("  Re-authorize? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_microsoft()
+            else:
+                ui.step("Microsoft 365 authorization")
+                ui.kv_line("Connectors", ", ".join(ms_connectors))
+                answer = input("  Run Microsoft OAuth now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_microsoft()
+
+        gh_enabled = "github" in enabled_connectors
+        has_gh = env_values.get("PULSE_GITHUB_CLIENT_ID") and env_values.get(
+            "PULSE_GITHUB_CLIENT_SECRET"
+        )
+        github_tokens = data_dir / "github_tokens.json"
+        if gh_enabled and has_gh:
+            if github_tokens.exists():
+                ui.muted_line(f"GitHub: already authorized ({github_tokens})")
+                answer = input("  Re-authorize GitHub? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_github()
+            else:
+                ui.step("GitHub authorization")
+                answer = input("  Run GitHub OAuth now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_github()
+
+        gl_enabled = "gitlab" in enabled_connectors
+        has_gl_oauth = env_values.get("PULSE_GITLAB_CLIENT_ID") and env_values.get(
+            "PULSE_GITLAB_CLIENT_SECRET"
+        )
+        has_gl_pat = bool(env_values.get("PULSE_GITLAB_TOKEN"))
+        gitlab_tokens = data_dir / "gitlab_tokens.json"
+        if gl_enabled and has_gl_oauth and not has_gl_pat:
+            if gitlab_tokens.exists():
+                ui.muted_line(f"GitLab: already authorized ({gitlab_tokens})")
+                answer = input("  Re-authorize GitLab? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_gitlab()
+            else:
+                ui.step("GitLab authorization")
+                answer = input("  Run GitLab OAuth now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_gitlab()
+        elif gl_enabled and has_gl_pat:
+            ui.muted_line("GitLab: using PULSE_GITLAB_TOKEN — OAuth skipped.")
+
+        plaid_enabled = "plaid" in enabled_connectors
+        has_plaid = env_values.get("PULSE_PLAID_CLIENT_ID") and env_values.get(
+            "PULSE_PLAID_SECRET"
+        )
+        plaid_tokens = data_dir / "plaid_tokens.json"
+        if plaid_enabled and has_plaid:
+            if plaid_tokens.exists():
+                ui.muted_line(f"Plaid: already linked ({plaid_tokens})")
+                answer = input("  Re-link Plaid? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_plaid()
+            else:
+                ui.step("Plaid Link")
+                answer = input("  Open Plaid Link now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_plaid()
 
     # --- Done ---
     ui.rule("Configuration complete")
@@ -1277,3 +1506,228 @@ def _auth_spotify(*, show_rule: bool = True) -> None:
     tokens = auth_manager._exchange_code(received_code[0])
     auth_manager.save_tokens(tokens)
     ui.success("Spotify authorization complete!")
+
+
+def _auth_microsoft(*, show_rule: bool = True) -> None:
+    config = load_config()
+
+    if not config.microsoft_client_id or not config.microsoft_client_secret:
+        ui.error("PULSE_MICROSOFT_CLIENT_ID and PULSE_MICROSOFT_CLIENT_SECRET must be set.")
+        sys.exit(1)
+
+    token_path = Path(config.database_path).parent / "microsoft_tokens.json"
+    auth_manager = MicrosoftAuthManager(
+        client_id=config.microsoft_client_id,
+        client_secret=config.microsoft_client_secret,
+        token_path=token_path,
+        tenant_id=config.microsoft_tenant_id or "common",
+    )
+
+    active = [
+        name
+        for name in ("microsoft_mail", "microsoft_calendar")
+        if (c := config.connectors.get(name)) is not None and c.enabled
+    ]
+    if not active:
+        ui.error(
+            "No Microsoft 365 connectors enabled in pulse.toml. "
+            "Enable microsoft_mail and/or microsoft_calendar."
+        )
+        sys.exit(1)
+
+    scopes = auth_manager.get_required_scopes(active)
+    state = secrets.token_urlsafe(32)
+    auth_url = auth_manager._get_auth_url(scopes, state)
+
+    if show_rule:
+        ui.rule("pulse auth microsoft")
+    ui.kv_line("Authorizing for", ", ".join(active))
+    ui.muted_line("Scopes: " + " ".join(scopes))
+    ui.say("[accent]Opening browser[/] for Microsoft sign-in…")
+    ui.muted_line(f"If it doesn't open, visit: {auth_url}")
+    webbrowser.open(auth_url)
+
+    received_code: list[str] = []
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            query = parse_qs(urlparse(self.path).query)
+            returned_state = query.get("state", [None])[0]
+            code = query.get("code", [None])[0]
+
+            if returned_state != state:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"State mismatch - possible CSRF attack.")
+                return
+
+            if code:
+                received_code.append(code)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(
+                    b"Authorization successful! You can close this tab."
+                )
+            else:
+                err = query.get("error_description", query.get("error", ["Unknown error"]))
+                self.send_response(400)
+                self.end_headers()
+                msg = (err[0] if err else "No code").encode("utf-8", errors="replace")
+                self.wfile.write(msg)
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("localhost", MICROSOFT_AUTH_PORT), CallbackHandler)
+    server.handle_request()
+
+    if not received_code:
+        ui.error("No authorization code received.")
+        sys.exit(1)
+
+    tokens = auth_manager._exchange_code(received_code[0])
+    auth_manager.save_tokens(tokens)
+    ui.success("Microsoft 365 authorization complete!")
+
+
+def _auth_github(*, show_rule: bool = True) -> None:
+    config = load_config()
+    if not config.github_client_id or not config.github_client_secret:
+        ui.error("PULSE_GITHUB_CLIENT_ID and PULSE_GITHUB_CLIENT_SECRET must be set.")
+        sys.exit(1)
+    gh = config.connectors.get("github")
+    if gh is None or not gh.enabled:
+        ui.error("Enable [connectors.github] in pulse.toml before running GitHub OAuth.")
+        sys.exit(1)
+
+    token_path = Path(config.database_path).parent / "github_tokens.json"
+    auth_manager = GitHubAuthManager(
+        client_id=config.github_client_id,
+        client_secret=config.github_client_secret,
+        token_path=token_path,
+    )
+    state = secrets.token_urlsafe(32)
+    auth_url = auth_manager._get_auth_url(GITHUB_SCOPES, state)
+    if show_rule:
+        ui.rule("pulse auth github")
+    ui.say("[accent]Opening browser[/] for GitHub authorization…")
+    ui.muted_line(f"If it doesn't open, visit: {auth_url}")
+    webbrowser.open(auth_url)
+
+    received_code: list[str] = []
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            query = parse_qs(urlparse(self.path).query)
+            if query.get("state", [None])[0] != state:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"State mismatch.")
+                return
+            code = query.get("code", [None])[0]
+            if code:
+                received_code.append(code)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK - you can close this tab.")
+            else:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"No code received.")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("localhost", GITHUB_AUTH_PORT), CallbackHandler)
+    server.handle_request()
+    if not received_code:
+        ui.error("No authorization code received.")
+        sys.exit(1)
+    tokens = auth_manager._exchange_code(received_code[0])
+    auth_manager.save_tokens(tokens)
+    ui.success("GitHub authorization complete!")
+
+
+def _auth_gitlab(*, show_rule: bool = True) -> None:
+    config = load_config()
+    if config.gitlab_token:
+        ui.error("PULSE_GITLAB_TOKEN is set — OAuth is not used. Unset it to use GitLab OAuth.")
+        sys.exit(1)
+    if not config.gitlab_client_id or not config.gitlab_client_secret:
+        ui.error("PULSE_GITLAB_CLIENT_ID and PULSE_GITLAB_CLIENT_SECRET must be set.")
+        sys.exit(1)
+    gl = config.connectors.get("gitlab")
+    if gl is None or not gl.enabled:
+        ui.error("Enable [connectors.gitlab] in pulse.toml before running GitLab OAuth.")
+        sys.exit(1)
+
+    base = _gitlab_base_url(config)
+    token_path = Path(config.database_path).parent / "gitlab_tokens.json"
+    auth_manager = GitLabAuthManager(
+        client_id=config.gitlab_client_id,
+        client_secret=config.gitlab_client_secret,
+        token_path=token_path,
+        base_url=base,
+    )
+    state = secrets.token_urlsafe(32)
+    auth_url = auth_manager._get_auth_url(GITLAB_SCOPES, state)
+    if show_rule:
+        ui.rule("pulse auth gitlab")
+    ui.kv_line("GitLab base URL", base)
+    ui.say("[accent]Opening browser[/] for GitLab authorization…")
+    ui.muted_line(f"If it doesn't open, visit: {auth_url}")
+    webbrowser.open(auth_url)
+
+    received_code: list[str] = []
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            query = parse_qs(urlparse(self.path).query)
+            if query.get("state", [None])[0] != state:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"State mismatch.")
+                return
+            code = query.get("code", [None])[0]
+            if code:
+                received_code.append(code)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK - you can close this tab.")
+            else:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"No code received.")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("localhost", GITLAB_AUTH_PORT), CallbackHandler)
+    server.handle_request()
+    if not received_code:
+        ui.error("No authorization code received.")
+        sys.exit(1)
+    tokens = auth_manager._exchange_code(received_code[0])
+    auth_manager.save_tokens(tokens)
+    ui.success("GitLab authorization complete!")
+
+
+def _auth_plaid(*, show_rule: bool = True) -> None:
+    config = load_config()
+    if not config.plaid_client_id or not config.plaid_secret:
+        ui.error("PULSE_PLAID_CLIENT_ID and PULSE_PLAID_SECRET must be set.")
+        sys.exit(1)
+    pl = config.connectors.get("plaid")
+    if pl is None or not pl.enabled:
+        ui.error("Enable [connectors.plaid] in pulse.toml before running Plaid Link.")
+        sys.exit(1)
+    if show_rule:
+        ui.rule("pulse auth plaid")
+    ui.say("[accent]Opening browser[/] for Plaid Link (http://localhost:8893/)…")
+    token_path = Path(config.database_path).parent / "plaid_tokens.json"
+    try:
+        run_plaid_link_flow(config, token_path)
+    except RuntimeError as e:
+        ui.error(str(e))
+        sys.exit(1)
+    ui.success("Plaid linked — tokens saved beside your database.")

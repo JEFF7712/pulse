@@ -27,10 +27,15 @@ QUICKSTART_REQUIRED_SNIPPETS = [
 CONNECTOR_REQUIRED_SNIPPETS = [
     "Google",
     "Spotify",
+    "Microsoft",
+    "GitHub",
+    "GitLab",
+    "Plaid",
     "browser history",
     "RSS",
     "pulse auth google",
     "pulse auth spotify",
+    "pulse auth microsoft",
     "db_path",
     "[connectors.browser]",
     'db_path = "/path/to/browser-history.sqlite"',
@@ -58,10 +63,14 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "PULSE_GOOGLE_CLIENT_ID",
     "PULSE_SPOTIFY_CLIENT_ID",
     "PULSE_SPOTIFY_CLIENT_SECRET",
+    "PULSE_MICROSOFT_CLIENT_ID",
+    "PULSE_PLAID_CLIENT_ID",
     "PULSE_ANTHROPIC_API_KEY",
     "pulse.toml",
     "google_tokens.json",
     "spotify_tokens.json",
+    "microsoft_tokens.json",
+    "plaid_tokens.json",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [

@@ -52,12 +52,18 @@ class DigestBuilder:
         if preprocessed.browsing_clusters:
             sections.extend(["## Browsing", self._build_browsing(preprocessed), ""])
 
+        if preprocessed.dev_activities:
+            sections.extend(["## Development", self._build_development(preprocessed), ""])
+
+        if preprocessed.finance_summary is not None:
+            sections.extend(["## Spending", self._build_spending(preprocessed), ""])
+
         return "\n".join(sections)
 
     def _build_glance(self, narratives: dict[str, str]) -> str:
         # Combine first sentence of each narrative
         parts = []
-        for source in ("calendar", "email", "browsing", "media"):
+        for source in ("calendar", "email", "browsing", "media", "dev", "finance"):
             text = narratives.get(source, "")
             if text:
                 # Take first sentence
@@ -92,6 +98,23 @@ class DigestBuilder:
                 session.first_item.hour,
                 f"- {time_str} {session.source.title()}: {item_preview}{count}",
             ))
+
+        for act in day.dev_activities[:15]:
+            time_str = act.timestamp.strftime("%H:%M")
+            prov = act.provider.title()
+            items.append((
+                act.timestamp.hour,
+                f"- {time_str} {prov}: {act.title}",
+            ))
+
+        if day.finance_summary and day.finance_summary.transaction_count:
+            fs = day.finance_summary
+            label = (
+                f"{fs.transaction_count} transactions"
+                if fs.omit_amounts
+                else f"{fs.transaction_count} transactions, ~${fs.total_outflow:,.2f} outflow"
+            )
+            items.append((12, f"- Spending: {label}"))
 
         if not items:
             return ""
@@ -146,3 +169,30 @@ class DigestBuilder:
                 f"- {cluster.domain}: {titles}{more} (~{cluster.estimated_minutes:.0f} min)"
             )
         return "\n".join(lines) if lines else "No browsing activity."
+
+    def _build_development(self, day: PreprocessedDay) -> str:
+        lines = []
+        for act in day.dev_activities[:25]:
+            repo = f" ({act.repo})" if act.repo else ""
+            lines.append(f"- **{act.provider}**{repo}: {act.title}")
+        return "\n".join(lines) if lines else "No development activity."
+
+    def _build_spending(self, day: PreprocessedDay) -> str:
+        fs = day.finance_summary
+        if fs is None:
+            return "No finance activity."
+        lines = []
+        if fs.omit_amounts:
+            lines.append(
+                f"- {fs.transaction_count} transactions (amounts hidden per connector setting)."
+            )
+            for name, cnt in fs.merchant_counts[:8]:
+                lines.append(f"- {name}: {cnt} tx")
+        else:
+            lines.append(
+                f"- Total outflow (debits): ${fs.total_outflow:,.2f} across "
+                f"{fs.transaction_count} transactions."
+            )
+            for name, spent in fs.merchant_spend[:8]:
+                lines.append(f"- {name}: ${spent:,.2f}")
+        return "\n".join(lines)

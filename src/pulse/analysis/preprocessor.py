@@ -51,11 +51,41 @@ class TimeBlock:
 
 
 @dataclass(slots=True)
+class DevActivity:
+    title: str
+    provider: str
+    action: str
+    repo: str
+    timestamp: datetime
+    url: str
+
+
+@dataclass(slots=True)
+class FinanceDaySummary:
+    transaction_count: int
+    total_outflow: float
+    merchant_counts: list[tuple[str, int]]
+    merchant_spend: list[tuple[str, float]]
+    omit_amounts: bool
+
+
+_DEV_EVENT_TYPES = frozenset({
+    "dev.push",
+    "dev.issue",
+    "dev.pull_request",
+    "dev.comment",
+    "dev.repo_activity",
+})
+
+
+@dataclass(slots=True)
 class PreprocessedDay:
     browsing_clusters: list[TopicCluster] = field(default_factory=list)
     email_threads: list[EmailThread] = field(default_factory=list)
     calendar_blocks: list[CalendarBlock] = field(default_factory=list)
     media_sessions: list[MediaSession] = field(default_factory=list)
+    dev_activities: list[DevActivity] = field(default_factory=list)
+    finance_summary: FinanceDaySummary | None = None
     time_blocks: list[TimeBlock] = field(default_factory=list)
     raw_stats: dict[str, int] = field(default_factory=dict)
 
@@ -70,11 +100,15 @@ class EventPreprocessor:
             by_type[event.event_type].append(event)
             source_counts[event.source] += 1
 
+        finance_events = by_type.get("finance.transaction", [])
+
         return PreprocessedDay(
             browsing_clusters=self._cluster_browsing(by_type.get("browsing.visit", [])),
             email_threads=self._group_email_threads(by_type.get("email.received", [])),
             calendar_blocks=self._build_calendar_blocks(by_type.get("calendar.event", [])),
             media_sessions=self._build_media_sessions(sorted_events),
+            dev_activities=self._build_dev_activities(sorted_events),
+            finance_summary=self._build_finance_summary(finance_events),
             time_blocks=self._build_time_blocks(sorted_events),
             raw_stats=dict(source_counts),
         )
@@ -143,7 +177,9 @@ class EventPreprocessor:
         result = []
         for subject, thread_events in threads.items():
             senders = list(dict.fromkeys(
-                e.data.get("from", "") for e in thread_events if e.data.get("from")
+                (e.data.get("from") or e.data.get("sender") or "").strip()
+                for e in thread_events
+                if (e.data.get("from") or e.data.get("sender"))
             ))
             result.append(EmailThread(
                 subject=subject,
@@ -242,3 +278,48 @@ class EventPreprocessor:
             TimeBlock(block=b, sources=dict(sources))
             for b, sources in sorted(block_map.items())
         ]
+
+    def _build_dev_activities(self, events: list[Event]) -> list[DevActivity]:
+        rows: list[DevActivity] = []
+        for e in events:
+            if e.event_type not in _DEV_EVENT_TYPES:
+                continue
+            rows.append(
+                DevActivity(
+                    title=str(e.data.get("title", "")),
+                    provider=str(e.data.get("provider", e.source)),
+                    action=str(e.data.get("action", e.event_type)),
+                    repo=str(e.data.get("repo", "")),
+                    timestamp=e.timestamp,
+                    url=str(e.data.get("url", "")),
+                )
+            )
+        rows.sort(key=lambda r: r.timestamp, reverse=True)
+        return rows[:40]
+
+    def _build_finance_summary(self, events: list[Event]) -> FinanceDaySummary | None:
+        if not events:
+            return None
+        omit_amounts = any(bool(e.data.get("omit_amount_in_digest")) for e in events)
+        by_merchant: dict[str, list[float]] = defaultdict(list)
+        for e in events:
+            name = str(e.data.get("name") or e.data.get("merchant_name") or "Unknown")
+            amt = e.data.get("amount")
+            try:
+                f = float(amt) if amt is not None else 0.0
+            except (TypeError, ValueError):
+                f = 0.0
+            if f > 0:
+                by_merchant[name].append(f)
+        merchant_spend = [(m, sum(vals)) for m, vals in by_merchant.items()]
+        merchant_spend.sort(key=lambda x: x[1], reverse=True)
+        merchant_counts = [(m, len(vals)) for m, vals in by_merchant.items()]
+        merchant_counts.sort(key=lambda x: x[1], reverse=True)
+        total = sum(sum(v) for v in by_merchant.values())
+        return FinanceDaySummary(
+            transaction_count=len(events),
+            total_outflow=total,
+            merchant_counts=merchant_counts[:10],
+            merchant_spend=merchant_spend[:10],
+            omit_amounts=omit_amounts,
+        )
