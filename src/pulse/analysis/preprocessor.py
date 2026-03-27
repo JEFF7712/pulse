@@ -62,10 +62,11 @@ class PreprocessedDay:
 
 class EventPreprocessor:
     def preprocess(self, events: list[Event]) -> PreprocessedDay:
+        sorted_events = sorted(events, key=lambda e: e.timestamp)
         by_type: dict[str, list[Event]] = defaultdict(list)
         source_counts: dict[str, int] = defaultdict(int)
 
-        for event in sorted(events, key=lambda e: e.timestamp):
+        for event in sorted_events:
             by_type[event.event_type].append(event)
             source_counts[event.source] += 1
 
@@ -73,8 +74,8 @@ class EventPreprocessor:
             browsing_clusters=self._cluster_browsing(by_type.get("browsing.visit", [])),
             email_threads=self._group_email_threads(by_type.get("email.received", [])),
             calendar_blocks=self._build_calendar_blocks(by_type.get("calendar.event", [])),
-            media_sessions=self._build_media_sessions(events),
-            time_blocks=self._build_time_blocks(events),
+            media_sessions=self._build_media_sessions(sorted_events),
+            time_blocks=self._build_time_blocks(sorted_events),
             raw_stats=dict(source_counts),
         )
 

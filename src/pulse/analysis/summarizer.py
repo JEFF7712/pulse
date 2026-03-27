@@ -4,7 +4,6 @@ from datetime import date
 from pulse.analysis.preprocessor import EventPreprocessor
 from pulse.analysis.digest_builder import DigestBuilder
 from pulse.domain.events import Event
-from pulse.vault.renderer import render_daily_digest
 
 
 @dataclass(slots=True)
@@ -40,12 +39,3 @@ class DailySummarizer:
         builder = DigestBuilder()
         markdown = builder.build(day, preprocessed, narratives=None)
         return DailySummary(day=day, markdown=markdown)
-
-
-def _event_text(event: Event, preferred_key: str | None = None) -> str:
-    if preferred_key is not None:
-        value = event.data.get(preferred_key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-
-    return event.event_type

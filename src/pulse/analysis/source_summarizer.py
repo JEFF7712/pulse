@@ -1,6 +1,8 @@
 """SourceSummarizer — Haiku pass for per-source narrative summaries."""
 from __future__ import annotations
 
+import asyncio
+
 from pulse.analysis.preprocessor import PreprocessedDay
 
 
@@ -11,18 +13,23 @@ class SourceSummarizer:
 
     async def summarize(self, day: PreprocessedDay) -> dict[str, str]:
         """Summarize each active source into a short narrative. Returns {source: narrative}."""
-        narratives: dict[str, str] = {}
+        tasks: list[tuple[str, object]] = []
 
         if day.browsing_clusters:
-            narratives["browsing"] = await self._summarize_browsing(day)
+            tasks.append(("browsing", self._summarize_browsing(day)))
         if day.email_threads:
-            narratives["email"] = await self._summarize_email(day)
+            tasks.append(("email", self._summarize_email(day)))
         if day.calendar_blocks:
-            narratives["calendar"] = await self._summarize_calendar(day)
+            tasks.append(("calendar", self._summarize_calendar(day)))
         if day.media_sessions:
-            narratives["media"] = await self._summarize_media(day)
+            tasks.append(("media", self._summarize_media(day)))
 
-        return narratives
+        if not tasks:
+            return {}
+
+        keys = [k for k, _ in tasks]
+        results = await asyncio.gather(*(coro for _, coro in tasks))
+        return dict(zip(keys, results))
 
     async def _summarize_browsing(self, day: PreprocessedDay) -> str:
         lines = []
