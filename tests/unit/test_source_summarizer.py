@@ -3,12 +3,12 @@ import asyncio
 from datetime import UTC, datetime
 
 from pulse.analysis.preprocessor import (
+    CalendarBlock,
+    DevActivity,
     EmailThread,
+    FinanceDaySummary,
     PreprocessedDay,
     TopicCluster,
-    CalendarBlock,
-    MediaSession,
-    TimeBlock,
 )
 
 
@@ -90,3 +90,33 @@ def test_source_summarizer_skips_empty_sources():
     assert len(llm.calls) == 1
     assert "calendar" in result
     assert "browsing" not in result
+
+
+def test_source_summarizer_includes_dev_and_finance():
+    from pulse.analysis.source_summarizer import SourceSummarizer
+
+    llm = FakeLLM()
+    summarizer = SourceSummarizer(llm=llm, model="claude-haiku-4-5-20251001")
+    day = PreprocessedDay(
+        dev_activities=[
+            DevActivity(
+                title="Merged PR",
+                provider="github",
+                action="PullRequestEvent",
+                repo="r/x",
+                timestamp=datetime(2026, 3, 26, 10, 0, tzinfo=UTC),
+                url="https://github.com/r/x/pull/1",
+            ),
+        ],
+        finance_summary=FinanceDaySummary(
+            transaction_count=1,
+            total_outflow=5.0,
+            merchant_counts=[("M", 1)],
+            merchant_spend=[("M", 5.0)],
+            omit_amounts=False,
+        ),
+    )
+    result = asyncio.run(summarizer.summarize(day))
+    assert len(llm.calls) == 2
+    assert "dev" in result
+    assert "finance" in result

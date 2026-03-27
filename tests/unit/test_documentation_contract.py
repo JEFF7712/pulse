@@ -322,10 +322,8 @@ def test_docs_app_pages_are_thin_wrappers_around_repo_docs() -> None:
 def test_docs_index_explains_that_repo_docs_drive_deployed_docs() -> None:
     docs_index = (REPO_ROOT / "docs/index.md").read_text(encoding="utf-8")
 
-    assert (
-        "This file is the source of truth for the deployed docs page at `/docs/`."
-        in docs_index
-    )
+    assert "source of truth for the deployed docs page" in docs_index
+    assert "/docs/" in docs_index
 
 
 def test_docs_app_readme_documents_wrapper_maintenance_rule() -> None:

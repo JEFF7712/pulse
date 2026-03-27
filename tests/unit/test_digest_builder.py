@@ -1,10 +1,11 @@
 # tests/unit/test_digest_builder.py
-import asyncio
 from datetime import UTC, date, datetime
 
 from pulse.analysis.preprocessor import (
     CalendarBlock,
+    DevActivity,
     EmailThread,
+    FinanceDaySummary,
     MediaSession,
     PreprocessedDay,
     TimeBlock,
@@ -87,3 +88,51 @@ def test_digest_builder_fallback_without_narratives():
     assert "# 2026-03-26" in md
     assert "Hello" in md
     assert "## Day at a Glance" not in md
+
+
+def test_digest_builder_development_and_spending_sections():
+    from pulse.analysis.digest_builder import DigestBuilder
+
+    day = PreprocessedDay(
+        dev_activities=[
+            DevActivity(
+                title="Push to main",
+                provider="github",
+                action="PushEvent",
+                repo="acme/app",
+                timestamp=datetime(2026, 3, 26, 15, 0, tzinfo=UTC),
+                url="https://github.com/acme/app",
+            ),
+        ],
+        finance_summary=FinanceDaySummary(
+            transaction_count=2,
+            total_outflow=25.50,
+            merchant_counts=[("Cafe", 2)],
+            merchant_spend=[("Cafe", 25.50)],
+            omit_amounts=False,
+        ),
+        raw_stats={"github": 1, "plaid": 2},
+    )
+
+    md = DigestBuilder().build(date(2026, 3, 26), day, narratives=None)
+    assert "## Development" in md
+    assert "Push to main" in md
+    assert "## Spending" in md
+    assert "25.50" in md or "25" in md
+
+
+def test_digest_builder_spending_omits_amounts_when_flagged():
+    from pulse.analysis.digest_builder import DigestBuilder
+
+    day = PreprocessedDay(
+        finance_summary=FinanceDaySummary(
+            transaction_count=3,
+            total_outflow=100.0,
+            merchant_counts=[("Shop", 3)],
+            merchant_spend=[],
+            omit_amounts=True,
+        ),
+    )
+    md = DigestBuilder().build(date(2026, 3, 26), day, narratives=None)
+    assert "## Spending" in md
+    assert "hidden" in md.lower() or "amounts" in md.lower()
