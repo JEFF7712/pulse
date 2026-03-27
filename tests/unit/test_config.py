@@ -1,4 +1,4 @@
-from pulse.app.config import PulseConfig, ConnectorConfig, Settings
+from pulse.app.config import PulseConfig, ConnectorConfig, Settings, LLMRoleConfig, LLMConfig
 
 
 def test_pulse_config_defaults_match_original_settings():
@@ -53,3 +53,32 @@ def test_pulse_config_has_model_defaults():
     config = PulseConfig()
     assert config.summarization_model == "claude-haiku-4-5-20251001"
     assert config.discovery_model == "claude-sonnet-4-5-20250514"
+
+
+def test_pulse_config_parses_llm_config():
+    from pulse.app.config import PulseConfig, LLMRoleConfig, LLMConfig
+
+    config = PulseConfig(
+        llm=LLMConfig(
+            summarization=LLMRoleConfig(
+                provider="ollama",
+                model="llama3",
+                base_url="http://localhost:11434/v1",
+            ),
+            discovery=LLMRoleConfig(
+                provider="anthropic",
+                model="claude-sonnet-4-5-20250514",
+            ),
+        )
+    )
+    assert config.llm.summarization.provider == "ollama"
+    assert config.llm.summarization.model == "llama3"
+    assert config.llm.summarization.base_url == "http://localhost:11434/v1"
+    assert config.llm.discovery.provider == "anthropic"
+    assert config.llm.discovery.model == "claude-sonnet-4-5-20250514"
+    assert config.llm.discovery.base_url is None
+
+
+def test_pulse_config_llm_defaults_to_none():
+    config = PulseConfig()
+    assert config.llm is None
