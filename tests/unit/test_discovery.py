@@ -50,8 +50,8 @@ class FakeLLM:
         self.calls: list[dict] = []
         self._response = response
 
-    async def complete(self, prompt, *, system_prompt=None):
-        self.calls.append({"prompt": prompt, "system_prompt": system_prompt})
+    async def complete(self, prompt, *, system_prompt=None, model=None):
+        self.calls.append({"prompt": prompt, "system_prompt": system_prompt, "model": model})
         return self._response
 
 
@@ -136,7 +136,7 @@ def test_discovery_engine_full_cycle(tmp_path):
     result, insights, patterns = asyncio.run(exercise())
 
     # LLM was called
-    assert len(fake_llm.calls) == 1, "LLM should have been called exactly once"
+    assert len(fake_llm.calls) >= 1, "LLM should have been called at least once"
 
     # New pattern counts
     assert result.new_patterns == 1
@@ -202,3 +202,50 @@ def test_discovery_engine_works_without_notification_channel(tmp_path):
 
     assert result.notifications_sent == 0
     assert result.new_patterns == 1
+
+
+def test_discovery_engine_uses_source_summarizer(tmp_path):
+    """Discovery should make Haiku summarization calls before the Sonnet discovery call."""
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+
+    fake_llm = FakeLLM(_LLM_RESPONSE)
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            event_repo = EventRepository(db)
+            events = [
+                _make_event("e1", datetime(2026, 3, 20, 9, 0, tzinfo=UTC),
+                            "gmail", "email.received",
+                            {"subject": "Project update", "from": "alice@example.com"}),
+                _make_event("e2", datetime(2026, 3, 20, 14, 0, tzinfo=UTC),
+                            "browser", "browsing.visit",
+                            {"url": "https://docs.rs/tokio", "title": "tokio - Rust"}),
+            ]
+            await event_repo.upsert_events(events)
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=fake_llm,
+            notification_channel=None,
+            summarization_model="claude-haiku-4-5-20251001",
+            discovery_model="claude-sonnet-4-5-20250514",
+        )
+        return await engine.run_discovery("daily", target_date)
+
+    asyncio.run(exercise())
+
+    # Should have summarization calls (haiku) + 1 discovery call (sonnet)
+    haiku_calls = [c for c in fake_llm.calls if c["model"] == "claude-haiku-4-5-20251001"]
+    sonnet_calls = [c for c in fake_llm.calls if c["model"] == "claude-sonnet-4-5-20250514"]
+
+    assert len(haiku_calls) >= 1, "Should have at least one Haiku summarization call"
+    assert len(sonnet_calls) == 1, "Should have exactly one Sonnet discovery call"
