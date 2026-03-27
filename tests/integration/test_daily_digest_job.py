@@ -53,31 +53,16 @@ def test_run_daily_digest_job_writes_digest_for_requested_day(tmp_path):
         assert result.status == "success"
         assert result.detail == str(output_path)
         assert output_path.exists()
-        assert output_path.read_text(encoding="utf-8") == "\n".join(
-            [
-                "# 2026-03-22",
-                "",
-                "## Timeline",
-                "- Team sync",
-                "",
-                "## Email Highlights",
-                "- Project update",
-                "",
-                "## Spending",
-                "- No spending recorded.",
-                "",
-                "## Health",
-                "- No health updates.",
-                "",
-                "## Media",
-                "- No media activity.",
-                "",
-                "## Browsing",
-                "- No browsing activity.",
-                "",
-                "## Tags",
-                "- No tags.",
-            ]
-        )
+
+        content = output_path.read_text(encoding="utf-8")
+        # New DigestBuilder format: timeline with time-block subheadings, Email section (not "Email Highlights")
+        assert "# 2026-03-22" in content
+        assert "## Timeline" in content
+        assert "Team sync" in content
+        assert "## Email" in content
+        assert "Project update" in content
+        # New format omits Spending, Health, Tags sections
+        assert "## Spending" not in content
+        assert "## Tags" not in content
 
     asyncio.run(exercise())

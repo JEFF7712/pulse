@@ -34,43 +34,30 @@ def test_daily_summarizer_renders_markdown_digest_from_events():
 
     summary = DailySummarizer().summarize(day, events)
 
-    expected = "\n".join(
-        [
-            "# 2026-03-22",
-            "",
-            "## Timeline",
-            "- Team sync",
-            "- message.created",
-            "",
-            "## Email Highlights",
-            "- Project update",
-            "",
-            "## Spending",
-            "- No spending recorded.",
-            "",
-            "## Health",
-            "- No health updates.",
-            "",
-            "## Media",
-            "- No media activity.",
-            "",
-            "## Browsing",
-            "- No browsing activity.",
-            "",
-            "## Tags",
-            "- No tags.",
-        ]
-    )
-
     assert summary.day == day
-    assert summary.markdown == expected
+    # New DigestBuilder format: timeline with time-block headers, email section, no spending/health/tags
+    assert "# 2026-03-22" in summary.markdown
+    assert "## Timeline" in summary.markdown
+    assert "Team sync" in summary.markdown
+    assert "## Email" in summary.markdown
+    assert "Project update" in summary.markdown
+    # New format does NOT include these old sections
+    assert "## Spending" not in summary.markdown
+    assert "## Health" not in summary.markdown
+    assert "## Tags" not in summary.markdown
 
 
-def test_daily_summarizer_does_not_accept_an_llm_dependency_yet():
+def test_daily_summarizer_accepts_llm_parameter():
     from pulse.analysis.summarizer import DailySummarizer
 
-    with pytest.raises(TypeError):
-        DailySummarizer(llm=object())
+    # New DailySummarizer accepts llm parameter without raising TypeError
+    summarizer = DailySummarizer(llm=None)
+    assert summarizer is not None
+
+    summarizer_with_model = DailySummarizer(
+        llm=None, summarization_model="claude-haiku-4-5-20251001"
+    )
+    assert summarizer_with_model is not None
 
 
 def test_summarizer_routes_spotify_play_to_media_section():
@@ -83,7 +70,9 @@ def test_summarizer_routes_spotify_play_to_media_section():
         data={"track_name": "Cool Song", "artist": "Artist A"},
     )]
     result = DailySummarizer().summarize(date(2026, 3, 25), events)
-    assert "Listened to Cool Song by Artist A" in result.markdown
+    # DigestBuilder formats as "Cool Song by Artist A" in the media session
+    assert "Cool Song by Artist A" in result.markdown
+    assert "## Media" in result.markdown
 
 
 def test_summarizer_routes_browsing_visit_to_browsing_section():

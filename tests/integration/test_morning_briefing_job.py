@@ -73,7 +73,6 @@ def test_run_morning_briefing_job_sends_one_notification_with_digest_lines(tmp_p
         assert notification.category == "morning_briefing"
         assert "Team sync" in notification.body
         assert "Project update" in notification.body
-        assert "No spending recorded." in notification.body
 
     asyncio.run(exercise())
 

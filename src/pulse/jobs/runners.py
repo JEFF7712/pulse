@@ -21,9 +21,13 @@ class JobResult:
 
 
 async def run_daily_digest_job(
-    day: date, database_path: str | Path, vault_path: str | Path
+    day: date, database_path: str | Path, vault_path: str | Path,
+    llm=None, summarization_model: str = "claude-haiku-4-5-20251001",
 ) -> JobResult:
-    summary = await _build_daily_summary(day=day, database_path=database_path)
+    summary = await _build_daily_summary(
+        day=day, database_path=database_path,
+        llm=llm, summarization_model=summarization_model,
+    )
     output_path = write_daily_digest(
         vault_root=Path(vault_path),
         date_slug=day.isoformat(),
@@ -55,13 +59,18 @@ async def run_morning_briefing_job(
 async def _build_daily_summary(
     day: date,
     database_path: str | Path,
+    llm=None,
+    summarization_model: str = "claude-haiku-4-5-20251001",
 ):
     async with connect_db(database_path) as db:
         await bootstrap_schema(db)
         repository = EventRepository(db)
         events = await repository.list_events_for_day(day.isoformat())
 
-    return DailySummarizer().summarize(day, events)
+    summarizer = DailySummarizer(llm=llm, summarization_model=summarization_model)
+    if llm is not None:
+        return await summarizer.summarize_async(day, events)
+    return summarizer.summarize(day, events)
 
 
 async def run_aggregation_job(day: date, database_path: str | Path) -> JobResult:
@@ -79,6 +88,8 @@ async def run_discovery_job(
     vault_path: str | Path,
     llm,
     notification_channel=None,
+    summarization_model: str = "claude-haiku-4-5-20251001",
+    discovery_model: str = "claude-sonnet-4-5-20250514",
 ) -> JobResult:
     from pulse.analysis.discovery import DiscoveryEngine
 
@@ -87,6 +98,8 @@ async def run_discovery_job(
         vault_root=Path(vault_path),
         llm=llm,
         notification_channel=notification_channel,
+        summarization_model=summarization_model,
+        discovery_model=discovery_model,
     )
     result = await engine.run_discovery(cadence=cadence, target_date=target_date)
     return JobResult(

@@ -45,7 +45,7 @@ def test_pattern_evolution_across_multiple_passes(tmp_path):
             "baseline_updates": None,
         })
 
-        call_count = {"n": 0}
+        pass_count = {"n": 0}
 
         # Pass 2: LLM sees the existing pattern and strengthens it
         pass2_response = json.dumps({
@@ -67,9 +67,12 @@ def test_pattern_evolution_across_multiple_passes(tmp_path):
         })
 
         class FakeLLM:
-            async def complete(self, prompt, *, system_prompt=None):
-                call_count["n"] += 1
-                if call_count["n"] == 1:
+            async def complete(self, prompt, *, system_prompt=None, model=None):
+                # Source summarizer calls have no system_prompt; discovery calls do
+                if system_prompt is None:
+                    return "Summary narrative."
+                pass_count["n"] += 1
+                if pass_count["n"] == 1:
                     return pass1_response
                 return pass2_response
 
@@ -148,7 +151,7 @@ def test_run_discovery_job(tmp_path):
             ])
 
         class FakeLLM:
-            async def complete(self, prompt, *, system_prompt=None):
+            async def complete(self, prompt, *, system_prompt=None, model=None):
                 return json.dumps({
                     "new_patterns": [],
                     "updated_patterns": [],
