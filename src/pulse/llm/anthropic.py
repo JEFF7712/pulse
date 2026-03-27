@@ -6,9 +6,9 @@ class AnthropicProvider:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
 
-    async def complete(self, prompt: str, *, system_prompt: str | None = None) -> str:
+    async def complete(self, prompt: str, *, system_prompt: str | None = None, model: str | None = None) -> str:
         kwargs: dict = {
-            "model": self._model,
+            "model": model or self._model,
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}],
         }
