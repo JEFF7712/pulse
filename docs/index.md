@@ -18,25 +18,25 @@ If you want the shortest path from a fresh checkout to a working deployment, use
 Use these guides when you want the shortest route from a fresh checkout to a working Pulse deployment.
 
 <div class="pulse-home-grid">
-  <a class="pulse-home-card" href="./self-hosting/quickstart.md">
+  <a class="pulse-home-card" href="./self-hosting/quickstart.html">
     <p class="pulse-home-kicker">Setup</p>
     <h3>Self-Hosting Quickstart</h3>
     <p>Install dependencies, configure the stack, and boot the app.</p>
     <span class="pulse-home-cta">Open quickstart</span>
   </a>
-  <a class="pulse-home-card" href="./reference/configuration.md">
+  <a class="pulse-home-card" href="./reference/configuration.html">
     <p class="pulse-home-kicker">Config</p>
     <h3>Configuration Reference</h3>
     <p>Environment variables, <code>pulse.toml</code>, and connector settings.</p>
     <span class="pulse-home-cta">Open reference</span>
   </a>
-  <a class="pulse-home-card" href="./operations/runbook.md">
+  <a class="pulse-home-card" href="./operations/runbook.html">
     <p class="pulse-home-kicker">Operations</p>
     <h3>Operations Runbook</h3>
     <p>Health checks, recovery, and day-two operations.</p>
     <span class="pulse-home-cta">Open runbook</span>
   </a>
-  <a class="pulse-home-card" href="./connectors/index.md">
+  <a class="pulse-home-card" href="./connectors/index.html">
     <p class="pulse-home-kicker">Data</p>
     <h3>Connectors</h3>
     <p>Expand ingestion across accounts and devices.</p>
