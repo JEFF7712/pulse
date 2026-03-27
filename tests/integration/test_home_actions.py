@@ -98,8 +98,9 @@ def test_discover_action_creates_database_parent_directory_on_fresh_setup(
     observed: dict[str, object] = {}
 
     class FakeAnthropicProvider:
-        def __init__(self, api_key: str) -> None:
+        def __init__(self, api_key: str, model: str | None = None) -> None:
             observed["api_key"] = api_key
+            observed["model"] = model
 
     async def fake_run_aggregation_job(*, day, database_path: str) -> None:
         observed["day"] = day

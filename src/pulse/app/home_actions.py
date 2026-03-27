@@ -91,10 +91,11 @@ async def run_digest_action(settings: PulseConfig) -> ActionResult:
 
 
 async def run_discovery_action(settings: PulseConfig) -> ActionResult:
-    if not settings.anthropic_api_key:
-        return ActionResult(query_key="error", token="discovery-not-configured")
+    from pulse.llm.factory import create_providers_from_config
 
-    from pulse.llm.anthropic import AnthropicProvider
+    _, disc_llm = create_providers_from_config(settings)
+    if disc_llm is None:
+        return ActionResult(query_key="error", token="discovery-not-configured")
 
     target_day = _resolve_current_day(settings)
     notification_channel = _build_telegram_channel(settings)
@@ -107,7 +108,7 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
             target_date=target_day,
             database_path=settings.database_path,
             vault_path=settings.vault_path,
-            llm=AnthropicProvider(api_key=settings.anthropic_api_key),
+            llm=disc_llm,
             notification_channel=notification_channel,
         )
     except Exception:
