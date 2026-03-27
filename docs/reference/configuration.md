@@ -2,8 +2,6 @@
 
 Pulse builds its runtime configuration from two places:
 
-This reference is part of the canonical docs set rooted at [Pulse Docs](../index.md).
-
 - `pulse.toml` for connector selection and nested connector settings
 - environment variables loaded from `.env` via `load_dotenv()` for top-level runtime fields
 

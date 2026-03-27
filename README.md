@@ -77,9 +77,7 @@ Standalone app and CLI commands use `PULSE_DATABASE_PATH`. The MCP server uses `
 
 ## Docs
 
-Start with [docs/index.md](docs/index.md), the source-of-truth docs entry for repo readers.
-
-[`/docs/`](/docs/) is the rendered version of that same docs set.
+Documentation lives under [docs/index.md](docs/index.md). The deployed site serves the same guides at [`/docs/`](/docs/).
 
 - [Self-hosting quickstart](docs/self-hosting/quickstart.md)
 - [Configuration reference](docs/reference/configuration.md)

@@ -2,8 +2,6 @@
 
 Use this guide when you want the shortest real path from a fresh checkout to a running self-hosted Pulse instance.
 
-If you are browsing the repo docs tree directly, start at [Pulse Docs](../index.md) for the full docs home.
-
 ## Before you start
 
 - Run these commands from the repository root.

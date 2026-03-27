@@ -999,12 +999,13 @@ def _init(
     ui.muted_line(result.detail)
 
     # --- Step 4: Initial discovery (if LLM available) ---
-    if config.anthropic_api_key:
+    from pulse.llm.factory import create_providers_from_config
+    _, disc_llm = create_providers_from_config(config)
+
+    if disc_llm is not None:
         ui.step("Running initial discovery")
         from pulse.jobs.runners import run_discovery_job
-        from pulse.llm.anthropic import AnthropicProvider
 
-        llm = AnthropicProvider(api_key=config.anthropic_api_key)
         channel = None
         if config.telegram_bot_token and config.telegram_chat_id:
             from pulse.notifications.telegram import TelegramChannel
@@ -1020,7 +1021,7 @@ def _init(
                     target_date=today,
                     database_path=config.database_path,
                     vault_path=config.vault_path,
-                    llm=llm,
+                    llm=disc_llm,
                     notification_channel=channel,
                 )
             )
@@ -1033,7 +1034,7 @@ def _init(
             raise SystemExit(1) from e
         ui.muted_line(result.detail)
     else:
-        ui.muted_line("Skipping discovery (no PULSE_ANTHROPIC_API_KEY set).")
+        ui.muted_line("Skipping discovery (no LLM provider configured).")
 
     ui.success("Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler.")
 
@@ -1079,6 +1080,7 @@ def _collect_profile(
 def _digest(args) -> None:
     from datetime import date
     from pulse.jobs.runners import run_daily_digest_job, run_aggregation_job
+    from pulse.llm.factory import create_providers_from_config
 
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
@@ -1088,11 +1090,14 @@ def _digest(args) -> None:
     result = asyncio.run(run_aggregation_job(day=target, database_path=config.database_path))
     ui.muted_line(result.detail)
 
+    summ_llm, _ = create_providers_from_config(config)
+
     ui.say(f"[accent]Generating digest[/] for [bold]{target.isoformat()}[/]…")
     result = asyncio.run(run_daily_digest_job(
         day=target,
         database_path=config.database_path,
         vault_path=config.vault_path,
+        llm=summ_llm,
     ))
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
@@ -1100,16 +1105,15 @@ def _digest(args) -> None:
 def _discover(args) -> None:
     from datetime import date
     from pulse.jobs.runners import run_discovery_job, run_aggregation_job
-    from pulse.llm.anthropic import AnthropicProvider
+    from pulse.llm.factory import create_providers_from_config
 
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
 
-    if not config.anthropic_api_key:
-        ui.error("PULSE_ANTHROPIC_API_KEY must be set for discovery.")
+    _, disc_llm = create_providers_from_config(config)
+    if disc_llm is None:
+        ui.error("No LLM provider configured. Set [llm.discovery] in pulse.toml or PULSE_ANTHROPIC_API_KEY.")
         sys.exit(1)
-
-    llm = AnthropicProvider(api_key=config.anthropic_api_key)
 
     ui.rule("pulse discover")
     ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
@@ -1125,7 +1129,7 @@ def _discover(args) -> None:
                 target_date=target,
                 database_path=config.database_path,
                 vault_path=config.vault_path,
-                llm=llm,
+                llm=disc_llm,
             )
         )
     except Exception as e:

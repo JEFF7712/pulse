@@ -53,3 +53,26 @@ poll_interval = "1h"
 # List RSS or Atom feed URLs (no API keys). Example:
 # urls = ["https://hnrss.org/newest"]
 urls = []
+
+# --- LLM Configuration ---
+# Configure providers for summarization (digest narratives) and
+# discovery (cross-source pattern detection) independently.
+#
+# Supported providers: anthropic, openai, gemini, ollama
+# API keys are read from environment variables:
+#   ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+#
+# If only one role is configured, it is used for both.
+
+# [llm.summarization]
+# provider = "ollama"
+# model = "llama3"
+# base_url = "http://localhost:11434/v1"
+
+# [llm.discovery]
+# provider = "anthropic"
+# model = "claude-sonnet-4-5-20250514"
+
+# --- Legacy (still works) ---
+# If you just want Anthropic for everything, set PULSE_ANTHROPIC_API_KEY
+# in .env and skip the [llm] section entirely.

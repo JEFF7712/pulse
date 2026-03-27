@@ -2,13 +2,11 @@
 
 Run the VitePress docs locally from `site/docs-app`.
 
-The markdown under `site/docs-app/docs/` is intentionally thin. The main published pages render the canonical repo docs from `docs/` via VitePress includes, so edit `docs/` first when you are changing content.
-
-The repo `docs/` tree is authoritative for published documentation content.
+The markdown under `site/docs-app/docs/` is intentionally thin: each published page is a VitePress include that pulls in the matching file from `docs/`. Edit the matching page under `docs/` first when you are changing content.
 
 When you add a new published markdown page under `docs/`, add a matching wrapper page under `site/docs-app/docs/`.
 
-Each wrapper should stay thin: identify the canonical repo doc and include it directly via a VitePress include.
+Each wrapper should be a single include line pointing at the repo file.
 
 ### Install dependencies
 

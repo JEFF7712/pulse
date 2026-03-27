@@ -1,7 +1,5 @@
 # Pulse Docs
 
-<p class="pulse-doc-meta">This file is the source of truth for the deployed docs page at <code>/docs/</code>. The VitePress site under <code>site/docs-app/</code> includes these markdown files verbatim.</p>
-
 ## What is Pulse?
 
 Pulse is a self-hosted personal intelligence agent. It connects the tools you already use, looks for patterns across them, and keeps the resulting memory in infrastructure you control.

@@ -95,8 +95,8 @@ ENV_EXAMPLE_REQUIRED_SNIPPETS = [
 README_REQUIRED_SNIPPETS = [
     "(/docs/)",
     "[docs/index.md](docs/index.md)",
-    "source-of-truth docs entry for repo readers",
-    "rendered version of that same docs set",
+    "Documentation lives under",
+    "deployed site serves the same guides",
     "`PULSE_DATABASE_PATH`",
     "`PULSE_DB_PATH`",
     "Standalone app and CLI commands use `PULSE_DATABASE_PATH`.",
@@ -105,9 +105,9 @@ README_REQUIRED_SNIPPETS = [
 ]
 
 DOCS_APP_README_REQUIRED_SNIPPETS = [
-    "The repo `docs/` tree is authoritative for published documentation content.",
+    "Edit the matching page under `docs/` first",
     "When you add a new published markdown page under `docs/`, add a matching wrapper page under `site/docs-app/docs/`.",
-    "Each wrapper should stay thin: identify the canonical repo doc and include it directly via a VitePress include.",
+    "Each wrapper should be a single include line pointing at the repo file.",
 ]
 
 NON_CANONICAL_DOC_PARTS = {"plans", "specs", "superpowers"}
@@ -314,16 +314,13 @@ def test_docs_app_pages_are_thin_wrappers_around_repo_docs() -> None:
         assert f"<!--@include: {include_path} -->" in wrapper, (
             f"{wrapper_path.as_posix()} should include {repo_path.as_posix()} directly"
         )
-        assert f"`{repo_path.as_posix()}`" in wrapper, (
-            f"{wrapper_path.as_posix()} should tell readers which repo doc it renders"
-        )
 
 
-def test_docs_index_explains_that_repo_docs_drive_deployed_docs() -> None:
+def test_docs_index_has_standard_home_sections() -> None:
     docs_index = (REPO_ROOT / "docs/index.md").read_text(encoding="utf-8")
 
-    assert "source of truth for the deployed docs page" in docs_index
-    assert "/docs/" in docs_index
+    assert "What is Pulse?" in docs_index
+    assert "## Quick Start" in docs_index
 
 
 def test_docs_app_readme_documents_wrapper_maintenance_rule() -> None:

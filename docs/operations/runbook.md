@@ -2,8 +2,6 @@
 
 This runbook is anchored to the current FastAPI app, config loader, and scheduler wiring.
 
-For the broader self-hosted guide set, use [Pulse Docs](../index.md) as the docs home.
-
 ## Fast health checks
 
 Start with the two lowest-cost checks:

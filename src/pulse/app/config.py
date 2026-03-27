@@ -7,6 +7,17 @@ class ConnectorConfig(BaseModel):
     poll_interval: str = "15m"
 
 
+class LLMRoleConfig(BaseModel):
+    provider: str  # "anthropic" | "openai" | "gemini" | "ollama"
+    model: str
+    base_url: str | None = None
+
+
+class LLMConfig(BaseModel):
+    summarization: LLMRoleConfig | None = None
+    discovery: LLMRoleConfig | None = None
+
+
 class PulseConfig(BaseModel):
     database_path: str = "data/pulse.db"
     vault_path: str = "Pulse-Vault"
@@ -31,6 +42,7 @@ class PulseConfig(BaseModel):
     anthropic_api_key: str | None = None
     summarization_model: str = "claude-haiku-4-5-20251001"
     discovery_model: str = "claude-sonnet-4-6"
+    llm: LLMConfig | None = None
     connectors: dict[str, ConnectorConfig] = {}
 
 

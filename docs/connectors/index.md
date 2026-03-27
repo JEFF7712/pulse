@@ -2,8 +2,6 @@
 
 Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Microsoft 365 (Outlook mail and calendar), Spotify, GitHub, GitLab, Plaid (bank transactions), local browser history, and RSS/Atom feeds (no API keys for feeds). There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure`. This page gives the setup path for each connector.
 
-If you want the overall operator flow first, start from [Pulse Docs](../index.md).
-
 ## Google
 
 Google authentication covers the Google-backed connectors Pulse can enable: Gmail, Google Calendar, and YouTube.

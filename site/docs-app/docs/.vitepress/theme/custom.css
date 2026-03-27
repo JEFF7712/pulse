@@ -124,15 +124,6 @@ body::before {
   outline-offset: 3px;
 }
 
-.pulse-doc-meta {
-  font-family: "Geist Mono", monospace;
-  font-size: 0.8125rem;
-  line-height: 1.65;
-  color: var(--pulse-cream);
-  max-width: 48rem;
-  opacity: 0.92;
-}
-
 .pulse-docs-home .pulse-home-kicker,
 .pulse-docs-home .vp-doc > div > ol {
   font-family: "Geist Mono", monospace;
@@ -170,12 +161,8 @@ body::before {
   padding-right: 1.25rem;
 }
 
-.pulse-docs-home .vp-doc h1,
-.pulse-docs-home .vp-doc > div > .pulse-doc-meta {
-  margin: 0;
-}
-
 .pulse-docs-home .vp-doc h1 {
+  margin: 0;
   padding-top: 1.5rem;
 }
 
