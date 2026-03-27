@@ -25,6 +25,11 @@ dependencies = [
 pulse-mcp = "pulse.mcp.server:main"
 pulse = "pulse.app.cli:main"
 
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+gemini = ["google-genai>=1.0"]
+all-llm = ["openai>=1.0", "google-genai>=1.0"]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
