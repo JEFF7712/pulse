@@ -95,7 +95,7 @@ curl -fsS "http://127.0.0.1:$port$docs_nav_path" >/dev/null
 [[ -n "${docs_bridge_html:-}" ]]
 grep -q '<title>Pulse</title>' <<<"$html"
 grep -q 'href="/docs/"' <<<"$html"
-grep -q 'Personal Intelligence Agent' <<<"$html"
+grep -q 'Personal intelligence agent' <<<"$html"
 grep -q 'Turn your life data into useful observations\.' <<<"$html"
 grep -q 'It explains what is changing in plain English' <<<"$html"
 grep -q 'Pulse connects the tools you already use' <<<"$html"

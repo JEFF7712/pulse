@@ -52,7 +52,7 @@ function createEnvironment(fetchImpl) {
         case 'signupError':
           return signupError;
         default:
-          throw new Error(`unexpected id lookup: ${id}`);
+          return null;
       }
     },
     querySelector(selector) {
@@ -69,7 +69,13 @@ function createEnvironment(fetchImpl) {
 
   const context = {
     document,
-    window: { fetch: fetchImpl, FormData: FakeFormData },
+    window: {
+      fetch: fetchImpl,
+      FormData: FakeFormData,
+      matchMedia: function matchMedia() {
+        return { matches: true };
+      },
+    },
     fetch: fetchImpl,
     FormData: FakeFormData,
     console,
