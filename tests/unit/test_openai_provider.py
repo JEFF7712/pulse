@@ -1,3 +1,10 @@
+import sys
+from unittest.mock import MagicMock
+
+# Mock the openai module if not installed so we can test the provider
+if "openai" not in sys.modules:
+    sys.modules["openai"] = MagicMock()
+
 import asyncio
 
 

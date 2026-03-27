@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 from pulse.app.config import LLMRoleConfig, PulseConfig
+from pulse.domain.llm import LLM
 
 _API_KEY_ENV = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -15,7 +16,7 @@ _API_KEY_ENV = {
 _SUPPORTED_PROVIDERS = set(_API_KEY_ENV.keys())
 
 
-def create_llm_provider(role_config: LLMRoleConfig):
+def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
     """Create an LLM provider instance from a role config."""
     provider = role_config.provider
 
@@ -49,14 +50,12 @@ def create_llm_provider(role_config: LLMRoleConfig):
             base_url=role_config.base_url,
         )
 
-    if provider == "gemini":
-        from pulse.llm.gemini import GeminiProvider
-        return GeminiProvider(api_key=api_key, model=role_config.model)
-
-    raise ValueError(f"Unknown LLM provider: '{provider}'")
+    # provider == "gemini"
+    from pulse.llm.gemini import GeminiProvider
+    return GeminiProvider(api_key=api_key, model=role_config.model)
 
 
-def create_providers_from_config(config: PulseConfig) -> tuple:
+def create_providers_from_config(config: PulseConfig) -> tuple[LLM | None, LLM | None]:
     """Returns (summarization_llm, discovery_llm) from config.
 
     Resolution order:
