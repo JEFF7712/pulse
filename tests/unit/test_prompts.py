@@ -73,9 +73,18 @@ def test_build_discovery_prompt_cadence_instructions():
         user_profile="",
     )
 
-    assert "notable" in daily["user_prompt"].lower() or "unusual" in daily["user_prompt"].lower()
-    assert "cross-source" in weekly["user_prompt"].lower() or "week" in weekly["user_prompt"].lower()
-    assert "long-term" in monthly["user_prompt"].lower() or "trend" in monthly["user_prompt"].lower()
+    assert (
+        "notable" in daily["user_prompt"].lower()
+        or "unusual" in daily["user_prompt"].lower()
+    )
+    assert (
+        "cross-source" in weekly["user_prompt"].lower()
+        or "week" in weekly["user_prompt"].lower()
+    )
+    assert (
+        "long-term" in monthly["user_prompt"].lower()
+        or "trend" in monthly["user_prompt"].lower()
+    )
 
 
 def test_parse_discovery_response_extracts_fields():
@@ -103,7 +112,8 @@ def test_parse_discovery_response_extracts_fields():
             {
                 "title": "Late-night browsing detected",
                 "body": "You browsed late 3 nights this week",
-                "priority": "low"
+                "priority": "low",
+                "pattern_slug": "late-night-browsing"
             }
         ],
         "baseline_updates": "avg browsing: 45min/night"
@@ -137,6 +147,7 @@ def test_parse_discovery_response_extracts_fields():
     assert notif.title == "Late-night browsing detected"
     assert notif.body == "You browsed late 3 nights this week"
     assert notif.priority == "low"
+    assert notif.pattern_slug == "late-night-browsing"
 
     assert response.baseline_updates == "avg browsing: 45min/night"
 
@@ -151,6 +162,11 @@ def test_parse_discovery_response_handles_malformed_json():
     assert response.baseline_updates is None
 
 
+def test_parse_discovery_response_handles_non_object_top_level_json():
+    assert parse_discovery_response("[]") == DiscoveryResponse()
+    assert parse_discovery_response('"foo"') == DiscoveryResponse()
+
+
 def test_parse_discovery_response_handles_empty_lists():
     raw = '{"new_patterns": [], "updated_patterns": [], "notifications": [], "baseline_updates": null}'
     response = parse_discovery_response(raw)
@@ -159,6 +175,80 @@ def test_parse_discovery_response_handles_empty_lists():
     assert response.updated_patterns == []
     assert response.notifications == []
     assert response.baseline_updates is None
+
+
+def test_parse_discovery_response_handles_messy_notification_shapes():
+    raw = """{
+        "new_patterns": [],
+        "updated_patterns": [],
+        "notifications": [
+            null,
+            "skip me",
+            {
+                "title": "  Late-night browsing detected  ",
+                "body": "  You browsed late 3 nights this week  ",
+                "priority": null,
+                "pattern_slug": "  Late Night Browsing!!  "
+            }
+        ],
+        "baseline_updates": null
+    }"""
+
+    response = parse_discovery_response(raw)
+
+    assert len(response.notifications) == 1
+    notif = response.notifications[0]
+    assert notif.title == "Late-night browsing detected"
+    assert notif.body == "You browsed late 3 nights this week"
+    assert notif.priority == "low"
+    assert notif.pattern_slug == "Late Night Browsing!!"
+
+
+def test_parse_discovery_response_ignores_wrong_types_for_lists_and_baseline_updates():
+    raw = """{
+        "new_patterns": "not-a-list",
+        "updated_patterns": {"slug": "sleep-deficit"},
+        "notifications": "nope",
+        "baseline_updates": ["wrong", "type"]
+    }"""
+
+    response = parse_discovery_response(raw)
+
+    assert response.new_patterns == []
+    assert response.updated_patterns == []
+    assert response.notifications == []
+    assert response.baseline_updates is None
+
+
+def test_parse_discovery_response_ignores_non_list_evidence_fields():
+    raw = """{
+        "new_patterns": [
+            {
+                "title": "Late-night browsing",
+                "observation": "Browsing spikes after 11pm on weekdays",
+                "confidence": 0.8,
+                "evidence": "not-a-list",
+                "trend": "increasing"
+            }
+        ],
+        "updated_patterns": [
+            {
+                "slug": "sleep-deficit",
+                "status": "confirmed",
+                "confidence": 0.9,
+                "update_note": "Still occurring",
+                "new_evidence": "not-a-list",
+                "trend": "stable"
+            }
+        ],
+        "notifications": [],
+        "baseline_updates": "ok"
+    }"""
+
+    response = parse_discovery_response(raw)
+
+    assert response.new_patterns[0].evidence == []
+    assert response.updated_patterns[0].new_evidence == []
 
 
 def test_discovery_prompt_includes_rejection_criteria():
@@ -175,3 +265,23 @@ def test_discovery_prompt_includes_rejection_criteria():
     assert "do not report" in system.lower() or "do not" in system.lower()
     assert "cross-source" in system.lower()
     assert "baseline" in system.lower()
+
+
+def test_discovery_prompt_advertises_bounded_pattern_statuses():
+    result = build_discovery_prompt(
+        cadence="weekly",
+        date_range="2026-03-20 to 2026-03-26",
+        event_summary="some events",
+        active_patterns="",
+        baselines="",
+        user_profile="",
+    )
+
+    system = result["system_prompt"]
+    assert (
+        '"status": "emerging | active | strengthening | confirmed | weakening | inactive | invalidated"'
+        in system
+    )
+    assert "strengthening" in system
+    assert "weakening" in system
+    assert "invalidated" in system

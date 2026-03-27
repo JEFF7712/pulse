@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from pulse.domain.pattern_statuses import PATTERN_STATUS_CHOICES
+
+_PATTERN_STATUS_CHOICES = " | ".join(PATTERN_STATUS_CHOICES)
+
 SYSTEM_PROMPT = """You are Pulse's insight engine, analyzing personal data for cross-source patterns.
 
 ## Role
@@ -13,7 +17,7 @@ Analyze the user's personal data streams (calendar, email, browsing, music, etc.
 ## Rules
 - Only report interesting or actionable findings — skip noise
 - Update existing patterns with new evidence rather than duplicating them
-- Mark patterns as invalidated if the data no longer supports them
+- Use only the bounded pattern statuses in the schema below
 - Be specific: include concrete data points, counts, and time references
 - Actively look for cross-source connections (e.g., browsing topics after meetings, music mood shifts after heavy email days)
 
@@ -45,7 +49,7 @@ A pattern MUST involve at least one of:
   "updated_patterns": [
     {
       "slug": "existing-pattern-slug",
-      "status": "confirmed | weakening | invalidated",
+      "status": "PLACEHOLDER_PATTERN_STATUSES",
       "confidence": 0.0,
       "update_note": "What changed or was reinforced",
       "new_evidence": ["new data point 1"],
@@ -56,14 +60,17 @@ A pattern MUST involve at least one of:
     {
       "title": "Notification title",
       "body": "Notification body text",
-      "priority": "high | medium | low"
+      "priority": "high | medium | low",
+      "pattern_slug": "pattern-slug-if-this-notification-is-about-a-pattern | null"
     }
   ],
   "baseline_updates": "Updated baseline description or null"
 }
 ```
 
-Output only the JSON object. Do not include any explanation or markdown formatting outside the JSON."""
+Output only the JSON object. Do not include any explanation or markdown formatting outside the JSON.""".replace(
+    "PLACEHOLDER_PATTERN_STATUSES", _PATTERN_STATUS_CHOICES
+)
 
 
 def build_discovery_prompt(
@@ -87,8 +94,12 @@ def build_discovery_prompt(
     Returns:
         Dict with "system_prompt" and "user_prompt" keys.
     """
-    patterns_section = active_patterns.strip() if active_patterns.strip() else "No active patterns yet"
-    baselines_section = baselines.strip() if baselines.strip() else "No baselines established yet"
+    patterns_section = (
+        active_patterns.strip() if active_patterns.strip() else "No active patterns yet"
+    )
+    baselines_section = (
+        baselines.strip() if baselines.strip() else "No baselines established yet"
+    )
 
     cadence_instruction = _cadence_instruction(cadence)
 
@@ -162,6 +173,7 @@ class NotificationItem:
     title: str
     body: str
     priority: str
+    pattern_slug: str | None = None
 
 
 @dataclass(slots=True)
@@ -182,13 +194,33 @@ def _parse_confidence(value: object) -> float | str:
         return 0.0
 
 
+def _as_dict_list(value: object) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _as_str_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    return [item.strip() for item in value if isinstance(item, str)]
+
+
+def _as_str(value: object, default: str = "") -> str:
+    if not isinstance(value, str):
+        return default
+    return value.strip()
+
+
 def _strip_code_fences(text: str) -> str:
     """Remove markdown code fences (```json ... ```) from LLM output."""
     stripped = text.strip()
     if stripped.startswith("```"):
         # Remove opening fence (```json or ```)
         first_newline = stripped.index("\n") if "\n" in stripped else len(stripped)
-        stripped = stripped[first_newline + 1:]
+        stripped = stripped[first_newline + 1 :]
     if stripped.endswith("```"):
         stripped = stripped[:-3]
     return stripped.strip()
@@ -205,40 +237,47 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
         data = json.loads(cleaned)
     except (json.JSONDecodeError, ValueError):
         return DiscoveryResponse()
+    if not isinstance(data, dict):
+        return DiscoveryResponse()
 
     new_patterns = [
         NewPattern(
-            title=p.get("title", ""),
-            observation=p.get("observation", ""),
+            title=_as_str(p.get("title")),
+            observation=_as_str(p.get("observation")),
             confidence=_parse_confidence(p.get("confidence", 0.0)),
-            evidence=list(p.get("evidence", [])),
-            trend=p.get("trend", ""),
+            evidence=_as_str_list(p.get("evidence")),
+            trend=_as_str(p.get("trend")),
         )
-        for p in data.get("new_patterns", [])
+        for p in _as_dict_list(data.get("new_patterns"))
     ]
 
     updated_patterns = [
         UpdatedPattern(
-            slug=p.get("slug", ""),
-            status=p.get("status", ""),
+            slug=_as_str(p.get("slug")),
+            status=_as_str(p.get("status")),
             confidence=_parse_confidence(p.get("confidence", 0.0)),
-            update_note=p.get("update_note", ""),
-            new_evidence=list(p.get("new_evidence", [])),
-            trend=p.get("trend", ""),
+            update_note=_as_str(p.get("update_note")),
+            new_evidence=_as_str_list(p.get("new_evidence")),
+            trend=_as_str(p.get("trend")),
         )
-        for p in data.get("updated_patterns", [])
+        for p in _as_dict_list(data.get("updated_patterns"))
     ]
 
     notifications = [
         NotificationItem(
-            title=n.get("title", ""),
-            body=n.get("body", ""),
-            priority=n.get("priority", "low"),
+            title=_as_str(n.get("title")),
+            body=_as_str(n.get("body")),
+            priority=_as_str(n.get("priority"), "low") or "low",
+            pattern_slug=_as_str(n.get("pattern_slug")) or None,
         )
-        for n in data.get("notifications", [])
+        for n in _as_dict_list(data.get("notifications"))
     ]
 
-    baseline_updates = data.get("baseline_updates", None)
+    baseline_updates = data.get("baseline_updates")
+    if not isinstance(baseline_updates, str):
+        baseline_updates = None
+    else:
+        baseline_updates = baseline_updates.strip() or None
 
     return DiscoveryResponse(
         new_patterns=new_patterns,

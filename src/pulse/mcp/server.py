@@ -1,5 +1,4 @@
 import json
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
@@ -9,13 +8,11 @@ from uuid import uuid4
 from mcp.server.fastmcp import Context, FastMCP
 
 from pulse.analysis.summarizer import DailySummarizer
+from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
 from pulse.mcp.context import PulseContext, open_pulse_context
-from pulse.services.corrections import CorrectionService
+from pulse.services.corrections import build_correction_service
 from pulse.vault.writer import write_daily_digest
-
-_DB_PATH = os.environ.get("PULSE_DB_PATH", "data/pulse.db")
-_VAULT_PATH = os.environ.get("PULSE_VAULT_PATH", "Pulse-Vault")
 
 
 def _parse_day(day: str) -> date | str:
@@ -28,7 +25,12 @@ def _parse_day(day: str) -> date | str:
 
 @asynccontextmanager
 async def pulse_lifespan(server: FastMCP) -> AsyncIterator[PulseContext]:
-    async with open_pulse_context(db_path=_DB_PATH, vault_path=_VAULT_PATH) as ctx:
+    config = load_config()
+    async with open_pulse_context(
+        db_path=config.database_path,
+        vault_path=config.vault_path,
+        config=config,
+    ) as ctx:
         yield ctx
 
 
@@ -119,9 +121,7 @@ async def pulse_ingest_event(
 
 
 @mcp.tool()
-async def pulse_correct(
-    context_id: str, message_text: str, ctx: Context = None
-) -> str:
+async def pulse_correct(context_id: str, message_text: str, ctx: Context = None) -> str:
     """Record a correction or feedback about a Pulse insight.
 
     Args:
@@ -129,7 +129,12 @@ async def pulse_correct(
         message_text: The correction text.
     """
     pulse_ctx = _get_pulse_ctx(ctx)
-    service = CorrectionService(pulse_ctx.corrections)
+    service = build_correction_service(
+        pulse_ctx.corrections,
+        config=pulse_ctx.config,
+        correction_applications=pulse_ctx.correction_applications,
+        vault_path=pulse_ctx.vault_path,
+    )
     correction = await service.record_correction(context_id, message_text)
 
     return f"Correction {correction.id} recorded."
@@ -153,9 +158,7 @@ async def pulse_digest(day: str | None = None, ctx: Context = None) -> str:
     events = await pulse_ctx.events.list_events_for_day(day)
     summarizer = DailySummarizer()
     summary = summarizer.summarize(target_date, events)
-    output_path = write_daily_digest(
-        Path(pulse_ctx.vault_path), day, summary.markdown
-    )
+    output_path = write_daily_digest(Path(pulse_ctx.vault_path), day, summary.markdown)
 
     return f"Digest for {day} written to {output_path} ({len(events)} events)."
 

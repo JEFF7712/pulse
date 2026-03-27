@@ -36,7 +36,7 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Legacy single-provider fallback for profile structuring, digest summarization, and discovery when `[llm.*]` role config is not set. |
 | `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Legacy Anthropic model id for summarization when `PULSE_ANTHROPIC_API_KEY` is being used. |
 | `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Legacy Anthropic model id for discovery when `PULSE_ANTHROPIC_API_KEY` is being used. |
-| `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization` and `discovery`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
+| `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization`, `discovery`, and `corrections`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
 
 You can also set `summarization_model` and `discovery_model` as top-level keys in `pulse.toml` (same names, string values); environment variables override file values when both are present.
 
@@ -45,7 +45,7 @@ You can also set `summarization_model` and `discovery_model` as top-level keys i
 Pulse supports two LLM configuration paths:
 
 1. **Legacy Anthropic fallback** via `PULSE_ANTHROPIC_API_KEY` plus optional `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`. This is also what `pulse init` uses for profile structuring.
-2. **Per-role provider config** in `pulse.toml` via `[llm.summarization]` and `[llm.discovery]`. Each block sets `provider`, `model`, and optional `base_url`. If you configure only one role, Pulse reuses it for both summarization and discovery.
+2. **Per-role provider config** in `pulse.toml` via `[llm.summarization]`, `[llm.discovery]`, and `[llm.corrections]`. Each block sets `provider`, `model`, and optional `base_url`. If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery.
 
 Supported providers are `anthropic`, `openai`, `gemini`, and `ollama`.
 
@@ -58,6 +58,10 @@ base_url = "http://localhost:11434/v1"
 [llm.discovery]
 provider = "anthropic"
 model = "claude-sonnet-4-5-20250514"
+
+[llm.corrections]
+provider = "openai"
+model = "gpt-4o-mini"
 ```
 
 Provider API keys come from standard environment variables, not `PULSE_...` names:
@@ -67,6 +71,8 @@ Provider API keys come from standard environment variables, not `PULSE_...` name
 - `GEMINI_API_KEY`
 
 `ollama` uses the OpenAI-compatible transport and defaults to a placeholder key when no `OPENAI_API_KEY` is set.
+
+Corrections use a different fallback chain than digest/discovery creation: `llm.corrections` is used first, then `llm.discovery`, then the legacy `PULSE_ANTHROPIC_API_KEY` fallback using `PULSE_DISCOVERY_MODEL`. In short: corrections -> discovery -> legacy `PULSE_ANTHROPIC_API_KEY` fallback.
 
 ## `pulse.toml`
 
@@ -128,6 +134,8 @@ urls = []
 
 The full checked-in template is `pulse.toml.example` at the repository root. Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. For RSS/Atom feeds, set `[connectors.feeds] enabled = true` and list URLs in `urls` (see [Connectors Index](../connectors/index.md)). `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
 
+The example file also includes a commented `llm.corrections` block. Leave it out if you want corrections to inherit discovery behavior; add it when correction interpretation should use a different provider or model than discovery.
+
 Each connector entry is parsed into a `ConnectorConfig` model with:
 
 - `enabled` defaulting to `true`
@@ -147,11 +155,16 @@ Because the token paths are derived from `Path(config.database_path).parent`, ch
 
 ## MCP server vs standalone app
 
-The FastAPI app and CLI load config through `load_dotenv()` and use `PULSE_DATABASE_PATH` for the SQLite file.
+The FastAPI app, CLI, and MCP entrypoint all call the same `load_config()` path. MCP server now loads the same `pulse.toml` + `.env` config path as the app/CLI, so corrections behavior is driven by the same `PULSE_DATABASE_PATH`, `PULSE_VAULT_PATH`, and `[llm.*]` settings.
 
-The MCP entrypoint (`python -m pulse.mcp.server`) reads **`PULSE_DB_PATH`** and **`PULSE_VAULT_PATH`** from the environment only (see the repository README for a sample agent config). If you run both surfaces against one database, point `PULSE_DATABASE_PATH` and `PULSE_DB_PATH` at the same file path.
+That matters for the corrections workflow:
 
-The MCP `pulse_digest` tool uses the non-LLM `DailySummarizer` path; it does not read `PULSE_ANTHROPIC_API_KEY`.
+- Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`
+- both surfaces also initialize the `correction_applications` table and record the correction status there (`applied`, `needs_review`, `skipped`, or `failed`)
+- when a corrections provider is configured, the interpreter may apply one bounded vault update to the resolved target (daily digest note append, pattern notes/status update, `profile.md` learned corrections section replace, or `routines.md` correction updates section replace)
+- when no corrections provider is configured, the raw correction is still stored and the audit/status row explains that application was skipped
+
+The MCP `pulse_digest` tool still uses the non-LLM `DailySummarizer` path.
 
 ## Runtime consequences
 
@@ -160,7 +173,8 @@ The MCP `pulse_digest` tool uses the non-LLM `DailySummarizer` path; it does not
 - the **scheduled** `daily_digest` job still fires every 24 hours; when a summarization provider is configured it passes an LLM into the digest runner, otherwise it uses the non-LLM summarizer
 - `pulse digest` now uses the same summarization-provider path as the scheduler; the web **Digest** action still invokes the digest runner without an LLM client, so browser-triggered digests stay non-LLM today
 - `morning_briefing` needs both Telegram settings to deliver notifications
-- discovery jobs need `[llm.discovery]` in `pulse.toml` or the legacy `PULSE_ANTHROPIC_API_KEY`; otherwise they skip with a no-provider message
+- discovery jobs resolve the same way as digest/discovery provider creation: a single configured summarization/discovery role is reused for both, otherwise Pulse uses the legacy `PULSE_ANTHROPIC_API_KEY` fallback; if neither path resolves, discovery skips with a no-provider message
+- corrections application needs `correction_applications`, a vault path, and a corrections provider resolved from `llm.corrections`, then `llm.discovery`, then the legacy Anthropic fallback; otherwise the system keeps the raw correction and records a skipped or needs-review status instead of editing vault files
 
 ## Minimal `.env`
 

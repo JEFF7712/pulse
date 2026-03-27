@@ -55,14 +55,17 @@ poll_interval = "1h"
 urls = []
 
 # --- LLM Configuration ---
-# Configure providers for summarization (digest narratives) and
-# discovery (cross-source pattern detection) independently.
+# Configure providers for summarization (digest narratives),
+# discovery (cross-source pattern detection), and corrections
+# (interpreting Telegram / MCP feedback into bounded vault updates)
+# independently.
 #
 # Supported providers: anthropic, openai, gemini, ollama
 # API keys are read from environment variables:
 #   ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
 #
-# If only one role is configured, it is used for both.
+# Summarization and discovery can reuse each other when only one of those
+# two roles is configured. Corrections follow the separate fallback below.
 
 # [llm.summarization]
 # provider = "ollama"
@@ -72,6 +75,13 @@ urls = []
 # [llm.discovery]
 # provider = "anthropic"
 # model = "claude-sonnet-4-5-20250514"
+
+# [llm.corrections]
+# provider = "openai"
+# model = "gpt-4o-mini"
+# If omitted, corrections reuse [llm.discovery]. If neither block is set,
+# corrections fall back to legacy PULSE_ANTHROPIC_API_KEY with
+# PULSE_DISCOVERY_MODEL.
 
 # --- Legacy (still works) ---
 # If you just want Anthropic for everything, set PULSE_ANTHROPIC_API_KEY

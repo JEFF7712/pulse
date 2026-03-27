@@ -75,14 +75,14 @@ Connector toggles and nested connector settings live in `pulse.toml`, not in `.e
 
 LLM configuration has two supported paths:
 
-- Recommended: configure `[llm.summarization]` and/or `[llm.discovery]` in `pulse.toml` (see `pulse.toml.example`). Provider credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`.
+- Recommended: configure `[llm.summarization]`, `[llm.discovery]`, and/or `[llm.corrections]` in `pulse.toml` (see `pulse.toml.example`). Provider credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`.
 - Legacy fallback: set `PULSE_ANTHROPIC_API_KEY` and optionally override `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`.
 
 `pulse digest` and the scheduler use the configured summarization provider when one is available. The homepage digest action and MCP `pulse_digest` tool still use the non-LLM digest path today.
 
 The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
 
-Standalone app and CLI commands use `PULSE_DATABASE_PATH`. The MCP server uses `PULSE_DB_PATH`. If you run both surfaces against the same data, point both variables at the same SQLite file.
+Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. They also share the same `PULSE_VAULT_PATH` and `pulse.toml` + `.env` config path.
 
 ## Docs
 
@@ -112,7 +112,7 @@ uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 
 Add to your agent's MCP config (e.g. `.claude/settings.json`):
 
-This example uses the MCP server's own env surface, which differs slightly from the standalone app: keep `PULSE_VAULT_PATH`, but use `PULSE_DB_PATH` here instead of `PULSE_DATABASE_PATH`.
+This example uses the same config model as the standalone app: `pulse.mcp.server` calls the shared config loader, so use `PULSE_DATABASE_PATH` and `PULSE_VAULT_PATH` here too.
 
 ```json
 {
@@ -121,7 +121,7 @@ This example uses the MCP server's own env surface, which differs slightly from 
       "command": "uv",
       "args": ["run", "python", "-m", "pulse.mcp.server"],
       "env": {
-        "PULSE_DB_PATH": "/absolute/path/to/pulse.db",
+        "PULSE_DATABASE_PATH": "/absolute/path/to/pulse.db",
         "PULSE_VAULT_PATH": "/absolute/path/to/Pulse-Vault"
       }
     }

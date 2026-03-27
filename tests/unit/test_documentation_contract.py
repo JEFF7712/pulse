@@ -71,6 +71,13 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "spotify_tokens.json",
     "microsoft_tokens.json",
     "plaid_tokens.json",
+    "llm.corrections",
+    "corrections -> discovery -> legacy `PULSE_ANTHROPIC_API_KEY` fallback",
+    "`correction_applications`",
+    "Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`",
+    "bounded vault update",
+    "MCP server now loads the same `pulse.toml` + `.env` config path as the app/CLI",
+    "If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery.",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [
@@ -85,6 +92,20 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "discovery_daily",
     "host timezone",
     "process timezone",
+    "raw correction text",
+    "bounded vault updates",
+    "correction_applications",
+    "pulse_correct",
+    "single configured summarization/discovery role is reused for both",
+]
+
+QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
+    "single configured summarization/discovery role is reused for both",
+]
+
+PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
+    "[llm.corrections]",
+    "# If omitted, corrections reuse [llm.discovery].",
 ]
 
 ENV_EXAMPLE_REQUIRED_SNIPPETS = [
@@ -98,9 +119,9 @@ README_REQUIRED_SNIPPETS = [
     "Documentation lives under",
     "deployed site serves the same guides",
     "`PULSE_DATABASE_PATH`",
-    "`PULSE_DB_PATH`",
-    "Standalone app and CLI commands use `PULSE_DATABASE_PATH`.",
-    "The MCP server uses `PULSE_DB_PATH`.",
+    "Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`.",
+    "`PULSE_VAULT_PATH`",
+    "`pulse.toml` + `.env` config path",
     "day boundaries",
 ]
 
@@ -165,6 +186,17 @@ def test_quickstart_documents_pulse_onboard() -> None:
 
     missing = [s for s in QUICKSTART_ONBOARD_SNIPPETS if s not in quickstart]
     assert not missing, f"quickstart.md should document pulse onboard: {missing}"
+
+
+def test_quickstart_documents_discovery_role_fallback() -> None:
+    quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
+        encoding="utf-8"
+    )
+
+    missing = [s for s in QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS if s not in quickstart]
+    assert not missing, (
+        f"quickstart.md should document discovery role fallback: {missing}"
+    )
 
 
 def test_quickstart_marks_auth_commands_as_optional() -> None:
@@ -273,6 +305,25 @@ def test_operations_runbook_covers_runtime_health_and_recovery() -> None:
         "runbook.md should not claim cron trigger timezones the scheduler does not configure"
     )
 
+    assert (
+        "discovery jobs skip when neither `[llm.discovery]` nor the legacy `PULSE_ANTHROPIC_API_KEY` fallback is configured"
+        not in runbook
+    ), "runbook.md should not ignore summarization-to-discovery role reuse"
+
+
+def test_pulse_toml_example_covers_corrections_role() -> None:
+    pulse_toml_example = (REPO_ROOT / "pulse.toml.example").read_text(encoding="utf-8")
+
+    missing_snippets = [
+        snippet
+        for snippet in PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS
+        if snippet not in pulse_toml_example
+    ]
+
+    assert not missing_snippets, (
+        f"pulse.toml.example is missing corrections-role guidance: {missing_snippets}"
+    )
+
 
 def test_env_example_lists_spotify_credentials() -> None:
     env_example = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
@@ -298,6 +349,10 @@ def test_readme_reconciles_app_and_mcp_database_env_vars() -> None:
 
     assert not missing_snippets, (
         f"README.md is missing env-var reconciliation guidance: {missing_snippets}"
+    )
+
+    assert "The MCP server uses `PULSE_DB_PATH`." not in readme, (
+        "README.md should not describe the old MCP-only PULSE_DB_PATH behavior"
     )
 
     assert "Scheduler timezone for day boundaries and cron jobs" not in readme, (

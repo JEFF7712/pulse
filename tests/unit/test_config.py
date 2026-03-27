@@ -1,4 +1,10 @@
-from pulse.app.config import PulseConfig, ConnectorConfig, Settings, LLMRoleConfig, LLMConfig
+from pulse.app.config import (
+    PulseConfig,
+    ConnectorConfig,
+    Settings,
+    LLMRoleConfig,
+    LLMConfig,
+)
 
 
 def test_pulse_config_defaults_match_original_settings():
@@ -42,6 +48,7 @@ def test_pulse_config_with_connectors():
 
 def test_get_settings_reads_pulse_prefixed_environment_variables(monkeypatch):
     from pulse.app.dependencies import get_settings
+
     monkeypatch.setenv("PULSE_DATABASE_PATH", "/tmp/pulse-test.db")
     monkeypatch.setenv("PULSE_TIMEZONE", "America/New_York")
     settings = get_settings()
@@ -77,6 +84,24 @@ def test_pulse_config_parses_llm_config():
     assert config.llm.discovery.provider == "anthropic"
     assert config.llm.discovery.model == "claude-sonnet-4-5-20250514"
     assert config.llm.discovery.base_url is None
+
+
+def test_pulse_config_parses_corrections_llm_role():
+    config = PulseConfig(
+        llm=LLMConfig(
+            corrections=LLMRoleConfig(
+                provider="openai",
+                model="gpt-4.1-mini",
+                base_url="https://api.openai.com/v1",
+            )
+        )
+    )
+
+    assert config.llm is not None
+    assert config.llm.corrections is not None
+    assert config.llm.corrections.provider == "openai"
+    assert config.llm.corrections.model == "gpt-4.1-mini"
+    assert config.llm.corrections.base_url == "https://api.openai.com/v1"
 
 
 def test_pulse_config_llm_defaults_to_none():

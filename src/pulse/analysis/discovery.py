@@ -1,4 +1,5 @@
 """DiscoveryEngine — orchestrates LLM-assisted pattern discovery."""
+
 from __future__ import annotations
 
 import re
@@ -10,6 +11,7 @@ from pulse.analysis.preprocessor import EventPreprocessor
 from pulse.analysis.prompts import build_discovery_prompt, parse_discovery_response
 from pulse.analysis.source_summarizer import SourceSummarizer
 from pulse.analysis.vault_memory import VaultMemory
+from pulse.domain.pattern_statuses import normalize_pattern_status
 from pulse.domain.notifications import Notification
 from pulse.store.analytics import AnalyticsRepository
 from pulse.store.db import connect_db
@@ -37,6 +39,30 @@ def _slugify(text: str) -> str:
     text = re.sub(r"[^a-z0-9 ]", "", text)
     text = re.sub(r"\s+", "-", text.strip())
     return text[:80]
+
+
+def _notification_pattern_context_id(pattern_ref: str | None) -> str | None:
+    if pattern_ref is None:
+        return None
+
+    slug = _canonicalize_pattern_ref(pattern_ref)
+    if not slug:
+        return None
+
+    return f"pattern:{slug}"
+
+
+def _canonicalize_pattern_ref(pattern_ref: str) -> str:
+    normalized_ref = re.sub(r"[^a-z0-9]+", " ", pattern_ref.lower()).strip()
+    return re.sub(r"\s+", "-", normalized_ref)[:80]
+
+
+def _valid_new_pattern_title(title: str) -> bool:
+    return bool(_slugify(title))
+
+
+def _valid_updated_pattern_slug(slug: str) -> bool:
+    return bool(_canonicalize_pattern_ref(slug))
 
 
 class DiscoveryEngine:
@@ -84,7 +110,10 @@ class DiscoveryEngine:
             baselines: list[dict] = []
             for weeks_back in range(1, 5):
                 week_start = target_date - timedelta(weeks=weeks_back)
-                week_baselines = await analytics.get_weekly_baselines(week_start.isoformat())
+                await analytics.aggregate_weekly_baselines(week_start.isoformat())
+                week_baselines = await analytics.get_weekly_baselines(
+                    week_start.isoformat()
+                )
                 baselines.extend(week_baselines)
 
         # Stage 1: Preprocess events
@@ -120,6 +149,11 @@ class DiscoveryEngine:
 
         # Read vault memory
         active_patterns = self._vault.read_patterns()
+        known_pattern_context_ids = {
+            f"pattern:{slug}"
+            for pattern in active_patterns
+            if (slug := _canonicalize_pattern_ref(pattern["slug"]))
+        }
         patterns_text = "\n\n".join(
             f"### {p['slug']}\n{p['content']}" for p in active_patterns
         )
@@ -151,8 +185,17 @@ class DiscoveryEngine:
 
         async with connect_db(self._db_path) as db:
             analytics = AnalyticsRepository(db)
+            existing_insights = await analytics.list_insights()
+            known_pattern_context_ids.update(
+                f"pattern:{slug}"
+                for insight in existing_insights
+                if (slug := _canonicalize_pattern_ref(insight["id"]))
+            )
 
             for pattern in discovery.new_patterns:
+                if not _valid_new_pattern_title(pattern.title):
+                    continue
+
                 slug = _slugify(pattern.title)
                 vault_path = f"02-Insights/patterns/{slug}.md"
 
@@ -177,19 +220,41 @@ class DiscoveryEngine:
                     last_seen=target_str,
                     vault_path=vault_path,
                 )
+                known_pattern_context_ids.add(f"pattern:{slug}")
                 new_count += 1
 
             for update in discovery.updated_patterns:
-                slug = update.slug
-                title = update.slug.replace("-", " ").title()
+                if not _valid_updated_pattern_slug(update.slug):
+                    continue
+
+                slug = _canonicalize_pattern_ref(update.slug)
+                existing_insight = await analytics.get_insight(slug)
+                if existing_insight is None and not self._vault.pattern_exists(slug):
+                    continue
+
+                try:
+                    status = normalize_pattern_status(update.status)
+                except ValueError:
+                    continue
+
                 vault_path = f"02-Insights/patterns/{slug}.md"
+                title = (
+                    existing_insight["title"]
+                    if existing_insight is not None
+                    else update.slug.replace("-", " ").title()
+                )
+                first_seen = (
+                    existing_insight["first_seen"]
+                    if existing_insight is not None
+                    else target_str
+                )
 
                 self._vault.update_pattern(
                     slug=slug,
                     title=title,
-                    status=update.status,
+                    status=status,
                     confidence=update.confidence,
-                    first_seen=target_str,
+                    first_seen=first_seen,
                     last_updated=target_str,
                     observation=update.update_note,
                     evidence_log=update.new_evidence,
@@ -199,12 +264,13 @@ class DiscoveryEngine:
                 await analytics.upsert_insight(
                     id=slug,
                     title=title,
-                    status=update.status,
+                    status=status,
                     confidence=str(update.confidence),
-                    first_seen=target_str,
+                    first_seen=first_seen,
                     last_seen=target_str,
                     vault_path=vault_path,
                 )
+                known_pattern_context_ids.add(f"pattern:{slug}")
                 updated_count += 1
 
         if discovery.baseline_updates:
@@ -213,11 +279,20 @@ class DiscoveryEngine:
         notifications_sent = 0
         for notif_item in discovery.notifications:
             if self._channel is not None:
+                context_id = None
+                if notif_item.pattern_slug:
+                    candidate_context_id = _notification_pattern_context_id(
+                        notif_item.pattern_slug
+                    )
+                    if candidate_context_id in known_pattern_context_ids:
+                        context_id = candidate_context_id
+
                 self._channel.send(
                     Notification(
                         title=notif_item.title,
                         body=notif_item.body,
                         category="insight",
+                        context_id=context_id,
                         priority=notif_item.priority,
                     )
                 )

@@ -16,6 +16,7 @@ class LLMRoleConfig(BaseModel):
 class LLMConfig(BaseModel):
     summarization: LLMRoleConfig | None = None
     discovery: LLMRoleConfig | None = None
+    corrections: LLMRoleConfig | None = None
 
 
 class PulseConfig(BaseModel):

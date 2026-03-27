@@ -225,6 +225,30 @@ class AnalyticsRepository:
         )
         await self._db.commit()
 
+    async def get_insight(self, id: str) -> dict | None:
+        cursor = await self._db.execute(
+            """
+            SELECT id, title, status, confidence, first_seen, last_seen, vault_path
+            FROM insights
+            WHERE id = ?
+            """,
+            (id,),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row is None:
+            return None
+
+        return {
+            "id": row[0],
+            "title": row[1],
+            "status": row[2],
+            "confidence": row[3],
+            "first_seen": row[4],
+            "last_seen": row[5],
+            "vault_path": row[6],
+        }
+
     async def list_insights(self, status: str | None = None) -> list[dict]:
         if status is not None:
             cursor = await self._db.execute(

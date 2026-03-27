@@ -1,4 +1,5 @@
 """LLM provider factory — creates providers from config."""
+
 from __future__ import annotations
 
 import os
@@ -40,10 +41,12 @@ def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
 
     if provider == "anthropic":
         from pulse.llm.anthropic import AnthropicProvider
+
         return AnthropicProvider(api_key=api_key, model=role_config.model)
 
     if provider in ("openai", "ollama"):
         from pulse.llm.openai_compat import OpenAICompatibleProvider
+
         return OpenAICompatibleProvider(
             api_key=api_key,
             model=role_config.model,
@@ -52,7 +55,28 @@ def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
 
     # provider == "gemini"
     from pulse.llm.gemini import GeminiProvider
+
     return GeminiProvider(api_key=api_key, model=role_config.model)
+
+
+def create_corrections_provider_from_config(config: PulseConfig) -> LLM | None:
+    """Return the corrections LLM from config using corrections-specific fallback."""
+    if config.llm is not None:
+        if config.llm.corrections is not None:
+            return create_llm_provider(config.llm.corrections)
+
+        if config.llm.discovery is not None:
+            return create_llm_provider(config.llm.discovery)
+
+    if config.anthropic_api_key:
+        from pulse.llm.anthropic import AnthropicProvider
+
+        return AnthropicProvider(
+            api_key=config.anthropic_api_key,
+            model=config.discovery_model,
+        )
+
+    return None
 
 
 def create_providers_from_config(config: PulseConfig) -> tuple[LLM | None, LLM | None]:
@@ -83,6 +107,7 @@ def create_providers_from_config(config: PulseConfig) -> tuple[LLM | None, LLM |
     # Legacy: anthropic_api_key
     if config.anthropic_api_key:
         from pulse.llm.anthropic import AnthropicProvider
+
         summ_llm = AnthropicProvider(
             api_key=config.anthropic_api_key,
             model=config.summarization_model,

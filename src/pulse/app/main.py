@@ -17,7 +17,8 @@ from pulse.app.homepage import HomepageNotice, HomepageStatus, render_homepage
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import extract_reply_context
 from pulse.jobs.scheduler import build_scheduler
-from pulse.services.corrections import CorrectionService
+from pulse.services.corrections import build_correction_service
+from pulse.store.correction_applications import CorrectionApplicationRepository
 from pulse.store.corrections import CorrectionRepository
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
@@ -139,7 +140,13 @@ def create_app(
         async with connect_db(s.database_path) as db:
             await bootstrap_schema(db)
             repository = CorrectionRepository(db)
-            service = CorrectionService(repository)
+            correction_applications = CorrectionApplicationRepository(db)
+            service = build_correction_service(
+                repository,
+                config=s,
+                correction_applications=correction_applications,
+                vault_path=s.vault_path,
+            )
             await service.record_reply(
                 context_id=context_id, message_text=reply_text.strip()
             )
@@ -154,9 +161,7 @@ def create_app(
     return app
 
 
-def _register_push_route(
-    app: FastAPI, push_conn, settings_dependency
-) -> None:
+def _register_push_route(app: FastAPI, push_conn, settings_dependency) -> None:
     path = push_conn.get_webhook_path()
 
     async def handler(
