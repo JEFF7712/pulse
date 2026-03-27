@@ -7,7 +7,7 @@
   --pulse-accent: #4ade80;
   --pulse-dim: #3a3632;
   --pulse-line: rgba(196, 191, 184, 0.18);
-  --vp-font-family-base: Georgia, "Times New Roman", serif;
+  --vp-font-family-base: "Source Sans 3", system-ui, sans-serif;
   --vp-font-family-mono: "Geist Mono", monospace;
   --vp-c-brand-1: #4ade80;
   --vp-c-brand-2: #73e89a;
@@ -106,21 +106,49 @@ body::before {
 .vp-doc p,
 .vp-doc li {
   color: var(--pulse-cream);
-  line-height: 1.8;
-}
-
-.pulse-docs-home .vp-doc > div > p:first-of-type,
-.pulse-docs-home .vp-doc > div > p:nth-of-type(2),
-.pulse-docs-home .vp-doc > div > ol,
-.pulse-docs-home .pulse-home-kicker,
-.pulse-docs-home .pulse-home-card p,
-.pulse-docs-home .pulse-home-card a {
-  font-family: "Geist Mono", monospace;
+  line-height: 1.75;
+  font-family: var(--vp-font-family-base);
 }
 
 .vp-doc a,
 .VPLink.link {
   color: var(--pulse-accent);
+  border-radius: 2px;
+}
+
+.vp-doc a:focus-visible,
+.VPLink.link:focus-visible,
+.VPNavBarMenuLink:focus-visible,
+.VPSidebarItem a:focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 3px;
+}
+
+.pulse-doc-meta {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--pulse-cream);
+  max-width: 48rem;
+  opacity: 0.92;
+}
+
+.pulse-docs-home .pulse-home-kicker,
+.pulse-docs-home .vp-doc > div > ol {
+  font-family: "Geist Mono", monospace;
+}
+
+.pulse-docs-home .pulse-home-card p {
+  font-family: var(--vp-font-family-base);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+.pulse-docs-home .pulse-home-card .pulse-home-cta {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .pulse-docs-home .vp-doc {
@@ -134,29 +162,21 @@ body::before {
 
 .pulse-docs-home .vp-doc h1,
 .pulse-docs-home .vp-doc h2,
-.pulse-docs-home .pulse-home-grid {
-  padding: 0 1.25rem;
-}
-
-.pulse-docs-home .vp-doc > div > p:first-of-type,
-.pulse-docs-home .vp-doc > div > p:nth-of-type(2),
+.pulse-docs-home .vp-doc > div > p,
 .pulse-docs-home .vp-doc > div > ol,
-.pulse-docs-home .vp-doc > div > p:last-of-type {
-  padding: 0 1.25rem;
+.pulse-docs-home .vp-doc > div > .pulse-home-grid,
+.pulse-docs-home .vp-doc > div > .custom-block {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 .pulse-docs-home .vp-doc h1,
-.pulse-docs-home .vp-doc > div > p:first-of-type {
+.pulse-docs-home .vp-doc > div > .pulse-doc-meta {
   margin: 0;
 }
 
 .pulse-docs-home .vp-doc h1 {
   padding-top: 1.5rem;
-}
-
-.pulse-docs-home .vp-doc > div > p:first-of-type {
-  max-width: 48rem;
-  font-size: 1rem;
 }
 
 .pulse-docs-home .vp-doc h2 {
@@ -176,12 +196,32 @@ body::before {
   margin: 0.5rem 0 1rem;
 }
 
-.pulse-home-card {
+a.pulse-home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   min-height: 100%;
   padding: 1.25rem;
   border: 1px solid var(--pulse-line);
+  border-radius: 2px;
   background: linear-gradient(180deg, rgba(17, 16, 15, 0.92), rgba(11, 11, 10, 0.92));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+  color: var(--pulse-cream);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+a.pulse-home-card:hover {
+  border-color: var(--pulse-accent);
+  outline: none;
+  background: linear-gradient(180deg, rgba(22, 28, 24, 0.95), rgba(12, 16, 14, 0.95));
+}
+
+.pulse-docs-home .vp-doc a.pulse-home-card:focus-visible {
+  border-color: var(--pulse-accent);
+  outline: none;
 }
 
 .pulse-home-kicker {
@@ -194,31 +234,36 @@ body::before {
 
 .pulse-home-card h3 {
   margin: 0 0 0.75rem;
+  font-family: "Instrument Serif", serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--pulse-white);
 }
 
 .pulse-home-card p {
   margin: 0 0 1rem;
 }
 
-.pulse-home-card a {
+.pulse-home-cta {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  text-decoration: none;
+  margin-top: auto;
+  color: var(--pulse-accent);
 }
 
-.pulse-home-card a::after {
+.pulse-home-cta::after {
   content: "->";
 }
 
 @media (max-width: 640px) {
   .pulse-docs-home .vp-doc h1,
   .pulse-docs-home .vp-doc h2,
-  .pulse-docs-home .pulse-home-grid,
-  .pulse-docs-home .vp-doc > div > p:first-of-type,
-  .pulse-docs-home .vp-doc > div > p:nth-of-type(2),
+  .pulse-docs-home .vp-doc > div > p,
   .pulse-docs-home .vp-doc > div > ol,
-  .pulse-docs-home .vp-doc > div > p:last-of-type {
+  .pulse-docs-home .vp-doc > div > .pulse-home-grid,
+  .pulse-docs-home .vp-doc > div > .custom-block {
     padding-left: 0;
     padding-right: 0;
   }

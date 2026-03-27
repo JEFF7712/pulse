@@ -2,9 +2,17 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   base: "/docs/",
+  // `false` removes the toggle and avoids truthy `site.appearance` (e.g. force-dark still
+  // satisfies `hasExtraContent` in VPNavBarExtra). Dark class is set via script below.
+  appearance: false,
   title: "Pulse Docs",
   description: "Self-hosted Pulse deployment and operations docs.",
   head: [
+    [
+      "script",
+      { id: "pulse-docs-dark" },
+      "document.documentElement.classList.add('dark')"
+    ],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     [
       "link",
@@ -18,12 +26,15 @@ export default defineConfig({
       "link",
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400&display=swap"
+        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&display=swap"
       }
     ]
   ],
   themeConfig: {
+    logo: "/pulse-mark.svg",
+    siteTitle: "Pulse Docs",
     nav: [
+      { text: "Website", link: "/" },
       { text: "Self-Hosting", link: "/self-hosting/quickstart" },
       { text: "Configuration", link: "/reference/configuration" },
       { text: "Operations", link: "/operations/runbook" },

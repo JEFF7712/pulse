@@ -34,7 +34,7 @@ grep -qx 'docs/.vitepress/dist' docs-app/.gitignore
 ! grep -q '^\.vitepress/' docs-app/.gitignore
 grep -q 'base: "/docs/"' docs-app/docs/.vitepress/config.mts
 grep -q 'import "./custom.css";' docs-app/docs/.vitepress/theme/index.ts
-grep -q '^  --vp-font-family-base: Georgia, "Times New Roman", serif;$' docs-app/docs/.vitepress/theme/custom.css
+grep -q '^  --vp-font-family-base: "Source Sans 3", system-ui, sans-serif;$' docs-app/docs/.vitepress/theme/custom.css
 grep -q '^  --vp-font-family-mono: "Geist Mono", monospace;$' docs-app/docs/.vitepress/theme/custom.css
 grep -q '^\.pulse-docs-home \.vp-doc > div {$' docs-app/docs/.vitepress/theme/custom.css
 npm ci --ignore-scripts --no-audit --no-fund --prefix docs-app >/dev/null
@@ -94,6 +94,7 @@ curl -fsS "http://127.0.0.1:$port$docs_nav_path" >/dev/null
 [[ -n "${docs_html:-}" ]]
 [[ -n "${docs_bridge_html:-}" ]]
 grep -q '<title>Pulse</title>' <<<"$html"
+grep -q 'href="/docs/"' <<<"$html"
 grep -q 'Personal Intelligence Agent' <<<"$html"
 grep -q 'Turn your life data into useful observations\.' <<<"$html"
 grep -q 'It explains what is changing in plain English' <<<"$html"
@@ -145,6 +146,8 @@ assert_contains "$docs_html" 'Configuration'
 assert_contains "$docs_html" 'Operations'
 assert_contains "$docs_html" 'Connectors'
 assert_contains "$docs_html" 'Self-Hosting Quickstart'
+assert_contains "$docs_html" 'pulse-home-card'
+assert_contains "$docs_html" 'Open quickstart'
 assert_contains "$docs_html" 'This page renders the canonical repo doc'
 assert_contains "$docs_html" 'docs/index.md'
 assert_contains "$quickstart_html" 'Self-Hosting Quickstart'

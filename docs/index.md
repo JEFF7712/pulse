@@ -1,6 +1,6 @@
 # Pulse Docs
 
-This file is the source of truth for the deployed docs page at `/docs/`. The VitePress site under `site/docs-app/` includes these markdown files verbatim.
+<p class="pulse-doc-meta">This file is the source of truth for the deployed docs page at <code>/docs/</code>. The VitePress site under <code>site/docs-app/</code> includes these markdown files verbatim.</p>
 
 ## What is Pulse?
 
@@ -19,10 +19,32 @@ If you want the shortest path from a fresh checkout to a working deployment, use
 
 Use these guides when you want the shortest route from a fresh checkout to a working Pulse deployment.
 
-- [Self-Hosting Quickstart](./self-hosting/quickstart.md)
-- [Configuration Reference](./reference/configuration.md)
-- [Operations Runbook](./operations/runbook.md)
-- [Connectors Index](./connectors/index.md)
+<div class="pulse-home-grid">
+  <a class="pulse-home-card" href="./self-hosting/quickstart.md">
+    <p class="pulse-home-kicker">Setup</p>
+    <h3>Self-Hosting Quickstart</h3>
+    <p>Install dependencies, configure the stack, and boot the app.</p>
+    <span class="pulse-home-cta">Open quickstart</span>
+  </a>
+  <a class="pulse-home-card" href="./reference/configuration.md">
+    <p class="pulse-home-kicker">Config</p>
+    <h3>Configuration Reference</h3>
+    <p>Environment variables, <code>pulse.toml</code>, and connector settings.</p>
+    <span class="pulse-home-cta">Open reference</span>
+  </a>
+  <a class="pulse-home-card" href="./operations/runbook.md">
+    <p class="pulse-home-kicker">Operations</p>
+    <h3>Operations Runbook</h3>
+    <p>Health checks, recovery, and day-two operations.</p>
+    <span class="pulse-home-cta">Open runbook</span>
+  </a>
+  <a class="pulse-home-card" href="./connectors/index.md">
+    <p class="pulse-home-kicker">Data</p>
+    <h3>Connectors</h3>
+    <p>Expand ingestion across accounts and devices.</p>
+    <span class="pulse-home-cta">Open connectors</span>
+  </a>
+</div>
 
 ## Agent integration (MCP)
 
