@@ -1,7 +1,19 @@
+FROM node:20-alpine AS docs-builder
+
+WORKDIR /app/site/docs-app
+
+COPY site/docs-app/package.json site/docs-app/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+
+COPY site/docs-app/ ./
+COPY docs/ /app/docs/
+RUN npm run docs:build
+
 FROM nginx:alpine
 
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY index.html /usr/share/nginx/html/index.html
+COPY site/nginx.conf /etc/nginx/nginx.conf
+COPY site/index.html /usr/share/nginx/html/index.html
+COPY --from=docs-builder /app/site/docs-app/docs/.vitepress/dist/ /usr/share/nginx/html/docs/
 
 EXPOSE 8080
 

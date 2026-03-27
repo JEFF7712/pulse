@@ -1,0 +1,10 @@
+.git
+.env
+.DS_Store
+.pytest_cache
+.venv/
+data/
+Pulse-Vault/
+site/docs-app/node_modules
+site/docs-app/docs/.vitepress/cache
+site/docs-app/docs/.vitepress/dist

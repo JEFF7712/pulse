@@ -1,4 +1,6 @@
 .git
 .DS_Store
-docs
 tests
+docs-app/node_modules
+docs-app/docs/.vitepress/cache
+docs-app/docs/.vitepress/dist

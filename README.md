@@ -46,15 +46,33 @@ Copy `.env.example` and set any values you need:
 cp .env.example .env
 ```
 
-| Variable | Description | Default |
+| Variable | Runtime use | Default |
 |----------|-------------|---------|
-| `PULSE_DATABASE_PATH` | SQLite database location | `data/pulse.db` |
-| `PULSE_VAULT_PATH` | Markdown vault directory | `Pulse-Vault` |
-| `PULSE_TIMEZONE` | Timezone for scheduling | `UTC` |
-| `PULSE_TELEGRAM_BOT_TOKEN` | Telegram bot token | _(optional)_ |
-| `PULSE_TELEGRAM_CHAT_ID` | Your Telegram chat ID | _(optional)_ |
-| `PULSE_GOOGLE_CLIENT_ID` | Google OAuth client ID | _(optional)_ |
+| `PULSE_DATABASE_PATH` | SQLite database path; also determines where OAuth token files are stored | `data/pulse.db` |
+| `PULSE_VAULT_PATH` | Markdown vault output directory | `Pulse-Vault` |
+| `PULSE_TIMEZONE` | Timezone used for current-day resolution and day boundaries inside jobs | `UTC` |
+| `PULSE_TELEGRAM_BOT_TOKEN` | Enables outbound Telegram notifications when paired with chat ID | _(optional)_ |
+| `PULSE_TELEGRAM_CHAT_ID` | Destination chat for Telegram notifications | _(optional)_ |
+| `PULSE_GOOGLE_CLIENT_ID` | Google OAuth client ID for enabled Google connectors | _(optional)_ |
 | `PULSE_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | _(optional)_ |
+| `PULSE_SPOTIFY_CLIENT_ID` | Spotify OAuth client ID for the Spotify connector | _(optional)_ |
+| `PULSE_SPOTIFY_CLIENT_SECRET` | Spotify OAuth client secret | _(optional)_ |
+| `PULSE_ANTHROPIC_API_KEY` | Enables discovery jobs instead of skipping them | _(optional)_ |
+
+Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`. The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
+
+Standalone app and CLI commands use `PULSE_DATABASE_PATH`. The MCP server uses `PULSE_DB_PATH`. If you run both surfaces against the same data, point both variables at the same SQLite file.
+
+## Docs
+
+Start with [docs/index.md](docs/index.md), the source-of-truth docs entry for repo readers.
+
+[`/docs/`](/docs/) is the rendered version of that same docs set.
+
+- [Self-hosting quickstart](docs/self-hosting/quickstart.md)
+- [Configuration reference](docs/reference/configuration.md)
+- [Operations runbook](docs/operations/runbook.md)
+- [Connectors index](docs/connectors/index.md)
 
 ## Run tests
 
@@ -71,6 +89,8 @@ uvicorn --app-dir src pulse.app.main:create_app --factory
 ## Use as an MCP server
 
 Add to your agent's MCP config (e.g. `.claude/settings.json`):
+
+This example uses the MCP server's own env surface, which differs slightly from the standalone app: keep `PULSE_VAULT_PATH`, but use `PULSE_DB_PATH` here instead of `PULSE_DATABASE_PATH`.
 
 ```json
 {
