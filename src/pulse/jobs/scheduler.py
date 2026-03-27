@@ -152,17 +152,14 @@ def _make_daily_digest_job(config):
     async def job():
         day = _resolve_current_day(config)
 
-        llm = None
-        if config.anthropic_api_key:
-            from pulse.llm.anthropic import AnthropicProvider
-            llm = AnthropicProvider(api_key=config.anthropic_api_key)
+        from pulse.llm.factory import create_providers_from_config
+        summ_llm, _ = create_providers_from_config(config)
 
         return await run_daily_digest_job(
             day=day,
             database_path=config.database_path,
             vault_path=config.vault_path,
-            llm=llm,
-            summarization_model=config.summarization_model,
+            llm=summ_llm,
         )
     return job
 
@@ -196,14 +193,12 @@ def _make_aggregation_job(config):
 def _make_discovery_job(cadence, config):
     async def job():
         from pulse.jobs.runners import run_discovery_job
-        from pulse.llm.anthropic import AnthropicProvider
+        from pulse.llm.factory import create_providers_from_config
 
         day = _resolve_current_day(config)
-        llm = None
-        if config.anthropic_api_key:
-            llm = AnthropicProvider(api_key=config.anthropic_api_key)
+        _, disc_llm = create_providers_from_config(config)
 
-        if llm is None:
+        if disc_llm is None:
             return JobResult(
                 status="skipped",
                 detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
@@ -215,10 +210,8 @@ def _make_discovery_job(cadence, config):
             target_date=day,
             database_path=config.database_path,
             vault_path=config.vault_path,
-            llm=llm,
+            llm=disc_llm,
             notification_channel=channel,
-            summarization_model=config.summarization_model,
-            discovery_model=config.discovery_model,
         )
     return job
 
