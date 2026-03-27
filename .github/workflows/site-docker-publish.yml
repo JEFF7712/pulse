@@ -4,10 +4,12 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - '.dockerignore'
       - '.github/workflows/site-docker-publish.yml'
   pull_request:
     paths:
       - 'site/**'
+      - '.dockerignore'
       - '.github/workflows/site-docker-publish.yml'
 permissions:
   contents: read
@@ -47,7 +49,7 @@ jobs:
       - name: Build and push site image
         uses: docker/build-push-action@v6
         with:
-          context: ./site
+          context: .
           file: ./site/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
