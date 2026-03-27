@@ -47,3 +47,9 @@ def test_get_settings_reads_pulse_prefixed_environment_variables(monkeypatch):
     settings = get_settings()
     assert settings.database_path == "/tmp/pulse-test.db"
     assert settings.timezone == "America/New_York"
+
+
+def test_pulse_config_has_model_defaults():
+    config = PulseConfig()
+    assert config.summarization_model == "claude-haiku-4-5-20251001"
+    assert config.discovery_model == "claude-sonnet-4-5-20250514"

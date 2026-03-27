@@ -18,6 +18,8 @@ class PulseConfig(BaseModel):
     spotify_client_id: str | None = None
     spotify_client_secret: str | None = None
     anthropic_api_key: str | None = None
+    summarization_model: str = "claude-haiku-4-5-20251001"
+    discovery_model: str = "claude-sonnet-4-5-20250514"
     connectors: dict[str, ConnectorConfig] = {}
 
 
