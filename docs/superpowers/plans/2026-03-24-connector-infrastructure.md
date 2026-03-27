@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-24-connector-infrastructure-design.md`
 
+**Status:** Partially implemented
+
+**Current state:** The connector ABC updates, config loading, registry, shared Google auth, scheduler wiring, webhook registration, and the initial Google connector rollout are all shipped. The main gap left from this plan is `pulse_connector_status` in `src/pulse/mcp/server.py`, which still uses a hard-coded source list instead of surfacing connector status from the registry/config-driven runtime.
+
 ---
 
 ## File Structure

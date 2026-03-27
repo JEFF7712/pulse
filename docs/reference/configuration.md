@@ -33,11 +33,40 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `plaid_client_id` | `PULSE_PLAID_CLIENT_ID` | unset | Plaid Link + transactions. |
 | `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Keep in `.env`. |
 | `plaid_env` | `PULSE_PLAID_ENV` | unset | `sandbox`, `development`, or `production`. |
-| `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Optional; discovery jobs skip themselves when this is missing. |
-| `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model id for daily digests, profile structuring, and parts of discovery when an LLM is used. |
-| `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Anthropic model id for the main discovery pass. |
+| `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Legacy single-provider fallback for profile structuring, digest summarization, and discovery when `[llm.*]` role config is not set. |
+| `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Legacy Anthropic model id for summarization when `PULSE_ANTHROPIC_API_KEY` is being used. |
+| `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Legacy Anthropic model id for discovery when `PULSE_ANTHROPIC_API_KEY` is being used. |
+| `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization` and `discovery`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
 
 You can also set `summarization_model` and `discovery_model` as top-level keys in `pulse.toml` (same names, string values); environment variables override file values when both are present.
+
+### LLM provider configuration
+
+Pulse supports two LLM configuration paths:
+
+1. **Legacy Anthropic fallback** via `PULSE_ANTHROPIC_API_KEY` plus optional `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`. This is also what `pulse init` uses for profile structuring.
+2. **Per-role provider config** in `pulse.toml` via `[llm.summarization]` and `[llm.discovery]`. Each block sets `provider`, `model`, and optional `base_url`. If you configure only one role, Pulse reuses it for both summarization and discovery.
+
+Supported providers are `anthropic`, `openai`, `gemini`, and `ollama`.
+
+```toml
+[llm.summarization]
+provider = "ollama"
+model = "llama3"
+base_url = "http://localhost:11434/v1"
+
+[llm.discovery]
+provider = "anthropic"
+model = "claude-sonnet-4-5-20250514"
+```
+
+Provider API keys come from standard environment variables, not `PULSE_...` names:
+
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+
+`ollama` uses the OpenAI-compatible transport and defaults to a placeholder key when no `OPENAI_API_KEY` is set.
 
 ## `pulse.toml`
 
@@ -111,7 +140,7 @@ That extra-field behavior is what allows settings such as `browser = "chrome"`, 
 
 The runtime keeps secrets and refresh tokens in different places:
 
-- client credentials stay in `.env` (Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, Telegram) — never commit `.env`
+- client credentials stay in `.env` (Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Telegram, plus any provider API keys such as Anthropic/OpenAI/Gemini) — never commit `.env`
 - OAuth-style token files beside the database: `google_tokens.json`, `spotify_tokens.json`, `microsoft_tokens.json`, `github_tokens.json`, `gitlab_tokens.json`, `plaid_tokens.json` (Plaid stores `access_token` and transaction sync cursor; treat like other secrets)
 
 Because the token paths are derived from `Path(config.database_path).parent`, changing `PULSE_DATABASE_PATH` also changes where those `*.json` token files are written.
@@ -127,11 +156,11 @@ The MCP `pulse_digest` tool uses the non-LLM `DailySummarizer` path; it does not
 ## Runtime consequences
 
 - `/health` only checks that the app booted with a valid config object; it does not prove that external connectors are authenticated
-- the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when Telegram or Anthropic settings are absent
-- the **scheduled** `daily_digest` job still fires every 24 hours; when `PULSE_ANTHROPIC_API_KEY` is set it passes an LLM into the digest runner and uses `summarization_model`, otherwise it uses the non-LLM summarizer
-- **`pulse digest` and the web “Digest” action** invoke the same digest runner **without** an LLM client, so they always produce the non-LLM summary even when an API key is configured (only the scheduler’s digest job uses the LLM)
+- the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when Telegram or discovery-provider settings are absent
+- the **scheduled** `daily_digest` job still fires every 24 hours; when a summarization provider is configured it passes an LLM into the digest runner, otherwise it uses the non-LLM summarizer
+- `pulse digest` now uses the same summarization-provider path as the scheduler; the web **Digest** action still invokes the digest runner without an LLM client, so browser-triggered digests stay non-LLM today
 - `morning_briefing` needs both Telegram settings to deliver notifications
-- discovery jobs need `PULSE_ANTHROPIC_API_KEY`; otherwise they skip with a no-provider message
+- discovery jobs need `[llm.discovery]` in `pulse.toml` or the legacy `PULSE_ANTHROPIC_API_KEY`; otherwise they skip with a no-provider message
 
 ## Minimal `.env`
 
@@ -156,8 +185,13 @@ PULSE_GITLAB_TOKEN=
 PULSE_PLAID_CLIENT_ID=
 PULSE_PLAID_SECRET=
 PULSE_PLAID_ENV=
+# Legacy single-provider fallback:
 PULSE_ANTHROPIC_API_KEY=
-# Optional overrides:
+# Per-role provider API keys (used by [llm.*] in pulse.toml):
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+# Optional legacy overrides:
 # PULSE_SUMMARIZATION_MODEL=claude-haiku-4-5-20251001
 # PULSE_DISCOVERY_MODEL=claude-sonnet-4-6
 ```

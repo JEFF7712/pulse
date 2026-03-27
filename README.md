@@ -69,9 +69,18 @@ cp .env.example .env
 | `PULSE_GITLAB_TOKEN` | GitLab personal access token (skips OAuth when set) | _(optional)_ |
 | `PULSE_PLAID_CLIENT_ID` / `PULSE_PLAID_SECRET` | Plaid API credentials for bank transactions | _(optional)_ |
 | `PULSE_PLAID_ENV` | `sandbox`, `development`, or `production` | _(optional)_ |
-| `PULSE_ANTHROPIC_API_KEY` | Enables discovery jobs instead of skipping them | _(optional)_ |
+| `PULSE_ANTHROPIC_API_KEY` | Legacy single-provider fallback for profile structuring, digest summarization, and discovery | _(optional)_ |
 
-Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`. The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
+Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`.
+
+LLM configuration has two supported paths:
+
+- Recommended: configure `[llm.summarization]` and/or `[llm.discovery]` in `pulse.toml` (see `pulse.toml.example`). Provider credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`.
+- Legacy fallback: set `PULSE_ANTHROPIC_API_KEY` and optionally override `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`.
+
+`pulse digest` and the scheduler use the configured summarization provider when one is available. The homepage digest action and MCP `pulse_digest` tool still use the non-LLM digest path today.
+
+The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
 
 Standalone app and CLI commands use `PULSE_DATABASE_PATH`. The MCP server uses `PULSE_DB_PATH`. If you run both surfaces against the same data, point both variables at the same SQLite file.
 

@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python 3.12+, existing Pulse core (aiosqlite, anthropic SDK), Haiku for summarization, Sonnet for discovery
 
+**Status:** Partially implemented
+
+**Current state:** `EventPreprocessor`, `SourceSummarizer`, `DigestBuilder`, the sharpened discovery pipeline, and per-role model selection are all shipped. The remaining rollout gaps are consistency across entrypoints: `src/pulse/app/home_actions.py` still runs digest generation without a summarization LLM, and `src/pulse/mcp/server.py` still builds digests with `DailySummarizer()` and no model/config awareness.
+
 ---
 
 ## File Structure

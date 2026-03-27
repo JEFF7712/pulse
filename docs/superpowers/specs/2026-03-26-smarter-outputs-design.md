@@ -1,7 +1,11 @@
 # Smarter Outputs: Pre-processing, Two-pass LLM Pipeline & Narrative Digests
 
 **Date:** 2026-03-26
-**Status:** Approved
+**Status:** Partially implemented
+
+## Current state
+
+Most of this design is live in code: Pulse now preprocesses events, generates source narratives, builds smarter digests, and feeds discovery with the richer pipeline. The remaining mismatch is rollout consistency: CLI and scheduled jobs can use the configured summarization/discovery providers, but `src/pulse/app/home_actions.py` still calls the digest job without a summarization LLM and `src/pulse/mcp/server.py` still uses the sync `DailySummarizer()` path.
 
 ## Problem
 

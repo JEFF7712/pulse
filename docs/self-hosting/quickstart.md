@@ -131,7 +131,7 @@ pulse init
 - creates or updates your vault profile in `04-Config/profile.md` (structured with the LLM when `PULSE_ANTHROPIC_API_KEY` is set; otherwise saved as a simple “Self description” section)
 - performs the initial pull for active connectors
 - aggregates stats
-- optionally runs an initial **weekly** discovery pass when `PULSE_ANTHROPIC_API_KEY` is set (Telegram notifications are included if Telegram is configured)
+- optionally runs an initial **weekly** discovery pass when a discovery LLM is configured via `[llm.discovery]` in `pulse.toml` or the legacy `PULSE_ANTHROPIC_API_KEY` fallback (Telegram notifications are included if Telegram is configured)
 
 ## 4. Start the API server and scheduler
 
@@ -143,7 +143,7 @@ pulse run
 
 This boots the database schema, loads active connectors from `pulse.toml`, starts the scheduler, and serves the app on `0.0.0.0:8000` unless you override `--host`, `--port`, or `--log-level`.
 
-The root URL (`/`) is a small operator page: it shows database and vault paths, connector counts, and how many scheduler jobs are registered. You can trigger **Pull**, **Digest**, **Discover**, and **Test Telegram** from the browser (roughly like `pulse pull`, `pulse digest`, `pulse discover`, and `pulse test-telegram`). The on-demand digest path does not call the LLM; the **scheduled** `daily_digest` job does when `PULSE_ANTHROPIC_API_KEY` is set. The web **Discover** button runs daily cadence only—use the CLI for weekly or monthly passes.
+The root URL (`/`) is a small operator page: it shows database and vault paths, connector counts, and how many scheduler jobs are registered. You can trigger **Pull**, **Digest**, **Discover**, and **Test Telegram** from the browser (roughly like `pulse pull`, `pulse digest`, `pulse discover`, and `pulse test-telegram`). The web **Digest** action still uses the non-LLM digest path today; `pulse digest` and the **scheduled** `daily_digest` job use the configured summarization provider when one is available. The web **Discover** button runs daily cadence only—use the CLI for weekly or monthly passes.
 
 ## 5. Check that data is flowing
 
@@ -168,8 +168,8 @@ If no patterns exist yet, Pulse tells you to run discovery first. Otherwise it l
 ## Other CLI commands
 
 - `pulse pull [sources…]` — run connector pulls immediately (default: all active pull connectors).
-- `pulse digest [--date YYYY-MM-DD]` — aggregate stats and write the daily digest vault file for that day (today if omitted); uses the non-LLM summarizer (the scheduler’s digest job uses the LLM when an API key is configured).
-- `pulse discover [--cadence daily|weekly|monthly] [--date YYYY-MM-DD]` — run a discovery pass manually (requires `PULSE_ANTHROPIC_API_KEY`).
+- `pulse digest [--date YYYY-MM-DD]` — aggregate stats and write the daily digest vault file for that day (today if omitted); uses the configured summarization provider when available, otherwise falls back to the non-LLM summarizer.
+- `pulse discover [--cadence daily|weekly|monthly] [--date YYYY-MM-DD]` — run a discovery pass manually (requires `[llm.discovery]` in `pulse.toml` or the legacy `PULSE_ANTHROPIC_API_KEY` fallback).
 - `pulse test-telegram` — send a one-off test message using your Telegram settings.
 - `pulse cleanup [--dry-run]` — list or delete events whose timestamps are in the future (useful if bad data or clock skew landed in the database).
 

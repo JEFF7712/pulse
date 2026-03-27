@@ -1,12 +1,16 @@
 # Phase 1: Connector Infrastructure + Google Ecosystem
 
 **Date:** 2026-03-24
-**Status:** Approved
+**Status:** Partially implemented
 **Scope:** Infrastructure for scalable connector development + YouTube connector + Gmail/Calendar migration
 
 ---
 
 ## Context
+
+## Current state
+
+Most of this design has landed: Pulse now has enhanced connector interfaces, `pulse.toml`-driven config loading, a registry, shared Google OAuth, registry-backed scheduler startup, and push webhook registration. The remaining mismatch is the MCP connector-status surface in `src/pulse/mcp/server.py`, which still hardcodes `gmail`, `calendar`, and `youtube` instead of reporting from the active connector runtime.
 
 Pulse's core value scales with data breadth — cross-source patterns only emerge when correlating across domains. The project currently has two connectors (Gmail, Calendar) wired in ad-hoc. This phase establishes the infrastructure for 13+ planned connectors and adds YouTube as the third.
 

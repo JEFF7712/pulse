@@ -48,6 +48,8 @@ grep -q '^RUN npm run docs:build$' Dockerfile
 grep -q '^FROM nginx:alpine$' Dockerfile
 grep -q '^COPY site/nginx.conf /etc/nginx/nginx.conf$' Dockerfile
 grep -q '^COPY site/index.html /usr/share/nginx/html/index.html$' Dockerfile
+grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/pulse-mark\.svg /usr/share/nginx/html/pulse-mark\.svg$' Dockerfile
+grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/favicon\.ico /usr/share/nginx/html/favicon\.ico$' Dockerfile
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/ /usr/share/nginx/html/docs/$' Dockerfile
 grep -q '^EXPOSE 8080$' Dockerfile
 grep -q '^USER 101:101$' Dockerfile
