@@ -1,4 +1,8 @@
 from datetime import UTC, datetime
+from unittest.mock import Mock
+
+import pytest
+from googleapiclient.errors import HttpError
 
 
 def _make_fake_service(items):
@@ -126,3 +130,96 @@ def test_get_sync_timestamp_returns_pull_time_not_event_time():
     sync_ts = connector.get_sync_timestamp()
     # Sync timestamp should be around "now", not 2055
     assert before <= sync_ts <= after
+
+
+def test_google_calendar_resync_when_updated_min_too_long_ago():
+    """410 updatedMinTooLongAgo triggers a bounded timeMin list (no updatedMin)."""
+    from pulse.connectors.calendar import GoogleCalendarConnector
+
+    resp = Mock()
+    resp.status = 410
+    stale_err = HttpError(
+        resp,
+        b'{"error":{"errors":[{"reason":"updatedMinTooLongAgo","message":"too far"}]}}',
+    )
+
+    resync_items = [
+        {
+            "id": "resync-1",
+            "summary": "Recovered",
+            "start": {"dateTime": "2026-03-01T10:00:00+00:00"},
+        },
+    ]
+
+    class FakeListRequest:
+        def __init__(self, fn):
+            self._fn = fn
+
+        def execute(self):
+            return self._fn()
+
+    class FakeEvents:
+        def __init__(self, parent):
+            self.parent = parent
+
+        def list(self, **kwargs):
+            self.parent.kwargs_history.append(kwargs)
+            n = len(self.parent.kwargs_history)
+            if n == 1:
+
+                def _raise():
+                    raise stale_err
+
+                return FakeListRequest(_raise)
+
+            def _ok():
+                return {"items": resync_items, "nextPageToken": None}
+
+            return FakeListRequest(_ok)
+
+    class FakeService:
+        def __init__(self):
+            self.kwargs_history: list = []
+            self._events = FakeEvents(self)
+
+        def events(self):
+            return self._events
+
+    service = FakeService()
+    connector = GoogleCalendarConnector(client=service)
+    since = datetime(2025, 1, 1, tzinfo=UTC)
+    events = __import__("asyncio").run(connector.pull(since=since))
+
+    assert len(events) == 1
+    assert events[0].id == "calendar:resync-1"
+    assert len(service.kwargs_history) == 2
+    assert "updatedMin" in service.kwargs_history[0]
+    assert service.kwargs_history[1].get("timeMin")
+    assert service.kwargs_history[1]["orderBy"] == "startTime"
+    assert "updatedMin" not in service.kwargs_history[1]
+
+
+def test_google_calendar_non_410_http_error_propagates():
+    from pulse.connectors.calendar import GoogleCalendarConnector
+
+    resp = Mock()
+    resp.status = 403
+    forbidden = HttpError(resp, b'{"error":{"errors":[{"reason":"forbidden"}]}}')
+
+    class FakeListRequest:
+        def execute(self):
+            raise forbidden
+
+    class FakeEvents:
+        def list(self, **kwargs):
+            return FakeListRequest()
+
+    class FakeService:
+        def events(self):
+            return FakeEvents()
+
+    connector = GoogleCalendarConnector(client=FakeService())
+    with pytest.raises(HttpError):
+        __import__("asyncio").run(
+            connector.pull(since=datetime(2026, 3, 1, tzinfo=UTC))
+        )

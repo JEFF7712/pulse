@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import date, datetime, timedelta
 
@@ -14,6 +15,19 @@ try:
     from zoneinfo import ZoneInfo
 except ImportError:  # pragma: no cover
     ZoneInfo = None
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_llm_related_job_failure(job_label: str, exc: Exception) -> None:
+    from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
+
+    hint = user_message_for_anthropic_exception(exc)
+    if hint:
+        logger.error("%s: %s", job_label, hint, exc_info=exc)
+    else:
+        logger.exception("%s failed", job_label)
 
 
 def parse_interval(interval_str: str) -> timedelta:
@@ -150,38 +164,48 @@ def _make_supplementary_job(job_fn, config):
 
 def _make_daily_digest_job(config):
     async def job():
-        day = _resolve_current_day(config)
+        try:
+            day = _resolve_current_day(config)
 
-        llm = None
-        if config.anthropic_api_key:
-            from pulse.llm.anthropic import AnthropicProvider
-            llm = AnthropicProvider(api_key=config.anthropic_api_key)
+            llm = None
+            if config.anthropic_api_key:
+                from pulse.llm.anthropic import AnthropicProvider
+                llm = AnthropicProvider(api_key=config.anthropic_api_key)
 
-        return await run_daily_digest_job(
-            day=day,
-            database_path=config.database_path,
-            vault_path=config.vault_path,
-            llm=llm,
-            summarization_model=config.summarization_model,
-        )
+            return await run_daily_digest_job(
+                day=day,
+                database_path=config.database_path,
+                vault_path=config.vault_path,
+                llm=llm,
+                summarization_model=config.summarization_model,
+            )
+        except Exception as e:
+            _log_llm_related_job_failure("daily_digest", e)
+            raise
+
     return job
 
 
 def _make_morning_briefing_job(config):
     async def job():
-        day = _resolve_current_day(config)
-        channel = _build_telegram_channel(config)
-        if channel is None:
-            return JobResult(
-                status="skipped",
-                detail=f"Skipped morning briefing for {day.isoformat()}: Telegram channel not configured",
+        try:
+            day = _resolve_current_day(config)
+            channel = _build_telegram_channel(config)
+            if channel is None:
+                return JobResult(
+                    status="skipped",
+                    detail=f"Skipped morning briefing for {day.isoformat()}: Telegram channel not configured",
+                )
+            return await run_morning_briefing_job(
+                day=day,
+                database_path=config.database_path,
+                vault_path=config.vault_path,
+                channel=channel,
             )
-        return await run_morning_briefing_job(
-            day=day,
-            database_path=config.database_path,
-            vault_path=config.vault_path,
-            channel=channel,
-        )
+        except Exception as e:
+            _log_llm_related_job_failure("morning_briefing", e)
+            raise
+
     return job
 
 
@@ -195,31 +219,36 @@ def _make_aggregation_job(config):
 
 def _make_discovery_job(cadence, config):
     async def job():
-        from pulse.jobs.runners import run_discovery_job
-        from pulse.llm.anthropic import AnthropicProvider
+        try:
+            from pulse.jobs.runners import run_discovery_job
+            from pulse.llm.anthropic import AnthropicProvider
 
-        day = _resolve_current_day(config)
-        llm = None
-        if config.anthropic_api_key:
-            llm = AnthropicProvider(api_key=config.anthropic_api_key)
+            day = _resolve_current_day(config)
+            llm = None
+            if config.anthropic_api_key:
+                llm = AnthropicProvider(api_key=config.anthropic_api_key)
 
-        if llm is None:
-            return JobResult(
-                status="skipped",
-                detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
+            if llm is None:
+                return JobResult(
+                    status="skipped",
+                    detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
+                )
+
+            channel = _build_telegram_channel(config)
+            return await run_discovery_job(
+                cadence=cadence,
+                target_date=day,
+                database_path=config.database_path,
+                vault_path=config.vault_path,
+                llm=llm,
+                notification_channel=channel,
+                summarization_model=config.summarization_model,
+                discovery_model=config.discovery_model,
             )
+        except Exception as e:
+            _log_llm_related_job_failure(f"discovery_{cadence}", e)
+            raise
 
-        channel = _build_telegram_channel(config)
-        return await run_discovery_job(
-            cadence=cadence,
-            target_date=day,
-            database_path=config.database_path,
-            vault_path=config.vault_path,
-            llm=llm,
-            notification_channel=channel,
-            summarization_model=config.summarization_model,
-            discovery_model=config.discovery_model,
-        )
     return job
 
 

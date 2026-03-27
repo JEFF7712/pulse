@@ -1,4 +1,7 @@
+import httpx
 from fastapi.testclient import TestClient
+
+import anthropic
 
 import pulse.app.home_actions as home_actions
 import pulse.llm.anthropic as anthropic_module
@@ -33,6 +36,41 @@ def test_digest_action_redirects_back_to_home_with_result_token(tmp_path) -> Non
 
     assert response.status_code in (302, 303)
     assert response.headers["location"] == "/?notice=digest-complete"
+
+
+def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
+    tmp_path, monkeypatch
+) -> None:
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    resp = httpx.Response(429, request=req)
+    rate_exc = anthropic.RateLimitError("rate", response=resp, body=None)
+
+    async def fake_run_aggregation_job(*, day, database_path: str):
+        from pulse.jobs.runners import JobResult
+
+        return JobResult(status="success", detail="ok")
+
+    async def fake_run_discovery_job(**kwargs):
+        raise rate_exc
+
+    monkeypatch.setattr(home_actions, "run_aggregation_job", fake_run_aggregation_job)
+    monkeypatch.setattr(home_actions, "run_discovery_job", fake_run_discovery_job)
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        database_path=str(tmp_path / "pulse.db"),
+        vault_path=str(tmp_path / "vault"),
+        anthropic_api_key="test-key",
+    )
+    client = TestClient(app)
+
+    response = client.post("/actions/discover", follow_redirects=False)
+
+    assert response.status_code in (302, 303)
+    loc = response.headers["location"]
+    assert loc.startswith("/?error=discovery-failed")
+    assert "hint=" in loc
+    assert "429" in loc or "rate" in loc.lower()
 
 
 def test_digest_action_logs_failures_and_redirects_with_error_token(

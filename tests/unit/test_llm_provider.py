@@ -52,7 +52,7 @@ def test_anthropic_provider_respects_model_override():
 
         from pulse.llm.anthropic import AnthropicProvider
 
-        provider = AnthropicProvider(api_key="test-key", model="claude-sonnet-4-5-20250514")
+        provider = AnthropicProvider(api_key="test-key", model="claude-sonnet-4-6")
 
         import asyncio
         asyncio.run(provider.complete("hello", model="claude-haiku-4-5-20251001"))

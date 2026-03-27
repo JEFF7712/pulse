@@ -10,26 +10,29 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        # pyproject requires >=3.12; match nixpkgs’ 3.12 or 3.13 as you prefer
         python = pkgs.python313;
         pythonPkgs = python.pkgs;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            # Python with pip available inside the venv
             python
+            pkgs.uv
             pythonPkgs.venvShellHook
           ];
 
           venvDir = ".venv";
 
+          # Install from uv.lock + pyproject (includes dependency-groups.dev → pytest)
           postVenvCreation = ''
-            pip install -e ".[dev]" 2>/dev/null || pip install -e .
+            export UV_PYTHON="${python}/bin/python"
+            uv sync --group dev
           '';
 
           postShellHook = ''
-            # Re-sync if deps changed since last shell entry
-            pip install -e . --quiet 2>/dev/null
+            export UV_PYTHON="${python}/bin/python"
+            uv sync --group dev --quiet
           '';
 
           # Native libs some wheels need at build time

@@ -11,6 +11,7 @@ from pulse.jobs.runners import (
     run_daily_digest_job,
     run_discovery_job,
 )
+from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 from pulse.notifications.telegram import TelegramChannel
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
@@ -28,8 +29,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ActionResult:
+    """Redirect target for home actions; `hint` adds an extra line on the homepage for errors."""
+
     query_key: str
     token: str
+    hint: str | None = None
 
 
 async def run_pull_action(
@@ -83,9 +87,13 @@ async def run_digest_action(settings: PulseConfig) -> ActionResult:
             database_path=settings.database_path,
             vault_path=settings.vault_path,
         )
-    except Exception:
+    except Exception as e:
         logger.exception("Digest action failed")
-        return ActionResult(query_key="error", token="digest-failed")
+        return ActionResult(
+            query_key="error",
+            token="digest-failed",
+            hint=user_message_for_anthropic_exception(e),
+        )
 
     return ActionResult(query_key="notice", token="digest-complete")
 
@@ -110,9 +118,13 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
             llm=AnthropicProvider(api_key=settings.anthropic_api_key),
             notification_channel=notification_channel,
         )
-    except Exception:
+    except Exception as e:
         logger.exception("Discovery action failed")
-        return ActionResult(query_key="error", token="discovery-failed")
+        return ActionResult(
+            query_key="error",
+            token="discovery-failed",
+            hint=user_message_for_anthropic_exception(e),
+        )
 
     return ActionResult(query_key="notice", token="discovery-complete")
 

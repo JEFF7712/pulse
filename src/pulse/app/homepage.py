@@ -234,6 +234,7 @@ def render_homepage(
         padding: 0.65rem 0.8rem;
         font-size: 0.9rem;
         line-height: 1.4;
+        white-space: pre-wrap;
       }}
 
       .notice-success {{

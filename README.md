@@ -77,8 +77,11 @@ Start with [docs/index.md](docs/index.md), the source-of-truth docs entry for re
 ## Run tests
 
 ```bash
-pytest
+uv sync --group dev
+uv run pytest
 ```
+
+Continuous integration (`.github/workflows/ci.yml`) runs `uv sync --group dev --locked` and `uv run pytest` on pushes and pull requests to `main`, on Python 3.12 and 3.13.
 
 ## Start the standalone server
 

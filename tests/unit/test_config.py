@@ -52,4 +52,4 @@ def test_get_settings_reads_pulse_prefixed_environment_variables(monkeypatch):
 def test_pulse_config_has_model_defaults():
     config = PulseConfig()
     assert config.summarization_model == "claude-haiku-4-5-20251001"
-    assert config.discovery_model == "claude-sonnet-4-5-20250514"
+    assert config.discovery_model == "claude-sonnet-4-6"

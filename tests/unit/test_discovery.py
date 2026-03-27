@@ -237,7 +237,7 @@ def test_discovery_engine_uses_source_summarizer(tmp_path):
             llm=fake_llm,
             notification_channel=None,
             summarization_model="claude-haiku-4-5-20251001",
-            discovery_model="claude-sonnet-4-5-20250514",
+            discovery_model="claude-sonnet-4-6",
         )
         return await engine.run_discovery("daily", target_date)
 
@@ -245,7 +245,7 @@ def test_discovery_engine_uses_source_summarizer(tmp_path):
 
     # Should have summarization calls (haiku) + 1 discovery call (sonnet)
     haiku_calls = [c for c in fake_llm.calls if c["model"] == "claude-haiku-4-5-20251001"]
-    sonnet_calls = [c for c in fake_llm.calls if c["model"] == "claude-sonnet-4-5-20250514"]
+    sonnet_calls = [c for c in fake_llm.calls if c["model"] == "claude-sonnet-4-6"]
 
     assert len(haiku_calls) >= 1, "Should have at least one Haiku summarization call"
     assert len(sonnet_calls) == 1, "Should have exactly one Sonnet discovery call"

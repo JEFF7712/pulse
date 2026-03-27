@@ -9,6 +9,8 @@ description = "Backend-first MVP for Pulse"
 readme = "DESIGN.md"
 requires-python = ">=3.12"
 dependencies = [
+    "rich>=13.7",
+    "rich-argparse>=1.5",
     "fastapi",
     "pydantic",
     "aiosqlite",
@@ -30,6 +32,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

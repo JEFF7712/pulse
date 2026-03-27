@@ -1,4 +1,5 @@
 from typing import Annotated, Any
+from urllib.parse import quote_plus
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -71,9 +72,13 @@ def create_app(
         current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
         notice: str | None = None,
         error: str | None = None,
+        hint: str | None = None,
     ) -> str:
         homepage_status = _build_homepage_status(current_settings, registry)
-        homepage_notice = _build_homepage_notice(notice=notice, error=error)
+        hint_clean = hint[:700] if hint else None
+        homepage_notice = _build_homepage_notice(
+            notice=notice, error=error, hint=hint_clean
+        )
         return render_homepage(homepage_status, notice=homepage_notice)
 
     @app.post("/actions/pull")
@@ -188,12 +193,20 @@ def _build_homepage_status(
 
 
 def _redirect_home(result: ActionResult) -> RedirectResponse:
-    return RedirectResponse(url=f"/?{result.query_key}={result.token}", status_code=303)
+    url = f"/?{result.query_key}={result.token}"
+    if result.hint:
+        url += "&hint=" + quote_plus(result.hint[:500])
+    return RedirectResponse(url=url, status_code=303)
 
 
-def _build_homepage_notice(*, notice: str | None, error: str | None):
+def _build_homepage_notice(
+    *, notice: str | None, error: str | None, hint: str | None = None
+):
     if error is not None and error in _ERROR_MESSAGES:
-        return HomepageNotice(tone="error", message=_ERROR_MESSAGES[error])
+        message = _ERROR_MESSAGES[error]
+        if hint:
+            message = f"{message}\n\n{hint}"
+        return HomepageNotice(tone="error", message=message)
 
     if notice is not None and notice in _NOTICE_MESSAGES:
         return HomepageNotice(tone="success", message=_NOTICE_MESSAGES[notice])

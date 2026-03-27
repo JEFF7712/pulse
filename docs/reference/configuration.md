@@ -25,12 +25,16 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
 | `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | Keep in `.env`, never in `pulse.toml`. |
 | `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Optional; discovery jobs skip themselves when this is missing. |
+| `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model id for daily digests, profile structuring, and parts of discovery when an LLM is used. |
+| `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Anthropic model id for the main discovery pass. |
+
+You can also set `summarization_model` and `discovery_model` as top-level keys in `pulse.toml` (same names, string values); environment variables override file values when both are present.
 
 ## `pulse.toml`
 
 `config_loader.py` reads `pulse.toml` from the current working directory by default. The file is optional, but when present it is the source of truth for the nested `connectors` map because those settings are not flattened into `PULSE_...` overrides.
 
-The repository default looks like this in practice:
+The checked-in template matches `pulse.toml.example` (Spotify starts disabled so you opt in after OAuth setup):
 
 ```toml
 [connectors.gmail]
@@ -46,15 +50,17 @@ enabled = true
 poll_interval = "1h"
 
 [connectors.spotify]
-enabled = true
+enabled = false
 poll_interval = "30m"
 supplementary_interval = "6h"
 
 [connectors.browser]
 enabled = true
 poll_interval = "15m"
-browser = "chrome"
+browser = "chrome"  # or "firefox"
 ```
+
+Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
 
 Each connector entry is parsed into a `ConnectorConfig` model with:
 
@@ -74,10 +80,20 @@ The runtime keeps secrets and refresh tokens in different places:
 
 Because the token paths are derived from `Path(config.database_path).parent`, changing `PULSE_DATABASE_PATH` also changes where `google_tokens.json` and `spotify_tokens.json` are written.
 
+## MCP server vs standalone app
+
+The FastAPI app and CLI load config through `load_dotenv()` and use `PULSE_DATABASE_PATH` for the SQLite file.
+
+The MCP entrypoint (`python -m pulse.mcp.server`) reads **`PULSE_DB_PATH`** and **`PULSE_VAULT_PATH`** from the environment only (see the repository README for a sample agent config). If you run both surfaces against one database, point `PULSE_DATABASE_PATH` and `PULSE_DB_PATH` at the same file path.
+
+The MCP `pulse_digest` tool uses the non-LLM `DailySummarizer` path; it does not read `PULSE_ANTHROPIC_API_KEY`.
+
 ## Runtime consequences
 
 - `/health` only checks that the app booted with a valid config object; it does not prove that external connectors are authenticated
 - the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when Telegram or Anthropic settings are absent
+- the **scheduled** `daily_digest` job still fires every 24 hours; when `PULSE_ANTHROPIC_API_KEY` is set it passes an LLM into the digest runner and uses `summarization_model`, otherwise it uses the non-LLM summarizer
+- **`pulse digest` and the web “Digest” action** invoke the same digest runner **without** an LLM client, so they always produce the non-LLM summary even when an API key is configured (only the scheduler’s digest job uses the LLM)
 - `morning_briefing` needs both Telegram settings to deliver notifications
 - discovery jobs need `PULSE_ANTHROPIC_API_KEY`; otherwise they skip with a no-provider message
 
@@ -87,9 +103,14 @@ Because the token paths are derived from `Path(config.database_path).parent`, ch
 PULSE_DATABASE_PATH=data/pulse.db
 PULSE_VAULT_PATH=Pulse-Vault
 PULSE_TIMEZONE=UTC
+PULSE_TELEGRAM_BOT_TOKEN=
+PULSE_TELEGRAM_CHAT_ID=
 PULSE_GOOGLE_CLIENT_ID=
 PULSE_GOOGLE_CLIENT_SECRET=
 PULSE_SPOTIFY_CLIENT_ID=
 PULSE_SPOTIFY_CLIENT_SECRET=
 PULSE_ANTHROPIC_API_KEY=
+# Optional overrides:
+# PULSE_SUMMARIZATION_MODEL=claude-haiku-4-5-20251001
+# PULSE_DISCOVERY_MODEL=claude-sonnet-4-6
 ```

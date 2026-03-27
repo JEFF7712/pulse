@@ -1,8 +1,6 @@
 # Pulse Docs
 
-Pulse Docs is the canonical home for running Pulse yourself. The deployed docs app at `/docs/` and this repository docs tree describe the same self-hosted operator path.
-
-This file is the source of truth for the deployed docs page at `/docs/`.
+This file is the source of truth for the deployed docs page at `/docs/`. The VitePress site under `site/docs-app/` includes these markdown files verbatim.
 
 ## What is Pulse?
 
@@ -26,4 +24,6 @@ Use these guides when you want the shortest route from a fresh checkout to a wor
 - [Operations Runbook](./operations/runbook.md)
 - [Connectors Index](./connectors/index.md)
 
-The repo docs tree is the source material for the docs experience served at `/docs/`.
+## Agent integration (MCP)
+
+To run Pulse as a [Model Context Protocol](https://modelcontextprotocol.io/) server for tools like Claude Code, use `python -m pulse.mcp.server` with `PULSE_DB_PATH` and `PULSE_VAULT_PATH`. Tool names, resources, and a copy-paste JSON config live in the repository **README** under *Use as an MCP server*. [Configuration Reference](./reference/configuration.md) explains how `PULSE_DB_PATH` relates to `PULSE_DATABASE_PATH` when you run the app and MCP against one database.

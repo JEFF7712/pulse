@@ -8,21 +8,96 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from rich_argparse import RichHelpFormatter
+
+from pulse.app import cli_ui as ui
+from pulse.app.cli_ui import SITE_ACCENT, SITE_CREAM, SITE_MUTED_FG
+from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.connectors.google_auth import GoogleAuthManager, SCOPES_BY_CONNECTOR
+from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 from pulse.connectors.spotify_auth import SpotifyAuthManager, SPOTIFY_SCOPES, REDIRECT_URI
 
 logger = logging.getLogger(__name__)
 
 
+def _onboard_should_run_google_auth(config: PulseConfig) -> bool:
+    if not config.google_client_id or not config.google_client_secret:
+        return False
+    google_connectors = [
+        name
+        for name in config.connectors
+        if name in SCOPES_BY_CONNECTOR and config.connectors[name].enabled
+    ]
+    return bool(google_connectors)
+
+
+def _onboard_should_run_spotify_auth(config: PulseConfig) -> bool:
+    if not config.spotify_client_id or not config.spotify_client_secret:
+        return False
+    spot = config.connectors.get("spotify")
+    return spot is not None and spot.enabled
+
+
+def _onboard_print_prerequisites() -> None:
+    ui.rule("Before you start")
+    ui.muted_line("Run from the directory where .env and pulse.toml should live (usually the repo root).")
+    ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
+    ui.muted_line("For Google or Spotify, create OAuth apps and have client IDs/secrets ready for .env.")
+    ui.muted_line("Spotify OAuth uses a callback on localhost:8888 — keep that port free during auth.")
+
+
+def _onboard_print_next_steps(host: str, port: int) -> None:
+    ui.rule("Next steps")
+    ui.muted_line("Starting the server — open the app in a browser on this machine:")
+    ui.kv_line("URL", f"http://127.0.0.1:{port}/")
+    if host not in ("127.0.0.1", "localhost"):
+        ui.muted_line(f"Listen address is {host} — use your machine's IP or hostname if you browse from elsewhere.")
+    ui.step("While Pulse is running")
+    ui.muted_line("In another terminal: [cmd]pulse status[/]   [cmd]pulse insights[/]")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="pulse", description="Pulse CLI")
+    parser = argparse.ArgumentParser(
+        prog="pulse",
+        description=(
+            f"[bold {SITE_ACCENT}]Pulse[/] — [{SITE_CREAM}]self-hosted personal intelligence[/] "
+            f"[dim {SITE_MUTED_FG}](connectors · digests · insights)[/]"
+        ),
+        formatter_class=RichHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     run_parser = subparsers.add_parser("run", help="Start Pulse (API server + scheduler)")
     run_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     run_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     run_parser.add_argument("--log-level", default="info", help="Log level (default: info)")
+
+    onboard_parser = subparsers.add_parser(
+        "onboard",
+        help="Configure, authorize, initialize, and run (Google/Spotify auth only when applicable)",
+    )
+    onboard_parser.add_argument("--host", default="0.0.0.0", help="Bind address for pulse run (default: 0.0.0.0)")
+    onboard_parser.add_argument("--port", type=int, default=8000, help="Port for pulse run (default: 8000)")
+    onboard_parser.add_argument("--log-level", default="info", help="Log level for pulse run (default: info)")
+    onboard_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Always run pulse auth google and pulse auth spotify (exit if a step cannot run)",
+    )
+    onboard_parser.add_argument(
+        "-f",
+        "--profile-file",
+        type=Path,
+        default=None,
+        help="Same as pulse init: read profile text from this file",
+    )
+    onboard_parser.add_argument(
+        "--profile-text",
+        default=None,
+        metavar="TEXT",
+        help="Same as pulse init: profile text (non-interactive)",
+    )
 
     pull_parser = subparsers.add_parser("pull", help="Run pull cycle immediately")
     pull_parser.add_argument("sources", nargs="*", help="Connectors to pull (default: all)")
@@ -35,7 +110,20 @@ def main() -> None:
     discover_parser.add_argument("--date", default=None, help="Target date (YYYY-MM-DD, default: today)")
 
     subparsers.add_parser("configure", help="Interactive setup for .env, connectors, and auth")
-    subparsers.add_parser("init", help="Set up profile and run initial data collection")
+    init_parser = subparsers.add_parser("init", help="Set up profile and run initial data collection")
+    init_parser.add_argument(
+        "-f",
+        "--profile-file",
+        type=Path,
+        default=None,
+        help="Read free-form profile text from this file instead of interactive paste",
+    )
+    init_parser.add_argument(
+        "--profile-text",
+        default=None,
+        metavar="TEXT",
+        help="Free-form profile text (non-interactive; skips paste prompt)",
+    )
     subparsers.add_parser("status", help="Show database stats")
     subparsers.add_parser("insights", help="List discovered patterns")
     subparsers.add_parser("test-telegram", help="Send a test message via Telegram")
@@ -60,6 +148,8 @@ def main() -> None:
 
     if args.command == "run":
         _run(args)
+    elif args.command == "onboard":
+        _onboard(args)
     elif args.command == "pull":
         _pull(args)
     elif args.command == "digest":
@@ -67,9 +157,12 @@ def main() -> None:
     elif args.command == "discover":
         _discover(args)
     elif args.command == "configure":
-        _configure()
+        _configure(offer_oauth=True)
     elif args.command == "init":
-        _init()
+        _init(
+            profile_file=getattr(args, "profile_file", None),
+            profile_text=getattr(args, "profile_text", None),
+        )
     elif args.command == "status":
         _status()
     elif args.command == "insights":
@@ -89,6 +182,41 @@ def main() -> None:
     else:
         parser.print_help()
         sys.exit(1)
+
+
+def _onboard(args) -> None:
+    """Interactive first-time setup: configure, OAuth, init, then `pulse run`."""
+    ui.banner_tagline()
+    ui.rule("pulse onboard")
+    _onboard_print_prerequisites()
+    _configure(offer_oauth=False)
+    config = load_config()
+    strict = args.strict
+
+    ui.onboard_phase("auth google")
+    if strict or _onboard_should_run_google_auth(config):
+        _auth_google(show_rule=False)
+    else:
+        ui.muted_line(
+            "Skipping — no Google OAuth client in .env or no enabled Gmail / Calendar / YouTube connector."
+        )
+
+    ui.onboard_phase("auth spotify")
+    if strict or _onboard_should_run_spotify_auth(config):
+        _auth_spotify(show_rule=False)
+    else:
+        ui.muted_line(
+            "Skipping — Spotify client secrets missing, connector disabled, or spotify not in pulse.toml."
+        )
+
+    ui.onboard_phase("init")
+    _init(
+        profile_file=getattr(args, "profile_file", None),
+        profile_text=getattr(args, "profile_text", None),
+    )
+    ui.onboard_phase("run")
+    _onboard_print_next_steps(args.host, args.port)
+    _run(args)
 
 
 def _quiet_noisy_loggers() -> None:
@@ -163,11 +291,14 @@ def _run(args) -> None:
         scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
 
-    print(f"Starting Pulse on {args.host}:{args.port}")
-    print(f"  Pull connectors: {', '.join(c.get_source_name() for c, _ in active_pull) or 'none'}")
-    print(f"  Push connectors: {', '.join(c.get_source_name() for c, _ in active_push) or 'none'}")
-    print(f"  Vault: {config.vault_path}")
-    print(f"  Database: {config.database_path}")
+    ui.startup_panel(
+        host=args.host,
+        port=args.port,
+        pull_names=", ".join(c.get_source_name() for c, _ in active_pull) or "none",
+        push_names=", ".join(c.get_source_name() for c, _ in active_push) or "none",
+        vault=str(config.vault_path),
+        database=str(config.database_path),
+    )
 
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
 
@@ -201,10 +332,10 @@ def _pull(args) -> None:
         active = [(c, cc) for c, cc in active if c.get_source_name() in filter_sources]
         missing = filter_sources - {c.get_source_name() for c, _ in active}
         if missing:
-            print(f"Warning: unknown or inactive connectors: {', '.join(sorted(missing))}")
+            ui.warning(f"Unknown or inactive connectors: {', '.join(sorted(missing))}")
 
     if not active:
-        print("No active connectors to pull.")
+        ui.error("No active connectors to pull.")
         sys.exit(1)
 
     async def _run_pulls():
@@ -215,7 +346,7 @@ def _pull(args) -> None:
 
             for connector, _cc in active:
                 source = connector.get_source_name()
-                print(f"Pulling {source}...", end=" ", flush=True)
+                ui.inline(f"[bullet]●[/] [bold]{source}[/] … ", end="")
                 try:
                     cursor = await sync_state.load(source)
                     since = datetime.fromisoformat(cursor) if cursor else None
@@ -227,11 +358,13 @@ def _pull(args) -> None:
                         else:
                             ts = max(e.timestamp for e in events)
                         await sync_state.save(source, ts.isoformat())
-                        print(f"{new_count} new, {len(events) - new_count} updated")
+                        ui.say(
+                            f"[ok]{new_count}[/] new, [muted]{len(events) - new_count} updated[/]"
+                        )
                     else:
-                        print("0 events")
+                        ui.say("[muted]0 events[/]")
                 except Exception as e:
-                    print(f"ERROR: {e}")
+                    ui.say(f"[err]ERROR:[/] {e}")
 
     asyncio.run(_run_pulls())
 
@@ -257,13 +390,14 @@ def _prompt_env_field(key: str, label: str, current: str, is_secret: bool = Fals
         return value
 
 
-def _configure() -> None:
+def _configure(*, offer_oauth: bool = True) -> None:
     import tomllib
 
     env_path = Path(".env")
     toml_path = Path("pulse.toml")
 
-    print("=== Pulse Configuration ===\n")
+    ui.banner_tagline()
+    ui.rule("Pulse configuration")
 
     # Load existing .env
     existing_env: dict[str, str] = {}
@@ -275,7 +409,7 @@ def _configure() -> None:
                 existing_env[key.strip()] = val.strip()
 
     # --- Step 1: Core settings ---
-    print("--- Step 1: Core Settings ---\n")
+    ui.step("Step 1: Core settings")
 
     env_values: dict[str, str] = {}
     core_fields = [
@@ -288,8 +422,8 @@ def _configure() -> None:
         env_values[key] = _prompt_env_field(key, label, current, is_secret)
 
     # --- Step 2: Service credentials ---
-    print("\n--- Step 2: Service Credentials ---")
-    print("Leave blank to skip a service.\n")
+    ui.step("Step 2: Service credentials")
+    ui.muted_line("Leave blank to skip a service.")
 
     credential_fields = [
         ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
@@ -307,10 +441,10 @@ def _configure() -> None:
     # Write .env
     env_lines = [f"{key}={val}" for key, val in env_values.items()]
     env_path.write_text("\n".join(env_lines) + "\n")
-    print(f"\n  Saved {env_path}")
+    ui.success(f"Saved {env_path}")
 
     # --- Step 3: Connector config (pulse.toml) ---
-    print("\n--- Step 3: Connector Configuration ---\n")
+    ui.step("Step 3: Connector configuration")
 
     existing_toml: dict = {}
     if toml_path.exists():
@@ -382,52 +516,145 @@ def _configure() -> None:
             enabled_connectors.append(name)
 
     toml_path.write_text("\n".join(toml_lines))
-    print(f"\n  Saved {toml_path}")
-    print(f"  Enabled: {', '.join(enabled_connectors) or 'none'}")
+    ui.success(f"Saved {toml_path}")
+    ui.kv_line("Enabled", ", ".join(enabled_connectors) or "none")
 
     # --- Step 4: OAuth flows ---
-    google_connectors = [c for c in enabled_connectors if c in ("gmail", "calendar", "youtube")]
-    has_google_creds = env_values.get("PULSE_GOOGLE_CLIENT_ID") and env_values.get("PULSE_GOOGLE_CLIENT_SECRET")
-    has_spotify_creds = env_values.get("PULSE_SPOTIFY_CLIENT_ID") and env_values.get("PULSE_SPOTIFY_CLIENT_SECRET")
+    if offer_oauth:
+        google_connectors = [c for c in enabled_connectors if c in ("gmail", "calendar", "youtube")]
+        has_google_creds = env_values.get("PULSE_GOOGLE_CLIENT_ID") and env_values.get(
+            "PULSE_GOOGLE_CLIENT_SECRET"
+        )
+        has_spotify_creds = env_values.get("PULSE_SPOTIFY_CLIENT_ID") and env_values.get(
+            "PULSE_SPOTIFY_CLIENT_SECRET"
+        )
 
-    # Check if tokens already exist
-    data_dir = Path(env_values.get("PULSE_DATABASE_PATH", "data/pulse.db")).parent
-    google_tokens = data_dir / "google_tokens.json"
-    spotify_tokens = data_dir / "spotify_tokens.json"
+        # Check if tokens already exist
+        data_dir = Path(env_values.get("PULSE_DATABASE_PATH", "data/pulse.db")).parent
+        google_tokens = data_dir / "google_tokens.json"
+        spotify_tokens = data_dir / "spotify_tokens.json"
 
-    if google_connectors and has_google_creds:
-        if google_tokens.exists():
-            print(f"\n  Google: already authorized ({google_tokens})")
-            answer = input("  Re-authorize? [y/N] ").strip().lower()
-            if answer in ("y", "yes"):
-                _auth_google()
-        else:
-            print(f"\n--- Google Authorization ---")
-            print(f"  Connectors: {', '.join(google_connectors)}")
-            answer = input("  Run Google OAuth now? [Y/n] ").strip().lower()
-            if answer not in ("n", "no"):
-                _auth_google()
+        if google_connectors and has_google_creds:
+            if google_tokens.exists():
+                ui.muted_line(f"Google: already authorized ({google_tokens})")
+                answer = input("  Re-authorize? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_google()
+            else:
+                ui.step("Google authorization")
+                ui.kv_line("Connectors", ", ".join(google_connectors))
+                answer = input("  Run Google OAuth now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_google()
 
-    if "spotify" in enabled_connectors and has_spotify_creds:
-        if spotify_tokens.exists():
-            print(f"\n  Spotify: already authorized ({spotify_tokens})")
-            answer = input("  Re-authorize? [y/N] ").strip().lower()
-            if answer in ("y", "yes"):
-                _auth_spotify()
-        else:
-            print(f"\n--- Spotify Authorization ---")
-            answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
-            if answer not in ("n", "no"):
-                _auth_spotify()
+        if "spotify" in enabled_connectors and has_spotify_creds:
+            if spotify_tokens.exists():
+                ui.muted_line(f"Spotify: already authorized ({spotify_tokens})")
+                answer = input("  Re-authorize? [y/N] ").strip().lower()
+                if answer in ("y", "yes"):
+                    _auth_spotify()
+            else:
+                ui.step("Spotify authorization")
+                answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
+                if answer not in ("n", "no"):
+                    _auth_spotify()
 
     # --- Done ---
-    print("\n=== Configuration Complete ===")
-    print("Next steps:")
-    print("  pulse init     — set up your profile and pull initial data")
-    print("  pulse run      — start the server and scheduler")
+    ui.rule("Configuration complete")
+    if offer_oauth:
+        ui.say("[accent]Next steps[/]")
+        ui.kv_line("Profile + first pull", "[cmd]pulse init[/]")
+        ui.kv_line("Server + scheduler", "[cmd]pulse run[/]")
 
 
-def _init() -> None:
+_PROFILE_STRUCTURE_MODEL = "claude-haiku-4-5-20251001"
+
+_PROFILE_STRUCTURE_SYSTEM = """You format free-form text into a concise Obsidian markdown profile for Pulse, an app that analyzes the user's email, calendar, music, and browsing history.
+
+Output ONLY the markdown document. No surrounding code fences, no preamble or explanation.
+
+Use this shape when the user's text supports it (omit a **field** line or entire section if unknown):
+
+# User Profile
+
+**Name:** ...
+**Occupation:** ...
+**Interests:** ...
+
+## Discovery goals
+
+What patterns or themes they want Pulse to surface.
+
+## Additional context
+
+Other facts useful for personalization.
+
+Rules:
+- Preserve specifics from the user's text; do not invent biographical facts they did not imply.
+- If the input is sparse, keep the file short rather than padding with guesses."""
+
+
+def _read_profile_raw_text(*, profile_file: Path | None, profile_text: str | None) -> str:
+    """Load free-form profile source: explicit args, then stdin if piped, else interactive paste."""
+    if profile_text is not None:
+        return profile_text.strip()
+    if profile_file is not None:
+        path = profile_file.expanduser()
+        if not path.is_file():
+            ui.error(f"Profile file not found: {path}")
+            sys.exit(1)
+        return path.read_text(encoding="utf-8").strip()
+    if not sys.stdin.isatty():
+        return sys.stdin.read().strip()
+    ui.say(
+        "\n[accent]Paste[/] a free-form description of yourself [muted](role, interests, what you want Pulse to notice).[/]\n"
+        "[muted]End input with Ctrl-D on a new line (macOS/Linux), or Ctrl-Z then Enter (Windows).[/]\n"
+    )
+    try:
+        return sys.stdin.read().strip()
+    except KeyboardInterrupt:
+        ui.warning("Cancelled.")
+        return ""
+
+
+def _profile_markdown_without_llm(raw: str) -> str:
+    """Wrap raw text when no LLM is configured."""
+    return (
+        "# User Profile\n\n"
+        "## Self description\n\n"
+        f"{raw.strip()}\n"
+    )
+
+
+def _strip_markdown_fences(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        lines = t.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        t = "\n".join(lines).strip()
+    return t
+
+
+async def _structure_profile_markdown(raw: str, api_key: str) -> str:
+    from pulse.llm.anthropic import AnthropicProvider
+
+    llm = AnthropicProvider(api_key=api_key, model=_PROFILE_STRUCTURE_MODEL)
+    structured = await llm.complete(
+        f"The user wrote the following about themselves. Turn it into the vault profile markdown.\n\n---\n{raw}\n---",
+        system_prompt=_PROFILE_STRUCTURE_SYSTEM,
+        model=_PROFILE_STRUCTURE_MODEL,
+    )
+    return _strip_markdown_fences(structured)
+
+
+def _init(
+    *,
+    profile_file: Path | None = None,
+    profile_text: str | None = None,
+) -> None:
     from datetime import date, datetime
     from pulse.analysis.vault_memory import VaultMemory
     from pulse.connectors import register_all
@@ -447,20 +674,32 @@ def _init() -> None:
     config = load_config()
     vault = VaultMemory(config.vault_path)
 
+    ui.rule("pulse init")
+
     # --- Step 1: User profile ---
     profile_path = Path(config.vault_path) / "04-Config" / "profile.md"
     if profile_path.exists():
-        print(f"Profile already exists at {profile_path}")
+        ui.warning(f"Profile already exists at [bold]{profile_path}[/]")
         overwrite = input("Overwrite? [y/N] ").strip().lower()
         if overwrite != "y":
-            print("Keeping existing profile.")
+            ui.muted_line("Keeping existing profile.")
         else:
-            _collect_profile(vault)
+            _collect_profile(
+                vault,
+                config,
+                profile_file=profile_file,
+                profile_text=profile_text,
+            )
     else:
-        _collect_profile(vault)
+        _collect_profile(
+            vault,
+            config,
+            profile_file=profile_file,
+            profile_text=profile_text,
+        )
 
     # --- Step 2: Initial data pull ---
-    print("\n--- Initial Data Pull ---")
+    ui.step("Initial data pull")
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     registry = ConnectorRegistry()
@@ -469,7 +708,7 @@ def _init() -> None:
 
     active = registry.get_pull_connectors()
     if not active:
-        print("No active connectors. Run 'pulse auth' first to set up credentials.")
+        ui.warning("No active connectors. Run [cmd]pulse auth[/] first to set up credentials.")
     else:
         async def _run_pulls():
             async with connect_db(config.database_path) as db:
@@ -480,7 +719,7 @@ def _init() -> None:
 
                 for connector, _cc in active:
                     source = connector.get_source_name()
-                    print(f"  Pulling {source}...", end=" ", flush=True)
+                    ui.inline(f"  [bullet]●[/] [bold]{source}[/] … ", end="")
                     try:
                         events = await connector.pull(since=None)
                         if events:
@@ -491,26 +730,26 @@ def _init() -> None:
                                 ts = max(e.timestamp for e in events)
                             await sync_state.save(source, ts.isoformat())
                             total_new += new_count
-                            print(f"{new_count} new events")
+                            ui.say(f"[ok]{new_count}[/] new events")
                         else:
-                            print("0 events")
+                            ui.say("[muted]0 events[/]")
                     except Exception as e:
-                        print(f"ERROR: {e}")
+                        ui.say(f"[err]ERROR:[/] {e}")
 
                 return total_new
 
         total = asyncio.run(_run_pulls())
-        print(f"  Total: {total} new events collected")
+        ui.kv_line("Total new events", str(total))
 
     # --- Step 3: Aggregate ---
-    print("\n--- Aggregating Stats ---")
+    ui.step("Aggregating stats")
     today = date.today()
     result = asyncio.run(run_aggregation_job(day=today, database_path=config.database_path))
-    print(f"  {result.detail}")
+    ui.muted_line(result.detail)
 
     # --- Step 4: Initial discovery (if LLM available) ---
     if config.anthropic_api_key:
-        print("\n--- Running Initial Discovery ---")
+        ui.step("Running initial discovery")
         from pulse.jobs.runners import run_discovery_job
         from pulse.llm.anthropic import AnthropicProvider
 
@@ -523,49 +762,67 @@ def _init() -> None:
                 chat_id=config.telegram_chat_id,
             )
 
-        result = asyncio.run(run_discovery_job(
-            cadence="weekly",
-            target_date=today,
-            database_path=config.database_path,
-            vault_path=config.vault_path,
-            llm=llm,
-            notification_channel=channel,
-        ))
-        print(f"  {result.detail}")
+        try:
+            result = asyncio.run(
+                run_discovery_job(
+                    cadence="weekly",
+                    target_date=today,
+                    database_path=config.database_path,
+                    vault_path=config.vault_path,
+                    llm=llm,
+                    notification_channel=channel,
+                )
+            )
+        except Exception as e:
+            um = user_message_for_anthropic_exception(e)
+            if um:
+                ui.error(um)
+            else:
+                ui.error(f"Initial discovery failed: {e}")
+            raise SystemExit(1) from e
+        ui.muted_line(result.detail)
     else:
-        print("\nSkipping discovery (no PULSE_ANTHROPIC_API_KEY set)")
+        ui.muted_line("Skipping discovery (no PULSE_ANTHROPIC_API_KEY set).")
 
-    print("\nPulse initialized! Run 'pulse run' to start the server and scheduler.")
+    ui.success("Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler.")
 
 
-def _collect_profile(vault) -> None:
-    print("\n--- User Profile Setup ---")
-    print("This helps Pulse find patterns relevant to you.")
-    print("Press Enter to skip any question.\n")
+def _collect_profile(
+    vault,
+    config,
+    *,
+    profile_file: Path | None = None,
+    profile_text: str | None = None,
+) -> None:
+    ui.step("User profile")
+    ui.muted_line("Describe yourself in free form; Pulse will structure it for your vault.")
 
-    name = input("Your name: ").strip()
-    occupation = input("What do you do? (e.g., student, engineer, designer): ").strip()
-    interests = input("Key interests (comma-separated): ").strip()
-    goals = input("What patterns would you like Pulse to find? ").strip()
-    context = input("Anything else Pulse should know about you? ").strip()
+    raw = _read_profile_raw_text(profile_file=profile_file, profile_text=profile_text)
+    if not raw:
+        ui.warning("No profile text provided; skipping profile write.")
+        return
 
-    lines = ["# User Profile", ""]
-    if name:
-        lines.append(f"**Name:** {name}")
-    if occupation:
-        lines.append(f"**Occupation:** {occupation}")
-    if interests:
-        lines.append(f"**Interests:** {interests}")
-    lines.append("")
+    if config.anthropic_api_key:
+        ui.say("[accent]Structuring profile[/] with the LLM…")
+        try:
+            profile_content = asyncio.run(
+                _structure_profile_markdown(raw, config.anthropic_api_key)
+            )
+        except Exception as e:
+            um = user_message_for_anthropic_exception(e)
+            if um:
+                ui.warning(f"{um} Saving raw text under a single section instead.")
+            else:
+                ui.warning(f"LLM error ({e}); saving raw text under a single section instead.")
+            profile_content = _profile_markdown_without_llm(raw)
+    else:
+        ui.muted_line(
+            "No PULSE_ANTHROPIC_API_KEY; saving your text under “Self description” (no LLM pass)."
+        )
+        profile_content = _profile_markdown_without_llm(raw)
 
-    if goals:
-        lines.extend(["## Discovery Goals", goals, ""])
-    if context:
-        lines.extend(["## Additional Context", context, ""])
-
-    profile_content = "\n".join(lines)
     vault.write_config_file("profile.md", profile_content)
-    print(f"\nProfile saved!")
+    ui.success("Profile saved.")
 
 
 def _digest(args) -> None:
@@ -575,45 +832,59 @@ def _digest(args) -> None:
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
 
-    print(f"Aggregating stats for {target.isoformat()}...")
+    ui.rule("pulse digest")
+    ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
     result = asyncio.run(run_aggregation_job(day=target, database_path=config.database_path))
-    print(f"  {result.detail}")
+    ui.muted_line(result.detail)
 
-    print(f"Generating digest for {target.isoformat()}...")
+    ui.say(f"[accent]Generating digest[/] for [bold]{target.isoformat()}[/]…")
     result = asyncio.run(run_daily_digest_job(
         day=target,
         database_path=config.database_path,
         vault_path=config.vault_path,
     ))
-    print(f"  {result.status}: {result.detail}")
+    ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
 
 def _discover(args) -> None:
     from datetime import date
-    from pulse.jobs.runners import run_discovery_job, run_aggregation_job, JobResult
+    from pulse.jobs.runners import run_discovery_job, run_aggregation_job
     from pulse.llm.anthropic import AnthropicProvider
 
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
 
     if not config.anthropic_api_key:
-        print("Error: PULSE_ANTHROPIC_API_KEY must be set for discovery.")
+        ui.error("PULSE_ANTHROPIC_API_KEY must be set for discovery.")
         sys.exit(1)
 
     llm = AnthropicProvider(api_key=config.anthropic_api_key)
 
-    print(f"Aggregating stats for {target.isoformat()}...")
+    ui.rule("pulse discover")
+    ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
     asyncio.run(run_aggregation_job(day=target, database_path=config.database_path))
 
-    print(f"Running {args.cadence} discovery for {target.isoformat()}...")
-    result = asyncio.run(run_discovery_job(
-        cadence=args.cadence,
-        target_date=target,
-        database_path=config.database_path,
-        vault_path=config.vault_path,
-        llm=llm,
-    ))
-    print(f"  {result.status}: {result.detail}")
+    ui.say(
+        f"[accent]Running {args.cadence} discovery[/] for [bold]{target.isoformat()}[/]…"
+    )
+    try:
+        result = asyncio.run(
+            run_discovery_job(
+                cadence=args.cadence,
+                target_date=target,
+                database_path=config.database_path,
+                vault_path=config.vault_path,
+                llm=llm,
+            )
+        )
+    except Exception as e:
+        um = user_message_for_anthropic_exception(e)
+        if um:
+            ui.error(um)
+        else:
+            ui.error(f"Discovery failed: {e}")
+        raise SystemExit(1) from e
+    ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
 
 def _status() -> None:
@@ -623,7 +894,7 @@ def _status() -> None:
     config = load_config()
 
     if not Path(config.database_path).exists():
-        print("No database found. Run 'pulse pull' first.")
+        ui.error("No database found. Run [cmd]pulse pull[/] first.")
         sys.exit(1)
 
     async def _show():
@@ -645,17 +916,14 @@ def _status() -> None:
             cur4 = await db.execute("SELECT source, cursor, updated_at FROM connector_sync_state ORDER BY source")
             sync_rows = await cur4.fetchall()
 
-            print(f"Database: {config.database_path}")
-            print(f"Total events: {total}")
-            print(f"Time range: {mn} to {mx}")
-            print()
-            print("Events by source:")
-            for source, etype, count in rows:
-                print(f"  {source:10} {etype:30} {count:>6}")
-            print()
-            print("Sync cursors:")
-            for source, cursor, updated_at in sync_rows:
-                print(f"  {source:10} {cursor[:30]:30} (updated {updated_at})")
+            ui.rule("pulse status")
+            ui.status_tables(
+                database=str(config.database_path),
+                total=total,
+                time_range=f"{mn} → {mx}",
+                event_rows=rows,
+                sync_rows=sync_rows,
+            )
 
     asyncio.run(_show())
 
@@ -668,7 +936,7 @@ def _insights() -> None:
     config = load_config()
 
     if not Path(config.database_path).exists():
-        print("No database found. Run 'pulse pull' first.")
+        ui.error("No database found. Run [cmd]pulse pull[/] first.")
         sys.exit(1)
 
     async def _show():
@@ -677,18 +945,13 @@ def _insights() -> None:
             analytics = AnalyticsRepository(db)
             insights = await analytics.list_insights()
 
+            ui.rule("pulse insights")
             if not insights:
-                print("No patterns discovered yet. Run 'pulse discover' first.")
+                ui.warning("No patterns discovered yet. Run [cmd]pulse discover[/] first.")
                 return
 
-            print(f"Discovered patterns ({len(insights)}):\n")
-            for i in insights:
-                conf = i["confidence"]
-                status = i["status"]
-                print(f"  [{status:12}] {i['title']}")
-                print(f"               confidence: {conf}, seen: {i['first_seen']} to {i['last_seen']}")
-                print(f"               vault: {i['vault_path']}")
-                print()
+            ui.say(f"[accent]Discovered patterns[/] [bold]({len(insights)})[/]\n")
+            ui.insights_panel(insights)
 
     asyncio.run(_show())
 
@@ -702,7 +965,7 @@ def _logs(args) -> None:
     config = load_config()
 
     if not Path(config.database_path).exists():
-        print("No database found. Run 'pulse pull' first.")
+        ui.error("No database found. Run [cmd]pulse pull[/] first.")
         sys.exit(1)
 
     async def _show():
@@ -732,9 +995,11 @@ def _logs(args) -> None:
             rows = await cur.fetchall()
 
             if not rows:
-                print("No events found.")
+                ui.muted_line("No events found.")
                 return
 
+            ui.rule("pulse logs")
+            log_rows: list[tuple[str, str, str, str]] = []
             for ts, source, etype, data_str in reversed(rows):
                 data = json_mod.loads(data_str)
                 # Pick the most useful field to show
@@ -746,7 +1011,8 @@ def _logs(args) -> None:
                     or ""
                 )
                 ts_short = ts[:19] if len(ts) > 19 else ts
-                print(f"  {ts_short}  {source:10} {etype:28} {detail}")
+                log_rows.append((ts_short, source, etype, detail))
+            ui.logs_table(log_rows)
 
     asyncio.run(_show())
 
@@ -759,7 +1025,7 @@ def _reset(args) -> None:
     config = load_config()
 
     if not Path(config.database_path).exists():
-        print("No database found.")
+        ui.error("No database found.")
         sys.exit(1)
 
     source = args.source
@@ -769,36 +1035,37 @@ def _reset(args) -> None:
             await bootstrap_schema(db)
             sync_state = SyncStateRepository(db)
 
+            ui.rule("pulse reset")
             if source is None:
                 # Reset all cursors
                 cur = await db.execute("SELECT source, cursor FROM connector_sync_state ORDER BY source")
                 rows = await cur.fetchall()
                 if not rows:
-                    print("No sync cursors found.")
+                    ui.muted_line("No sync cursors found.")
                     return
 
-                print("Current cursors:")
+                ui.say("[accent]Current cursors[/]")
                 for s, c in rows:
-                    print(f"  {s:10} {c}")
+                    ui.kv_line(str(s), str(c))
 
                 confirm = input("\nReset ALL sync cursors? This will re-pull all data. [y/N] ").strip().lower()
                 if confirm not in ("y", "yes"):
-                    print("Cancelled.")
+                    ui.warning("Cancelled.")
                     return
 
                 await db.execute("DELETE FROM connector_sync_state")
                 await db.commit()
-                print(f"All {len(rows)} cursors cleared.")
+                ui.success(f"All {len(rows)} cursors cleared.")
             else:
                 cursor = await sync_state.load(source)
                 if not cursor:
-                    print(f"No sync cursor found for '{source}'.")
+                    ui.warning(f"No sync cursor found for '{source}'.")
                     return
 
-                print(f"Current cursor for '{source}': {cursor}")
+                ui.kv_line(f"Cursor ({source})", str(cursor))
                 confirm = input(f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] ").strip().lower()
                 if confirm not in ("y", "yes"):
-                    print("Cancelled.")
+                    ui.warning("Cancelled.")
                     return
 
                 await db.execute(
@@ -806,7 +1073,7 @@ def _reset(args) -> None:
                     (source,),
                 )
                 await db.commit()
-                print(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
+                ui.success(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
 
     asyncio.run(_do_reset())
 
@@ -819,7 +1086,7 @@ def _cleanup(args) -> None:
     config = load_config()
 
     if not Path(config.database_path).exists():
-        print("No database found.")
+        ui.error("No database found.")
         sys.exit(1)
 
     async def _do_cleanup():
@@ -836,29 +1103,30 @@ def _cleanup(args) -> None:
             )
             rows = await cur.fetchall()
 
+            ui.rule("pulse cleanup")
             if not rows:
-                print("No future-dated events found.")
+                ui.muted_line("No future-dated events found.")
                 return
 
             total = sum(r[2] for r in rows)
-            print(f"Found {total} events with timestamps in the future:")
+            ui.warning(f"Found [bold]{total}[/] events with timestamps in the future:")
             for source, etype, count in rows:
-                print(f"  {source:10} {etype:28} {count:>6}")
+                ui.kv_line(f"{source} / {etype}", str(count))
 
             if args.dry_run:
-                print("\nDry run — no changes made.")
+                ui.muted_line("Dry run — no changes made.")
                 return
 
             confirm = input(f"\nDelete {total} future events? [y/N] ").strip().lower()
             if confirm not in ("y", "yes"):
-                print("Cancelled.")
+                ui.warning("Cancelled.")
                 return
 
             await db.execute(
                 "DELETE FROM events WHERE timestamp > ?", (now_iso,)
             )
             await db.commit()
-            print(f"Deleted {total} future-dated events.")
+            ui.success(f"Deleted {total} future-dated events.")
 
     asyncio.run(_do_cleanup())
 
@@ -870,7 +1138,7 @@ def _test_telegram() -> None:
     config = load_config()
 
     if not config.telegram_bot_token or not config.telegram_chat_id:
-        print("Error: PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in .env")
+        ui.error("PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in .env")
         sys.exit(1)
 
     channel = TelegramChannel(
@@ -887,17 +1155,17 @@ def _test_telegram() -> None:
 
     try:
         channel.send(notification)
-        print("Test message sent! Check your Telegram.")
+        ui.success("Test message sent! Check your Telegram.")
     except Exception as e:
-        print(f"Failed to send: {e}")
+        ui.error(f"Failed to send: {e}")
         sys.exit(1)
 
 
-def _auth_google() -> None:
+def _auth_google(*, show_rule: bool = True) -> None:
     config = load_config()
 
     if not config.google_client_id or not config.google_client_secret:
-        print("Error: PULSE_GOOGLE_CLIENT_ID and PULSE_GOOGLE_CLIENT_SECRET must be set.")
+        ui.error("PULSE_GOOGLE_CLIENT_ID and PULSE_GOOGLE_CLIENT_SECRET must be set.")
         sys.exit(1)
 
     token_path = Path(config.database_path).parent / "google_tokens.json"
@@ -913,22 +1181,24 @@ def _auth_google() -> None:
     ]
 
     if not google_connectors:
-        print("No Google connectors enabled in pulse.toml. Enable gmail, calendar, or youtube.")
+        ui.error("No Google connectors enabled in pulse.toml. Enable gmail, calendar, or youtube.")
         sys.exit(1)
 
     scopes = auth_manager.get_required_scopes(google_connectors)
-    print(f"Authorizing for: {', '.join(google_connectors)}")
-    print(f"Scopes: {', '.join(scopes)}")
+    if show_rule:
+        ui.rule("pulse auth google")
+    ui.kv_line("Authorizing for", ", ".join(google_connectors))
+    ui.muted_line("Scopes: " + ", ".join(scopes))
 
     auth_manager.authorize(scopes)
-    print("Authorization complete!")
+    ui.success("Google authorization complete!")
 
 
-def _auth_spotify() -> None:
+def _auth_spotify(*, show_rule: bool = True) -> None:
     config = load_config()
 
     if not config.spotify_client_id or not config.spotify_client_secret:
-        print("Error: PULSE_SPOTIFY_CLIENT_ID and PULSE_SPOTIFY_CLIENT_SECRET must be set.")
+        ui.error("PULSE_SPOTIFY_CLIENT_ID and PULSE_SPOTIFY_CLIENT_SECRET must be set.")
         sys.exit(1)
 
     token_path = Path(config.database_path).parent / "spotify_tokens.json"
@@ -941,8 +1211,10 @@ def _auth_spotify() -> None:
     state = secrets.token_urlsafe(32)
     auth_url = auth_manager._get_auth_url(SPOTIFY_SCOPES, state)
 
-    print(f"Opening browser for Spotify authorization...")
-    print(f"If it doesn't open, visit: {auth_url}")
+    if show_rule:
+        ui.rule("pulse auth spotify")
+    ui.say("[accent]Opening browser[/] for Spotify authorization…")
+    ui.muted_line(f"If it doesn't open, visit: {auth_url}")
     webbrowser.open(auth_url)
 
     # Start temporary HTTP server to receive callback
@@ -977,9 +1249,9 @@ def _auth_spotify() -> None:
     server.handle_request()  # Handle single callback request
 
     if not received_code:
-        print("Error: No authorization code received.")
+        ui.error("No authorization code received.")
         sys.exit(1)
 
     tokens = auth_manager._exchange_code(received_code[0])
     auth_manager.save_tokens(tokens)
-    print("Spotify authorization complete!")
+    ui.success("Spotify authorization complete!")

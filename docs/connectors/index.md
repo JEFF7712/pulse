@@ -1,6 +1,6 @@
 # Connectors Index
 
-Pulse currently ships with Google, Spotify, and browser history pull connectors enabled in the default `pulse.toml`. This page gives the real setup path for each one.
+Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Spotify, and local browser history. There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure` (the example enables Google sources and browser history but leaves Spotify disabled until you turn it on). This page gives the setup path for each connector.
 
 If you want the overall operator flow first, start from [Pulse Docs](../index.md).
 

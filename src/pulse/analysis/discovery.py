@@ -47,7 +47,7 @@ class DiscoveryEngine:
         llm,
         notification_channel=None,
         summarization_model: str = "claude-haiku-4-5-20251001",
-        discovery_model: str = "claude-sonnet-4-5-20250514",
+        discovery_model: str = "claude-sonnet-4-6",
     ):
         self._db_path = database_path
         self._vault = VaultMemory(vault_root)

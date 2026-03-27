@@ -41,6 +41,14 @@ QUICKSTART_OPTIONAL_AUTH_SNIPPETS = [
     "Skip the auth commands for services you did not enable.",
 ]
 
+QUICKSTART_ONBOARD_SNIPPETS = [
+    "pulse onboard",
+    "pulse onboard --strict",
+    "pulse onboard -f ./my-profile.txt",
+    "--profile-text",
+    "localhost:8888",
+]
+
 CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "PULSE_DATABASE_PATH",
     "PULSE_VAULT_PATH",
@@ -136,6 +144,15 @@ def test_quickstart_documents_cli_happy_path() -> None:
     assert not missing_snippets, (
         f"quickstart.md is missing CLI setup steps: {missing_snippets}"
     )
+
+
+def test_quickstart_documents_pulse_onboard() -> None:
+    quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
+        encoding="utf-8"
+    )
+
+    missing = [s for s in QUICKSTART_ONBOARD_SNIPPETS if s not in quickstart]
+    assert not missing, f"quickstart.md should document pulse onboard: {missing}"
 
 
 def test_quickstart_marks_auth_commands_as_optional() -> None:
