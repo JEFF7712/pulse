@@ -54,6 +54,11 @@ poll_interval = "1h"
 # urls = ["https://hnrss.org/newest"]
 urls = []
 
+[connectors.companion]
+enabled = false
+# The companion app pushes location and health events to /webhooks/companion.
+# Set PULSE_COMPANION_TOKEN in .env to enable API auth.
+
 # --- LLM Configuration ---
 # Configure providers for summarization (digest narratives),
 # discovery (cross-source pattern detection), and corrections

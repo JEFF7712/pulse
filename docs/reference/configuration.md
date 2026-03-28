@@ -144,6 +144,26 @@ Each connector entry is parsed into a `ConnectorConfig` model with:
 
 That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, `urls` for feeds, `calendar_id` / `gitlab_base_url` / `omit_amounts_in_digest`, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
 
+## Companion app
+
+The companion mobile app pushes location and health events to the Pulse backend via a shared-secret webhook. Two environment variables control this integration:
+
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `PULSE_COMPANION_TOKEN` | unset | Shared secret for app ↔ server authentication. Set this in `.env`; requests without a matching `Authorization: Bearer <token>` header are rejected with HTTP 401. Leave unset to disable token enforcement (not recommended in production). |
+| `PULSE_FCM_SERVICE_ACCOUNT_PATH` | unset | Path to the Firebase service account JSON file used to send FCM push notifications to companion app users. Required for push delivery; notifications are silently skipped when unset. |
+
+Enable the companion connector in `pulse.toml` to mount the webhook route and allow the app to send events:
+
+```toml
+[connectors.companion]
+enabled = true
+# The companion app pushes location and health events to /webhooks/companion.
+# Set PULSE_COMPANION_TOKEN in .env to enable API auth.
+```
+
+When `[connectors.companion]` is disabled (the default), the `/webhooks/companion` route is not mounted and companion events are not accepted.
+
 ## Secret and token files
 
 The runtime keeps secrets and refresh tokens in different places:
