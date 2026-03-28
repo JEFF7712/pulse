@@ -451,7 +451,7 @@
         grid-template-columns: minmax(5.75rem, 1fr) minmax(0, min(100%, var(--measure)))
           minmax(5.75rem, 1fr);
         column-gap: clamp(0.75rem, 2.2vw, 1.5rem);
-        align-items: start;
+        align-items: stretch;
         padding: clamp(5rem, 12vw, 8rem) clamp(1rem, 3vw, 1.75rem)
           clamp(6rem, 14vw, 10rem);
         max-width: calc(var(--measure) + 22rem);
@@ -461,8 +461,18 @@
       .about-gutter {
         position: relative;
         align-self: stretch;
-        min-height: 100%;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 0.4rem;
+      }
+
+      /* One flex row per note so height tracks the main column; % top is per-slot. */
+      .about-float-slot {
+        position: relative;
+        flex: 1 1 0;
+        min-height: 2.25rem;
       }
 
       .about-gutter--left {
@@ -489,6 +499,7 @@
         left: 0;
         right: auto;
         top: 0;
+        bottom: auto;
         font-family: "Geist Mono", monospace;
         font-size: clamp(0.56rem, 1vw, 0.6875rem);
         letter-spacing: 0.2em;
@@ -499,7 +510,6 @@
         width: max-content;
         pointer-events: none;
         opacity: 0.9;
-        will-change: transform, top;
       }
 
       .about-gutter--right .about-float {
@@ -509,7 +519,7 @@
       }
 
       .about-float--vert {
-        max-height: 14rem;
+        max-height: min(9rem, 22vh);
         writing-mode: vertical-rl;
         text-orientation: mixed;
         letter-spacing: 0.28em;
@@ -540,10 +550,6 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .about-float {
-          will-change: auto;
-        }
-
         .about-float-caret {
           animation: none;
           opacity: 0.35;
@@ -1480,26 +1486,36 @@
 
     <section class="about reveal-section">
       <div class="about-gutter about-gutter--left" aria-hidden="true">
-        <div
-          class="about-float"
-          data-messages='["SIGNAL · INGEST","VAULT · READ/WRITE","LOCAL · FIRST"]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Plain text only.","No black box.","You keep the keys."]'
-        ></div>
-        <div
-          class="about-float about-float--vert"
-          data-messages='["OBS · FILE","MCP · OPEN","HOST · YOU"]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Background worker.","No dashboard required.","Always on."]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Self-hosted.","No subscription middleman.","Unplug anytime."]'
-        ></div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["SIGNAL · INGEST","VAULT · READ/WRITE","LOCAL · FIRST"]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Plain text only.","No black box.","You keep the keys."]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float about-float--vert"
+            data-messages='["OBS · FILE","MCP · OPEN","HOST · YOU"]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Background worker.","No dashboard required.","Always on."]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Self-hosted.","No subscription middleman.","Unplug anytime."]'
+          ></div>
+        </div>
       </div>
       <div class="about-main">
         <p class="about-label">What is Pulse</p>
@@ -1534,22 +1550,30 @@
         </div>
       </div>
       <div class="about-gutter about-gutter--right" aria-hidden="true">
-        <div
-          class="about-float"
-          data-messages='["SCHEDULED SYNC","CONNECTORS LIVE","PIPELINE IDLE"]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Agents query same memory.","One timeline.","Your machine."]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Claude · Codex · OpenClaw","Same protocol.","Same facts."]'
-        ></div>
-        <div
-          class="about-float"
-          data-messages='["Digest ready.","Corrections yours.","End of line."]'
-        ></div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["SCHEDULED SYNC","CONNECTORS LIVE","PIPELINE IDLE"]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Agents query same memory.","One timeline.","Your machine."]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Claude · Codex · OpenClaw","Same protocol.","Same facts."]'
+          ></div>
+        </div>
+        <div class="about-float-slot">
+          <div
+            class="about-float"
+            data-messages='["Digest ready.","Corrections yours.","End of line."]'
+          ></div>
+        </div>
       </div>
     </section>
 
@@ -1998,13 +2022,86 @@
         var section = document.querySelector(".about");
         if (!section) return;
 
+        var leftGutter = section.querySelector(".about-gutter--left");
+        var rightGutter = section.querySelector(".about-gutter--right");
+        if (!leftGutter || !rightGutter) return;
+
+        var leftNotes = leftGutter.querySelectorAll(".about-float[data-messages]");
+        var rightNotes = rightGutter.querySelectorAll(".about-float[data-messages]");
         var notes = section.querySelectorAll(".about-float[data-messages]");
         if (!notes.length) return;
+
+        var reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
 
         function wait(ms) {
           return new Promise(function (resolve) {
             setTimeout(resolve, ms);
           });
+        }
+
+        function rand(a, b) {
+          return a + Math.random() * (b - a);
+        }
+
+        /* 0–1 from integers — stable jitter inside each slot. */
+        function bandHash(moveGen, slotIndex, salt) {
+          var x =
+            Math.sin(moveGen * 12.9898 + slotIndex * 78.233 + salt * 31.374) *
+            43758.5453;
+          return x - Math.floor(x);
+        }
+
+        function slotIndexFor(el) {
+          var slot = el.parentElement;
+          if (!slot || !slot.classList.contains("about-float-slot")) return 0;
+          var slots = slot.parentElement.querySelectorAll(":scope > .about-float-slot");
+          return Array.prototype.indexOf.call(slots, slot);
+        }
+
+        /* % top is relative to .about-float-slot (flex shares main column height). */
+        function placeFloat(el, isRight, isVert, moveGen, slotIndex) {
+          el.style.transition = "none";
+
+          var u = bandHash(moveGen, slotIndex, isRight ? 2 : 1);
+          if (isVert) {
+            u *= 0.42;
+          }
+
+          var topPct;
+          if (reduceMotion) {
+            topPct = isVert ? 4 : 6;
+          } else {
+            topPct = 2 + u * (isVert ? 28 : 58);
+          }
+
+          el.style.top = topPct + "%";
+          el.style.bottom = "auto";
+
+          var wobble = reduceMotion ? 0 : (bandHash(moveGen, slotIndex, 3) - 0.5) * 8;
+          var lift = reduceMotion ? 0 : (bandHash(moveGen, slotIndex, 4) - 0.5) * 5;
+          var tilt = reduceMotion ? 0 : (bandHash(moveGen, slotIndex, 5) - 0.5) * 0.7;
+
+          if (isVert) {
+            el.style.left = "0";
+            el.style.right = "auto";
+            el.style.transform =
+              "translate3d(0, " + lift + "px, 0) rotate(" + tilt + "deg)";
+            return;
+          }
+
+          if (isRight) {
+            el.style.right = "0";
+            el.style.left = "auto";
+            el.style.transform =
+              "translate3d(" + wobble + "px, " + lift + "px, 0) rotate(" + tilt + "deg)";
+          } else {
+            el.style.left = "0";
+            el.style.right = "auto";
+            el.style.transform =
+              "translate3d(" + wobble + "px, " + lift + "px, 0) rotate(" + tilt + "deg)";
+          }
         }
 
         async function typePlain(el, text, charMs) {
@@ -2038,12 +2135,24 @@
           el.textContent = "";
         }
 
-        var reduceMotion = window.matchMedia(
-          "(prefers-reduced-motion: reduce)",
-        ).matches;
-
         if (reduceMotion || !("IntersectionObserver" in window)) {
-          notes.forEach(function (el) {
+          leftNotes.forEach(function (el, i) {
+            placeFloat(
+              el,
+              false,
+              el.classList.contains("about-float--vert"),
+              0,
+              slotIndexFor(el),
+            );
+            try {
+              var msgs = JSON.parse(el.getAttribute("data-messages") || "[]");
+              el.textContent = msgs[0] || "";
+            } catch (e) {
+              el.textContent = "";
+            }
+          });
+          rightNotes.forEach(function (el, i) {
+            placeFloat(el, true, false, 0, slotIndexFor(el));
             try {
               var msgs = JSON.parse(el.getAttribute("data-messages") || "[]");
               el.textContent = msgs[0] || "";
@@ -2074,6 +2183,12 @@
           }
           if (!messages.length) return;
 
+          var isRight = !!el.closest(".about-gutter--right");
+          var isVert = el.classList.contains("about-float--vert");
+          var slotIndex = slotIndexFor(el);
+          var moveGen = Math.floor(Math.random() * 24);
+          placeFloat(el, isRight, isVert, moveGen, slotIndex);
+
           (async function () {
             await wait(180 + idx * 220 + Math.floor(Math.random() * 400));
             var mi = 0;
@@ -2094,10 +2209,14 @@
               if (!sectionVisible) {
                 el.textContent = "";
                 mi += 1;
+                moveGen += 1;
+                placeFloat(el, isRight, isVert, moveGen, slotIndex);
                 continue;
               }
               await erasePlain(el, eraseMs);
               mi += 1;
+              moveGen += 1 + Math.floor(Math.random() * 3);
+              placeFloat(el, isRight, isVert, moveGen, slotIndex);
               await wait(320 + Math.floor(Math.random() * 280));
             }
           })();
