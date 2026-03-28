@@ -40,6 +40,8 @@ class PulseConfig(BaseModel):
     plaid_client_id: str | None = None
     plaid_secret: str | None = None
     plaid_env: str | None = None
+    companion_token: str | None = None
+    fcm_service_account_path: str | None = None
     anthropic_api_key: str | None = None
     summarization_model: str = "claude-haiku-4-5-20251001"
     discovery_model: str = "claude-sonnet-4-6"
