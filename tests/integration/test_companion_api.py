@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from pulse.app.config import PulseConfig
+from pulse.app.config import ConnectorConfig, PulseConfig
 
 
 def _build_test_app(tmp_path: Path, companion_token: str = "test-token") -> FastAPI:
@@ -120,3 +120,50 @@ def test_api_rejects_unauthenticated_request(tmp_path):
 
     response = client.get("/api/digests/2026-03-27")
     assert response.status_code == 401
+
+
+def test_companion_webhook_and_api_wired_in_full_app(tmp_path):
+    from pulse.app.config import PulseConfig, ConnectorConfig
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    # Companion webhook should be wired
+    response = client.post(
+        "/webhooks/companion",
+        json={
+            "events": [
+                {
+                    "type": "location.enter",
+                    "timestamp": "2026-03-27T09:00:00Z",
+                    "data": {"place": "office", "lat": 40.7, "lng": -74.0},
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["events_received"] == 1
+
+    # API digest route should be wired
+    vault = tmp_path / "vault" / "01-Daily"
+    vault.mkdir(parents=True, exist_ok=True)
+    (vault / "2026-03-27.md").write_text("# Test Digest", encoding="utf-8")
+
+    response = client.get(
+        "/api/digests/2026-03-27",
+        headers={"X-Pulse-Token": "integration-token"},
+    )
+    assert response.status_code == 200

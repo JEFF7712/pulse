@@ -4,6 +4,8 @@ from urllib.parse import quote_plus
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from pulse.app.api import build_api_router
+from pulse.app.auth import build_require_companion_token
 from pulse.app.config import PulseConfig
 from pulse.app.dependencies import get_settings
 from pulse.app.home_actions import (
@@ -155,8 +157,13 @@ def create_app(
 
     # Wire push connector webhook routes
     if registry is not None:
-        for push_conn, cc in registry.get_push_connectors():
+        for push_conn in registry.get_all_push_connector_instances():
             _register_push_route(app, push_conn, settings_dependency)
+
+    # Wire companion app API
+    auth_dep = build_require_companion_token(settings_dependency)
+    api_router = build_api_router(settings_dependency, auth_dep)
+    app.include_router(api_router)
 
     return app
 
