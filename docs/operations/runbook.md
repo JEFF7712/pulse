@@ -39,6 +39,19 @@ When `PULSE_CORRECTIONS_WEBHOOK_SECRET` is set, the app also mounts `POST /webho
 
 The stock `register_all` hook only registers **pull** connectors today, so a default install has zero push connectors and no extra webhook routes beyond Telegram. If you extend Pulse and register push connectors on the registry, the app mounts their `get_webhook_path()` routes at startup.
 
+## Companion app endpoints
+
+When `[connectors.companion] enabled = true` in `pulse.toml`, the app mounts these routes:
+
+- `POST /webhooks/companion` — the companion app pushes location and health events here; requests must include `Authorization: Bearer <PULSE_COMPANION_TOKEN>` when that env var is set; accepted payloads return HTTP 202 and store events in the database
+- `GET /api/digests` / `GET /api/digests/{date}` — companion app reads daily digests; returns digest content for the requested date or the most recent available
+- `POST /api/corrections` — companion app submits corrections; stored in the same `corrections` table as Telegram replies and MCP `pulse_correct` calls, triggering the same bounded vault update workflow
+- `POST /api/device-token` — companion app registers or refreshes an FCM push token; tokens are persisted in the `device_tokens` table so the backend can deliver push notifications
+
+The `device_tokens` table stores one row per device, keyed by token string. When `PULSE_FCM_SERVICE_ACCOUNT_PATH` is set and points to a valid Firebase service account JSON, the morning briefing job will also attempt FCM delivery in addition to Telegram.
+
+If `[connectors.companion]` is disabled or absent, none of these routes are mounted and companion app traffic will receive HTTP 404.
+
 ## MCP corrections workflow
 
 The MCP tool `pulse_correct` uses the same config loader and correction service as the Telegram and HTTP webhook paths.

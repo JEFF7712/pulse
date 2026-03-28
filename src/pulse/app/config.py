@@ -64,6 +64,8 @@ class PulseConfig(BaseModel):
     plaid_client_id: str | None = None
     plaid_secret: str | None = None
     plaid_env: str | None = None
+    companion_token: str | None = None
+    fcm_service_account_path: str | None = None
     anthropic_api_key: str | None = None
     llm: LLMConfig | None = None
     connectors: dict[str, ConnectorConfig] = {}

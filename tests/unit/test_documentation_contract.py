@@ -87,6 +87,9 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "bounded vault update",
     "MCP server now loads the same `pulse.toml` + `.env` config path as the app/CLI",
     "If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery.",
+    "PULSE_COMPANION_TOKEN",
+    "PULSE_FCM_SERVICE_ACCOUNT_PATH",
+    "[connectors.companion]",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [
@@ -111,6 +114,11 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "correction_applications",
     "pulse_correct",
     "single configured summarization/discovery role is reused for both",
+    "/webhooks/companion",
+    "/api/digests",
+    "/api/corrections",
+    "/api/device-token",
+    "device_tokens",
 ]
 
 QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
@@ -120,6 +128,7 @@ QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
 PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
     "[llm.corrections]",
     "# If omitted, corrections reuse [llm.discovery].",
+    "[connectors.companion]",
 ]
 
 ENV_EXAMPLE_REQUIRED_SNIPPETS = [
@@ -129,6 +138,8 @@ ENV_EXAMPLE_REQUIRED_SNIPPETS = [
     "PULSE_NTFY_TOPIC=",
     "PULSE_SPOTIFY_CLIENT_ID=",
     "PULSE_SPOTIFY_CLIENT_SECRET=",
+    "PULSE_COMPANION_TOKEN=",
+    "PULSE_FCM_SERVICE_ACCOUNT_PATH=",
 ]
 
 README_REQUIRED_SNIPPETS = [

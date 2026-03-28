@@ -153,3 +153,7 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
         "feeds",
         lambda u=feed_urls: FeedConnector(urls=u),
     )
+
+    from pulse.connectors.companion import CompanionConnector
+
+    registry.register_push("companion", CompanionConnector)

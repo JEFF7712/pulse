@@ -57,3 +57,11 @@ class ConnectorRegistry:
 
     def get_push_connectors(self) -> list[tuple[PushConnector, ConnectorConfig]]:
         return list(self._active_push)
+
+    def get_all_push_connector_instances(self) -> list[PushConnector]:
+        """Return one instance per registered push factory, regardless of active state.
+
+        Used by create_app() to wire webhook routes at startup without requiring
+        build_active_connectors() to have been called first.
+        """
+        return [factory() for factory in self._push_factories.values()]

@@ -51,6 +51,16 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS device_tokens (
+            token TEXT PRIMARY KEY,
+            platform TEXT NOT NULL,
+            registered_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
 
     # Analytics tables
     await db.execute(
