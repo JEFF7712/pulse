@@ -11,7 +11,7 @@ class _GeminiConfig:
 
 
 class GeminiProvider:
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash") -> None:
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash") -> None:
         try:
             from google.genai import Client
             self._client = Client(api_key=api_key)

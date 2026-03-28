@@ -57,7 +57,7 @@ pulse configure
 `pulse configure` is the real entry point for self-hosting. It walks through:
 
 - core settings such as `PULSE_DATABASE_PATH`, `PULSE_VAULT_PATH`, and `PULSE_TIMEZONE`
-- service credentials for Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, and Telegram
+- service credentials for Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, Telegram, and optional notification channels (ntfy, Gotify, SMTP, generic webhook, Discord, Slack, Pushover)
 - connector settings in `pulse.toml`
 
 There is no committed `pulse.toml` in the repo (it is gitignored). Copy `pulse.toml.example` to `pulse.toml` or run `pulse configure`, which writes `pulse.toml` from your answers. The example enables Gmail, Calendar, YouTube, and browser history; Spotify is disabled there so you opt in explicitly. Typical intervals when everything is enabled:
@@ -131,7 +131,7 @@ pulse init
 - creates or updates your vault profile in `04-Config/profile.md` (structured with the LLM when `PULSE_ANTHROPIC_API_KEY` is set; otherwise saved as a simple “Self description” section)
 - performs the initial pull for active connectors
 - aggregates stats
-- optionally runs an initial **weekly** discovery pass when a discovery provider resolves; a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path (Telegram notifications are included if Telegram is configured)
+- optionally runs an initial **weekly** discovery pass when a discovery provider resolves; a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path (discovery notifications are sent when any outbound channel is configured: Telegram, ntfy, or webhook URL)
 
 ## 4. Start the API server and scheduler
 
@@ -143,7 +143,7 @@ pulse run
 
 This boots the database schema, loads active connectors from `pulse.toml`, starts the scheduler, and serves the app on `0.0.0.0:8000` unless you override `--host`, `--port`, or `--log-level`.
 
-The root URL (`/`) is a small operator page: it shows database and vault paths, connector counts, and how many scheduler jobs are registered. You can trigger **Pull**, **Digest**, **Discover**, and **Test Telegram** from the browser (roughly like `pulse pull`, `pulse digest`, `pulse discover`, and `pulse test-telegram`). The web **Digest** action still uses the non-LLM digest path today; `pulse digest` and the **scheduled** `daily_digest` job use the configured summarization provider when one is available. The web **Discover** button runs daily cadence only—use the CLI for weekly or monthly passes.
+The root URL (`/`) is a small operator page: it shows database and vault paths, connector counts, and how many scheduler jobs are registered. You can trigger **Pull**, **Digest**, **Discover**, and **Test Telegram** from the browser (roughly like `pulse pull`, `pulse digest`, `pulse discover`, and `pulse test-telegram`). The web **Digest** action uses the same digest pipeline as `pulse digest` and the **scheduled** `daily_digest` job (summarization LLM when configured, otherwise non-LLM fallback). The web **Discover** button runs daily cadence only—use the CLI for weekly or monthly passes.
 
 ## 5. Check that data is flowing
 

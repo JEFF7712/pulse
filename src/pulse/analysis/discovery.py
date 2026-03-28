@@ -13,6 +13,10 @@ from pulse.analysis.source_summarizer import SourceSummarizer
 from pulse.analysis.vault_memory import VaultMemory
 from pulse.domain.pattern_statuses import normalize_pattern_status
 from pulse.domain.notifications import Notification
+from pulse.llm.factory import (
+    LEGACY_ANTHROPIC_DISCOVERY_MODEL,
+    LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+)
 from pulse.store.analytics import AnalyticsRepository
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
@@ -72,8 +76,8 @@ class DiscoveryEngine:
         vault_root,
         llm,
         notification_channel=None,
-        summarization_model: str = "claude-haiku-4-5-20251001",
-        discovery_model: str = "claude-sonnet-4-6",
+        summarization_model: str = LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+        discovery_model: str = LEGACY_ANTHROPIC_DISCOVERY_MODEL,
     ):
         self._db_path = database_path
         self._vault = VaultMemory(vault_root)

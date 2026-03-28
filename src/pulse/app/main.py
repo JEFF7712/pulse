@@ -13,6 +13,10 @@ from pulse.app.home_actions import (
     run_pull_action,
     run_test_telegram_action,
 )
+from pulse.app.corrections_webhook import (
+    parse_corrections_webhook_payload,
+    verify_corrections_webhook,
+)
 from pulse.app.homepage import HomepageNotice, HomepageStatus, render_homepage
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import extract_reply_context
@@ -151,6 +155,30 @@ def create_app(
                 context_id=context_id, message_text=reply_text.strip()
             )
 
+        return {"status": "accepted"}
+
+    @app.post("/webhooks/corrections", status_code=status.HTTP_202_ACCEPTED)
+    async def corrections_webhook(
+        request: Request,
+        s: Annotated[PulseConfig, Depends(settings_dependency)],
+    ) -> dict[str, str]:
+        body = await request.body()
+        secret = (s.corrections_webhook_secret or "").strip()
+        if not secret:
+            raise HTTPException(status_code=404, detail="Not found")
+        verify_corrections_webhook(request, body, secret)
+        context_id, message_text = parse_corrections_webhook_payload(body)
+        async with connect_db(s.database_path) as db:
+            await bootstrap_schema(db)
+            repository = CorrectionRepository(db)
+            correction_applications = CorrectionApplicationRepository(db)
+            service = build_correction_service(
+                repository,
+                config=s,
+                correction_applications=correction_applications,
+                vault_path=s.vault_path,
+            )
+            await service.record_correction(context_id, message_text)
         return {"status": "accepted"}
 
     # Wire push connector webhook routes

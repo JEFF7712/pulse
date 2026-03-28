@@ -89,7 +89,7 @@ def test_telegram_webhook_applies_digest_correction_and_records_audit_row(
             database_path=str(db_path),
             vault_path=str(vault_path),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
     )
@@ -185,7 +185,7 @@ def test_telegram_webhook_applies_pattern_correction_and_records_audit_row(
             database_path=str(db_path),
             vault_path=str(vault_path),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
     )
@@ -271,7 +271,7 @@ def test_telegram_webhook_persists_raw_correction_when_corrections_llm_init_fail
             database_path=str(db_path),
             vault_path=str(vault_path),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
     )

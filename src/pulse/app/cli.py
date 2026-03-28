@@ -546,10 +546,49 @@ def _configure(*, offer_oauth: bool = True) -> None:
         ("PULSE_ANTHROPIC_API_KEY", "Anthropic API Key", True),
         ("PULSE_TELEGRAM_BOT_TOKEN", "Telegram Bot Token", True),
         ("PULSE_TELEGRAM_CHAT_ID", "Telegram Chat ID", False),
+        (
+            "PULSE_CORRECTIONS_WEBHOOK_SECRET",
+            "Corrections webhook secret (optional; enables POST /webhooks/corrections)",
+            True,
+        ),
+        ("PULSE_NTFY_TOPIC", "ntfy topic (optional; leave blank to skip)", False),
+        (
+            "PULSE_NTFY_BASE_URL",
+            "ntfy server base URL (optional; blank uses https://ntfy.sh)",
+            False,
+        ),
+        (
+            "PULSE_NOTIFICATION_WEBHOOK_URL",
+            "Notification webhook URL (optional JSON POST)",
+            False,
+        ),
+        ("PULSE_DISCORD_WEBHOOK_URL", "Discord incoming webhook URL (optional)", False),
+        ("PULSE_SLACK_WEBHOOK_URL", "Slack incoming webhook URL (optional)", False),
+        ("PULSE_PUSHOVER_USER_KEY", "Pushover user key (optional; needs API token too)", False),
+        ("PULSE_PUSHOVER_API_TOKEN", "Pushover application API token", True),
+        (
+            "PULSE_GOTIFY_URL",
+            "Gotify server URL (optional; e.g. https://gotify.example.com)",
+            False,
+        ),
+        ("PULSE_GOTIFY_APP_TOKEN", "Gotify application token", True),
+        ("PULSE_SMTP_HOST", "SMTP host (optional)", False),
+        ("PULSE_SMTP_PORT", "SMTP port", False),
+        ("PULSE_SMTP_USER", "SMTP username (optional)", False),
+        ("PULSE_SMTP_PASSWORD", "SMTP password (optional)", True),
+        ("PULSE_SMTP_FROM", "SMTP From address (optional)", False),
+        (
+            "PULSE_SMTP_TO",
+            "SMTP To address(es), comma-separated (optional)",
+            False,
+        ),
     ]
     for key, label, is_secret in credential_fields:
         current = existing_env.get(key, "")
         env_values[key] = _prompt_env_field(key, label, current, is_secret)
+
+    if not env_values.get("PULSE_SMTP_PORT", "").strip():
+        env_values["PULSE_SMTP_PORT"] = "587"
 
     # Write .env
     env_lines = [f"{key}={val}" for key, val in env_values.items()]
@@ -629,6 +668,29 @@ def _configure(*, offer_oauth: bool = True) -> None:
                 choice = input(f"    Browser type [{browser_type}]: ").strip()
                 browser_type = choice if choice else browser_type
             toml_lines.append(f'browser = "{browser_type}"')
+
+            db_path_existing = ""
+            if existing:
+                raw_db = existing.get("db_path")
+                if isinstance(raw_db, str):
+                    db_path_existing = raw_db.strip()
+            db_path_val = db_path_existing
+            if enabled:
+                if db_path_existing:
+                    answer = input(
+                        f"    Browser history SQLite path [{db_path_existing}] — keep? [Y/n] "
+                    ).strip().lower()
+                    if answer in ("n", "no"):
+                        db_path_val = input(
+                            "    Path to browser history DB (blank = default for OS): "
+                        ).strip()
+                else:
+                    db_path_val = input(
+                        "    Path to browser history SQLite (optional; blank = default): "
+                    ).strip()
+            if enabled and db_path_val:
+                safe_db = db_path_val.replace("\\", "\\\\").replace('"', '\\"')
+                toml_lines.append(f'db_path = "{safe_db}"')
 
         if name == "microsoft_calendar":
             cal_id = (existing.get("calendar_id") if existing else None) or "primary"
@@ -999,20 +1061,20 @@ def _init(
     ui.muted_line(result.detail)
 
     # --- Step 4: Initial discovery (if LLM available) ---
-    from pulse.llm.factory import create_providers_from_config
+    from pulse.llm.factory import (
+        create_providers_from_config,
+        discovery_model_for_discovery,
+        summarization_model_for_digest,
+    )
     _, disc_llm = create_providers_from_config(config)
 
     if disc_llm is not None:
         ui.step("Running initial discovery")
         from pulse.jobs.runners import run_discovery_job
 
-        channel = None
-        if config.telegram_bot_token and config.telegram_chat_id:
-            from pulse.notifications.telegram import TelegramChannel
-            channel = TelegramChannel(
-                bot_token=config.telegram_bot_token,
-                chat_id=config.telegram_chat_id,
-            )
+        from pulse.notifications.factory import build_notification_channel
+
+        channel = build_notification_channel(config)
 
         try:
             result = asyncio.run(
@@ -1023,6 +1085,8 @@ def _init(
                     vault_path=config.vault_path,
                     llm=disc_llm,
                     notification_channel=channel,
+                    summarization_model=summarization_model_for_digest(config),
+                    discovery_model=discovery_model_for_discovery(config),
                 )
             )
         except Exception as e:
@@ -1080,7 +1144,10 @@ def _collect_profile(
 def _digest(args) -> None:
     from datetime import date
     from pulse.jobs.runners import run_daily_digest_job, run_aggregation_job
-    from pulse.llm.factory import create_providers_from_config
+    from pulse.llm.factory import (
+        create_providers_from_config,
+        summarization_model_for_digest,
+    )
 
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
@@ -1098,6 +1165,7 @@ def _digest(args) -> None:
         database_path=config.database_path,
         vault_path=config.vault_path,
         llm=summ_llm,
+        summarization_model=summarization_model_for_digest(config),
     ))
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
@@ -1105,7 +1173,11 @@ def _digest(args) -> None:
 def _discover(args) -> None:
     from datetime import date
     from pulse.jobs.runners import run_discovery_job, run_aggregation_job
-    from pulse.llm.factory import create_providers_from_config
+    from pulse.llm.factory import (
+        create_providers_from_config,
+        discovery_model_for_discovery,
+        summarization_model_for_digest,
+    )
 
     config = load_config()
     target = date.fromisoformat(args.date) if args.date else date.today()
@@ -1130,6 +1202,8 @@ def _discover(args) -> None:
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=disc_llm,
+                summarization_model=summarization_model_for_digest(config),
+                discovery_model=discovery_model_for_discovery(config),
             )
         )
     except Exception as e:

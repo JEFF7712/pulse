@@ -8,12 +8,18 @@ class ConnectorConfig(BaseModel):
 
 
 class LLMRoleConfig(BaseModel):
-    provider: str  # "anthropic" | "openai" | "gemini" | "ollama"
+    """Per-role LLM settings. Omit `provider` to inherit `[llm] provider` in pulse.toml."""
+
+    provider: str | None = None  # "anthropic" | "openai" | "gemini" | "ollama"
     model: str
     base_url: str | None = None
 
 
 class LLMConfig(BaseModel):
+    """Optional defaults for all roles: set `provider` once, then only `model` per role."""
+
+    provider: str | None = None
+    base_url: str | None = None
     summarization: LLMRoleConfig | None = None
     discovery: LLMRoleConfig | None = None
     corrections: LLMRoleConfig | None = None
@@ -25,6 +31,24 @@ class PulseConfig(BaseModel):
     timezone: str = "UTC"
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
+    ntfy_topic: str | None = None
+    ntfy_base_url: str | None = None
+    notification_webhook_url: str | None = None
+    discord_webhook_url: str | None = None
+    slack_webhook_url: str | None = None
+    pushover_user_key: str | None = None
+    pushover_api_token: str | None = None
+    corrections_webhook_secret: str | None = None
+    gotify_url: str | None = None
+    gotify_app_token: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_to: str | None = None
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
     google_client_id: str | None = None
     google_client_secret: str | None = None
     spotify_client_id: str | None = None
@@ -41,8 +65,6 @@ class PulseConfig(BaseModel):
     plaid_secret: str | None = None
     plaid_env: str | None = None
     anthropic_api_key: str | None = None
-    summarization_model: str = "claude-haiku-4-5-20251001"
-    discovery_model: str = "claude-sonnet-4-6"
     llm: LLMConfig | None = None
     connectors: dict[str, ConnectorConfig] = {}
 

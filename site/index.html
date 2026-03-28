@@ -444,13 +444,127 @@
         animation: fadeIn 0.9s var(--ease-out-expo) 1.35s forwards;
       }
 
-      /* About section */
+      /* About section — side gutters keep intel copy off the main column */
       .about {
         position: relative;
-        padding: clamp(5rem, 12vw, 8rem) clamp(1.5rem, 5vw, 2.5rem)
+        display: grid;
+        grid-template-columns: minmax(5.75rem, 1fr) minmax(0, min(100%, var(--measure)))
+          minmax(5.75rem, 1fr);
+        column-gap: clamp(0.75rem, 2.2vw, 1.5rem);
+        align-items: start;
+        padding: clamp(5rem, 12vw, 8rem) clamp(1rem, 3vw, 1.75rem)
           clamp(6rem, 14vw, 10rem);
-        max-width: calc(var(--measure) + 3rem);
+        max-width: calc(var(--measure) + 22rem);
         margin: 0 auto;
+      }
+
+      .about-gutter {
+        position: relative;
+        align-self: stretch;
+        min-height: 100%;
+        min-width: 0;
+      }
+
+      .about-gutter--left {
+        grid-column: 1;
+      }
+
+      .about-gutter--right {
+        grid-column: 3;
+      }
+
+      .about-main {
+        grid-column: 2;
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        max-width: var(--measure);
+        margin: 0 auto;
+        min-width: 0;
+      }
+
+      /* Intel notes live only inside gutters (never over article) */
+      .about-float {
+        position: absolute;
+        left: 0;
+        right: auto;
+        top: 0;
+        font-family: "Geist Mono", monospace;
+        font-size: clamp(0.56rem, 1vw, 0.6875rem);
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--dim);
+        line-height: 1.45;
+        max-width: 100%;
+        width: max-content;
+        pointer-events: none;
+        opacity: 0.9;
+        will-change: transform, top;
+      }
+
+      .about-gutter--right .about-float {
+        left: auto;
+        right: 0;
+        text-align: right;
+      }
+
+      .about-float--vert {
+        max-height: 14rem;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        letter-spacing: 0.28em;
+        max-width: none;
+      }
+
+      .about-float-caret {
+        display: inline-block;
+        width: 2px;
+        height: 0.95em;
+        margin-left: 2px;
+        vertical-align: -0.12em;
+        background: var(--accent);
+        opacity: 0.55;
+        animation: aboutFloatCaretBlink 0.85s step-end infinite;
+      }
+
+      .about-float--vert .about-float-caret {
+        margin-left: 0;
+        margin-bottom: 2px;
+        vertical-align: middle;
+      }
+
+      @keyframes aboutFloatCaretBlink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .about-float {
+          will-change: auto;
+        }
+
+        .about-float-caret {
+          animation: none;
+          opacity: 0.35;
+        }
+      }
+
+      @media (max-width: 960px) {
+        .about {
+          display: block;
+          max-width: calc(var(--measure) + 3rem);
+          padding-left: clamp(1.25rem, 5vw, 2rem);
+          padding-right: clamp(1.25rem, 5vw, 2rem);
+        }
+
+        .about-gutter {
+          display: none;
+        }
+
+        .about-main {
+          max-width: none;
+        }
       }
 
       .about::before {
@@ -485,7 +599,7 @@
         flex-shrink: 0;
       }
 
-      .about p {
+      .about-main p {
         font-family: "Instrument Serif", serif;
         font-size: var(--font-serif-body);
         line-height: 1.72;
@@ -494,12 +608,12 @@
         margin-bottom: 1.75rem;
       }
 
-      .about p strong {
+      .about-main p strong {
         color: var(--white);
         font-weight: 400;
       }
 
-      .about p em {
+      .about-main p em {
         color: var(--accent);
         font-style: normal;
       }
@@ -516,6 +630,7 @@
         text-transform: uppercase;
         color: var(--cream-muted);
       }
+
       /* Data sources section */
       .sources {
         position: relative;
@@ -1363,36 +1478,78 @@
       <p class="version">2026</p>
     </section>
 
-    <section class="about reveal-section reveal-stagger-children">
-      <p class="about-label">What is Pulse</p>
-      <p>
-        Pulse connects the tools you already use, watches for patterns across
-        them, and writes useful observations to your vault. It runs in the
-        background on your machine—scheduled syncs keep connectors fresh and the
-        pipeline moving without you watching a dashboard.
-        It explains what is changing in plain English, so you are not stitching the story together yourself.
-      </p>
-      <p>
-        That might mean noticing that
-        <strong>late meetings are pushing dinner later and sleep shorter</strong
-        >, that
-        <strong>errands across town keep leading to extra spending</strong>, or
-        that
-        <strong
-          >weeks with two strength workouts are your most focused
-          workweeks</strong
-        >.
-      </p>
-      <p>
-        Every observation lands as readable notes in your
-        <strong>Obsidian vault</strong>—yours to inspect, edit, or delete. A
-        <strong>Model Context Protocol</strong> server lets
-        <strong>Claude Code</strong>, <strong>Codex</strong>,
-        <strong>OpenClaw</strong>, and other MCP-capable tools query the same
-        timeline and digests.
-      </p>
-      <div class="about-footer">
-        <span>Background ingest · MCP to your agents · Your vault</span>
+    <section class="about reveal-section">
+      <div class="about-gutter about-gutter--left" aria-hidden="true">
+        <div
+          class="about-float"
+          data-messages='["SIGNAL · INGEST","VAULT · READ/WRITE","LOCAL · FIRST"]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Plain text only.","No black box.","You keep the keys."]'
+        ></div>
+        <div
+          class="about-float about-float--vert"
+          data-messages='["OBS · FILE","MCP · OPEN","HOST · YOU"]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Background worker.","No dashboard required.","Always on."]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Self-hosted.","No subscription middleman.","Unplug anytime."]'
+        ></div>
+      </div>
+      <div class="about-main">
+        <p class="about-label">What is Pulse</p>
+        <p>
+          Pulse connects the tools you already use, watches for patterns across
+          them, and writes useful observations to your vault. It runs in the
+          background on your machine—scheduled syncs keep connectors fresh and the
+          pipeline moving without you watching a dashboard.
+          It explains what is changing in plain English, so you are not stitching the story together yourself.
+        </p>
+        <p>
+          That might mean noticing that
+          <strong>late meetings are pushing dinner later and sleep shorter</strong
+          >, that
+          <strong>errands across town keep leading to extra spending</strong>, or
+          that
+          <strong
+            >weeks with two strength workouts are your most focused
+            workweeks</strong
+          >.
+        </p>
+        <p>
+          Every observation lands as readable notes in your
+          <strong>Obsidian vault</strong>—yours to inspect, edit, or delete. A
+          <strong>Model Context Protocol</strong> server lets
+          <strong>Claude Code</strong>, <strong>Codex</strong>,
+          <strong>OpenClaw</strong>, and other MCP-capable tools query the same
+          timeline and digests.
+        </p>
+        <div class="about-footer">
+          <span>Background ingest · MCP to your agents · Your vault</span>
+        </div>
+      </div>
+      <div class="about-gutter about-gutter--right" aria-hidden="true">
+        <div
+          class="about-float"
+          data-messages='["SCHEDULED SYNC","CONNECTORS LIVE","PIPELINE IDLE"]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Agents query same memory.","One timeline.","Your machine."]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Claude · Codex · OpenClaw","Same protocol.","Same facts."]'
+        ></div>
+        <div
+          class="about-float"
+          data-messages='["Digest ready.","Corrections yours.","End of line."]'
+        ></div>
       </div>
     </section>
 
@@ -1835,6 +1992,116 @@
           requestAnimationFrame(layoutSourcesFlow);
         });
         setTimeout(layoutSourcesFlow, 120);
+      })();
+
+      (function () {
+        var section = document.querySelector(".about");
+        if (!section) return;
+
+        var notes = section.querySelectorAll(".about-float[data-messages]");
+        if (!notes.length) return;
+
+        function wait(ms) {
+          return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+          });
+        }
+
+        async function typePlain(el, text, charMs) {
+          el.textContent = "";
+          var caret = document.createElement("span");
+          caret.className = "about-float-caret";
+          caret.setAttribute("aria-hidden", "true");
+          el.appendChild(caret);
+          for (var i = 0; i < text.length; i++) {
+            caret.remove();
+            el.appendChild(document.createTextNode(text.charAt(i)));
+            el.appendChild(caret);
+            await wait(charMs);
+          }
+          caret.remove();
+        }
+
+        async function erasePlain(el, charMs) {
+          var text = el.textContent;
+          for (var i = text.length; i > 0; i--) {
+            var slice = text.slice(0, i - 1);
+            el.textContent = "";
+            if (slice) el.appendChild(document.createTextNode(slice));
+            var caret = document.createElement("span");
+            caret.className = "about-float-caret";
+            caret.setAttribute("aria-hidden", "true");
+            el.appendChild(caret);
+            await wait(charMs);
+            caret.remove();
+          }
+          el.textContent = "";
+        }
+
+        var reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        if (reduceMotion || !("IntersectionObserver" in window)) {
+          notes.forEach(function (el) {
+            try {
+              var msgs = JSON.parse(el.getAttribute("data-messages") || "[]");
+              el.textContent = msgs[0] || "";
+            } catch (e) {
+              el.textContent = "";
+            }
+          });
+          return;
+        }
+
+        var sectionVisible = false;
+        var io = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              sectionVisible = entry.isIntersecting;
+            });
+          },
+          { rootMargin: "12% 0px 12% 0px", threshold: 0 },
+        );
+        io.observe(section);
+
+        notes.forEach(function (el, idx) {
+          var messages;
+          try {
+            messages = JSON.parse(el.getAttribute("data-messages") || "[]");
+          } catch (e) {
+            return;
+          }
+          if (!messages.length) return;
+
+          (async function () {
+            await wait(180 + idx * 220 + Math.floor(Math.random() * 400));
+            var mi = 0;
+            var typeMs = 13;
+            var eraseMs = 7;
+            var n = messages.length;
+            while (true) {
+              while (!sectionVisible) {
+                await wait(120);
+              }
+              await typePlain(el, messages[mi % n], typeMs);
+              var held = 0;
+              var holdTarget = 1400 + Math.floor(Math.random() * 900);
+              while (held < holdTarget && sectionVisible) {
+                await wait(70);
+                held += 70;
+              }
+              if (!sectionVisible) {
+                el.textContent = "";
+                mi += 1;
+                continue;
+              }
+              await erasePlain(el, eraseMs);
+              mi += 1;
+              await wait(320 + Math.floor(Math.random() * 280));
+            }
+          })();
+        });
       })();
 
       const signupForm = document.getElementById("signupForm");

@@ -12,6 +12,7 @@ def test_pulse_context_direct_construction_remains_compatible() -> None:
         corrections=object(),
         sync_state=object(),
         vault_path="vault",
+        database_path="data/pulse.db",
         _db=object(),
     )
 
@@ -34,6 +35,7 @@ def test_context_provides_repos(tmp_path: Path) -> None:
             assert ctx.correction_applications is not None
             assert ctx.sync_state is not None
             assert ctx.vault_path == str(tmp_path / "vault")
+            assert ctx.database_path == str(db_path)
 
     asyncio.run(_run())
 

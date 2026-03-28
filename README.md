@@ -22,7 +22,7 @@ Data Sources (Gmail, Calendar, ...)
 2. **Event Store** persists everything in a local SQLite database
 3. **Analysis Engine** generates daily digests and morning briefings
 4. **Vault** writes human-readable markdown files you can browse in Obsidian
-5. **Notifications** push insights to you via Telegram (more channels planned)
+5. **Notifications** push insights via Telegram, [ntfy](https://ntfy.sh), [Gotify](https://gotify.net/), email (SMTP), generic JSON webhooks, [Discord](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) / [Slack](https://api.slack.com/messaging/webhooks) incoming webhooks, [Pushover](https://pushover.net/)—configure one or more
 6. **Corrections** let you reply to fix anything the agent gets wrong
 
 ## Two ways to run
@@ -58,6 +58,22 @@ cp .env.example .env
 | `PULSE_TIMEZONE` | Timezone used for current-day resolution and day boundaries inside jobs | `UTC` |
 | `PULSE_TELEGRAM_BOT_TOKEN` | Enables outbound Telegram notifications when paired with chat ID | _(optional)_ |
 | `PULSE_TELEGRAM_CHAT_ID` | Destination chat for Telegram notifications | _(optional)_ |
+| `PULSE_CORRECTIONS_WEBHOOK_SECRET` | Enables `POST /webhooks/corrections` (Bearer or `X-Pulse-Signature` HMAC); omit to disable the route | _(optional)_ |
+| `PULSE_NTFY_TOPIC` | ntfy topic name (public `ntfy.sh` or self-hosted server) | _(optional)_ |
+| `PULSE_NTFY_BASE_URL` | ntfy server root URL (default `https://ntfy.sh`) | _(optional)_ |
+| `PULSE_NOTIFICATION_WEBHOOK_URL` | POST JSON payloads for any compatible receiver | _(optional)_ |
+| `PULSE_DISCORD_WEBHOOK_URL` | Discord server incoming webhook URL | _(optional)_ |
+| `PULSE_SLACK_WEBHOOK_URL` | Slack incoming webhook URL | _(optional)_ |
+| `PULSE_PUSHOVER_USER_KEY` | Pushover user key (use with API token) | _(optional)_ |
+| `PULSE_PUSHOVER_API_TOKEN` | Pushover application API token | _(optional)_ |
+| `PULSE_GOTIFY_URL` | Gotify server base URL | _(optional)_ |
+| `PULSE_GOTIFY_APP_TOKEN` | Gotify application token | _(optional)_ |
+| `PULSE_SMTP_HOST` | SMTP server for email notifications | _(optional)_ |
+| `PULSE_SMTP_PORT` | SMTP port (default `587`) | `587` |
+| `PULSE_SMTP_USER` / `PULSE_SMTP_PASSWORD` | SMTP auth (optional for local relay) | _(optional)_ |
+| `PULSE_SMTP_FROM` / `PULSE_SMTP_TO` | From address and recipient(s); `PULSE_SMTP_TO` can be comma-separated | _(optional)_ |
+| `PULSE_SMTP_USE_TLS` | Use STARTTLS after connect (typical for port 587) | `true` |
+| `PULSE_SMTP_USE_SSL` | Use implicit TLS (typical for port 465) | `false` |
 | `PULSE_GOOGLE_CLIENT_ID` | Google OAuth client ID for enabled Google connectors | _(optional)_ |
 | `PULSE_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | _(optional)_ |
 | `PULSE_SPOTIFY_CLIENT_ID` | Spotify OAuth client ID for the Spotify connector | _(optional)_ |
@@ -75,10 +91,10 @@ Connector toggles and nested connector settings live in `pulse.toml`, not in `.e
 
 LLM configuration has two supported paths:
 
-- Recommended: configure `[llm.summarization]`, `[llm.discovery]`, and/or `[llm.corrections]` in `pulse.toml` (see `pulse.toml.example`). Provider credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`.
-- Legacy fallback: set `PULSE_ANTHROPIC_API_KEY` and optionally override `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`.
+- Recommended: configure `[llm.summarization]`, `[llm.discovery]`, and/or `[llm.corrections]` in `pulse.toml` (see `pulse.toml.example`). Set `[llm] provider` once and use different `model` values per role (e.g. fast summarization + stronger discovery), or set `provider` on each block when mixing vendors. Credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`. For **up-to-date model id examples** (Claude 4.6 family, GPT-5.4 variants, Gemini 2.5, etc.) and links to each vendor’s model list, see [**LLM provider configuration** in the configuration reference](docs/reference/configuration.md#llm-provider-configuration).
+- Legacy fallback: set `PULSE_ANTHROPIC_API_KEY` only; model ids are fixed defaults unless you configure `[llm.summarization]` / `[llm.discovery]` in `pulse.toml`.
 
-`pulse digest` and the scheduler use the configured summarization provider when one is available. The homepage digest action and MCP `pulse_digest` tool still use the non-LLM digest path today.
+The scheduled `daily_digest` job, `pulse digest`, the homepage **Digest** action, and MCP `pulse_digest` all use the same path: they aggregate stats, then run the digest job with the configured summarization provider when one resolves, otherwise they fall back to the non-LLM summarizer.
 
 The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
 

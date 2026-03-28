@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -98,27 +98,30 @@ def test_correction_roundtrip(tmp_path: Path) -> None:
     asyncio.run(_run())
 
 
-def test_digest_writes_vault_file(tmp_path: Path) -> None:
-    """Generate a digest and verify the vault file contains expected content."""
-    from pulse.analysis.summarizer import DailySummarizer
-    from pulse.vault.writer import write_daily_digest
+def test_pulse_digest_writes_vault_file(tmp_path: Path) -> None:
+    """MCP pulse_digest matches CLI path: aggregate, then digest from DB into vault."""
+    from pulse.app.config import PulseConfig
+    from pulse.mcp import server as server_module
 
     async def _run() -> None:
-        async with open_pulse_context(
-            db_path=str(tmp_path / "test.db"),
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
             vault_path=str(tmp_path / "vault"),
-        ) as ctx:
-            await ctx.events.upsert_events(_make_events())
-            events = await ctx.events.list_events_for_day("2026-03-23")
-
-            summarizer = DailySummarizer()
-            summary = summarizer.summarize(date(2026, 3, 23), events)
-
-            output = write_daily_digest(
-                Path(ctx.vault_path), "2026-03-23", summary.markdown
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(_make_events())
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
             )
-            assert output.exists()
-            content = output.read_text()
+            result = await server_module.pulse_digest(day="2026-03-23", ctx=ctx)
+            assert "2026-03-23" in result
+            digest_path = Path(pulse_ctx.vault_path) / "01-Daily" / "2026-03-23.md"
+            assert digest_path.exists()
+            content = digest_path.read_text()
             assert "Team sync" in content
             assert "Q1 Report" in content
 
@@ -177,7 +180,7 @@ def test_pulse_correct_applies_profile_update_and_records_audit_row(
             database_path=str(tmp_path / "test.db"),
             vault_path=str(tmp_path / "vault"),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
         profile_path = Path(config.vault_path) / "04-Config" / "profile.md"
@@ -246,7 +249,7 @@ def test_pulse_correct_applies_routines_update_and_records_audit_row(
             database_path=str(tmp_path / "test.db"),
             vault_path=str(tmp_path / "vault"),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
         routines_path = Path(config.vault_path) / "03-Life" / "routines.md"
@@ -307,7 +310,7 @@ def test_pulse_correct_persists_raw_correction_when_corrections_llm_init_fails(
             database_path=str(tmp_path / "test.db"),
             vault_path=str(tmp_path / "vault"),
             llm=LLMConfig(
-                corrections=LLMRoleConfig(provider="openai", model="gpt-4o-mini")
+                corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
             ),
         )
 

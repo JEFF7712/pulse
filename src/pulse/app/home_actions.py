@@ -11,7 +11,13 @@ from pulse.jobs.runners import (
     run_daily_digest_job,
     run_discovery_job,
 )
+from pulse.llm.factory import (
+    create_providers_from_config,
+    discovery_model_for_discovery,
+    summarization_model_for_digest,
+)
 from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
+from pulse.notifications.factory import build_notification_channel
 from pulse.notifications.telegram import TelegramChannel
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
@@ -81,11 +87,14 @@ async def run_digest_action(settings: PulseConfig) -> ActionResult:
     Path(settings.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
+        summ_llm, _ = create_providers_from_config(settings)
         await run_aggregation_job(day=target_day, database_path=settings.database_path)
         await run_daily_digest_job(
             day=target_day,
             database_path=settings.database_path,
             vault_path=settings.vault_path,
+            llm=summ_llm,
+            summarization_model=summarization_model_for_digest(settings),
         )
     except Exception as e:
         logger.exception("Digest action failed")
@@ -106,7 +115,7 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
         return ActionResult(query_key="error", token="discovery-not-configured")
 
     target_day = _resolve_current_day(settings)
-    notification_channel = _build_telegram_channel(settings)
+    notification_channel = build_notification_channel(settings)
     Path(settings.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -118,6 +127,8 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
             vault_path=settings.vault_path,
             llm=disc_llm,
             notification_channel=notification_channel,
+            summarization_model=summarization_model_for_digest(settings),
+            discovery_model=discovery_model_for_discovery(settings),
         )
     except Exception as e:
         logger.exception("Discovery action failed")

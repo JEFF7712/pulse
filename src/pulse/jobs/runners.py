@@ -3,6 +3,10 @@ from datetime import date
 from pathlib import Path
 
 from pulse.analysis.briefing import build_morning_briefing
+from pulse.llm.factory import (
+    LEGACY_ANTHROPIC_DISCOVERY_MODEL,
+    LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+)
 from pulse.domain.notifications import Notification
 from pulse.domain.notifications import append_reply_context
 from pulse.domain.notifications import NotificationChannel
@@ -22,7 +26,7 @@ class JobResult:
 
 async def run_daily_digest_job(
     day: date, database_path: str | Path, vault_path: str | Path,
-    llm=None, summarization_model: str = "claude-haiku-4-5-20251001",
+    llm=None, summarization_model: str = LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
 ) -> JobResult:
     summary = await _build_daily_summary(
         day=day, database_path=database_path,
@@ -41,8 +45,15 @@ async def run_morning_briefing_job(
     database_path: str | Path,
     vault_path: str | Path,
     channel: NotificationChannel,
+    llm=None,
+    summarization_model: str = LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
 ) -> JobResult:
-    summary = await _build_daily_summary(day=day, database_path=database_path)
+    summary = await _build_daily_summary(
+        day=day,
+        database_path=database_path,
+        llm=llm,
+        summarization_model=summarization_model,
+    )
     notification = build_morning_briefing(day=day, digest_markdown=summary.markdown)
     notification = _attach_reply_context(notification)
     delivered = channel.send(notification)
@@ -60,7 +71,7 @@ async def _build_daily_summary(
     day: date,
     database_path: str | Path,
     llm=None,
-    summarization_model: str = "claude-haiku-4-5-20251001",
+    summarization_model: str = LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
 ):
     async with connect_db(database_path) as db:
         await bootstrap_schema(db)
@@ -88,8 +99,8 @@ async def run_discovery_job(
     vault_path: str | Path,
     llm,
     notification_channel=None,
-    summarization_model: str = "claude-haiku-4-5-20251001",
-    discovery_model: str = "claude-sonnet-4-6",
+    summarization_model: str = LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+    discovery_model: str = LEGACY_ANTHROPIC_DISCOVERY_MODEL,
 ) -> JobResult:
     from pulse.analysis.discovery import DiscoveryEngine
 

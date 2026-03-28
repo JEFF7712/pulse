@@ -9,7 +9,12 @@ from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.jobs.runners import run_daily_digest_job, run_morning_briefing_job, JobResult
-from pulse.notifications.telegram import TelegramChannel
+from pulse.llm.factory import (
+    create_providers_from_config,
+    discovery_model_for_discovery,
+    summarization_model_for_digest,
+)
+from pulse.notifications.factory import build_notification_channel
 
 try:
     from zoneinfo import ZoneInfo
@@ -167,7 +172,6 @@ def _make_daily_digest_job(config):
         try:
             day = _resolve_current_day(config)
 
-            from pulse.llm.factory import create_providers_from_config
             summ_llm, _ = create_providers_from_config(config)
 
             return await run_daily_digest_job(
@@ -175,6 +179,7 @@ def _make_daily_digest_job(config):
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=summ_llm,
+                summarization_model=summarization_model_for_digest(config),
             )
         except Exception as e:
             _log_llm_related_job_failure("daily_digest", e)
@@ -186,17 +191,23 @@ def _make_morning_briefing_job(config):
     async def job():
         try:
             day = _resolve_current_day(config)
-            channel = _build_telegram_channel(config)
+            channel = build_notification_channel(config)
             if channel is None:
                 return JobResult(
                     status="skipped",
-                    detail=f"Skipped morning briefing for {day.isoformat()}: Telegram channel not configured",
+                    detail=(
+                        f"Skipped morning briefing for {day.isoformat()}: "
+                        "no notification channel configured"
+                    ),
                 )
+            summ_llm, _ = create_providers_from_config(config)
             return await run_morning_briefing_job(
                 day=day,
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 channel=channel,
+                llm=summ_llm,
+                summarization_model=summarization_model_for_digest(config),
             )
         except Exception as e:
             _log_llm_related_job_failure("morning_briefing", e)
@@ -217,7 +228,6 @@ def _make_discovery_job(cadence, config):
     async def job():
         try:
             from pulse.jobs.runners import run_discovery_job
-            from pulse.llm.factory import create_providers_from_config
 
             day = _resolve_current_day(config)
             _, disc_llm = create_providers_from_config(config)
@@ -228,7 +238,7 @@ def _make_discovery_job(cadence, config):
                     detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
                 )
 
-            channel = _build_telegram_channel(config)
+            channel = build_notification_channel(config)
             return await run_discovery_job(
                 cadence=cadence,
                 target_date=day,
@@ -236,6 +246,8 @@ def _make_discovery_job(cadence, config):
                 vault_path=config.vault_path,
                 llm=disc_llm,
                 notification_channel=channel,
+                summarization_model=summarization_model_for_digest(config),
+                discovery_model=discovery_model_for_discovery(config),
             )
         except Exception as e:
             _log_llm_related_job_failure(f"discovery_{cadence}", e)
@@ -248,12 +260,3 @@ def _resolve_current_day(config: PulseConfig) -> date:
     if ZoneInfo is None:
         return date.today()
     return datetime.now(ZoneInfo(config.timezone)).date()
-
-
-def _build_telegram_channel(config: PulseConfig) -> TelegramChannel | None:
-    if not config.telegram_bot_token or not config.telegram_chat_id:
-        return None
-    return TelegramChannel(
-        bot_token=config.telegram_bot_token,
-        chat_id=config.telegram_chat_id,
-    )

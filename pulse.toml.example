@@ -66,23 +66,34 @@ urls = []
 #
 # Summarization and discovery can reuse each other when only one of those
 # two roles is configured. Corrections follow the separate fallback below.
-
+#
+# Option A — one provider, pick models per role (API key in .env for that vendor).
+# Model ids: see Anthropic / OpenAI / Gemini docs (linked from docs/reference/configuration.md).
+# [llm]
+# provider = "anthropic"
+#
+# [llm.summarization]
+# model = "claude-haiku-4-5-20251001"
+#
+# [llm.discovery]
+# model = "claude-opus-4-6"
+#
+# Option B — mixed vendors (each block sets provider + model):
 # [llm.summarization]
 # provider = "ollama"
-# model = "llama3"
+# model = "llama3.3"
 # base_url = "http://localhost:11434/v1"
-
+#
 # [llm.discovery]
 # provider = "anthropic"
-# model = "claude-sonnet-4-5-20250514"
-
+# model = "claude-sonnet-4-6"
+#
 # [llm.corrections]
 # provider = "openai"
-# model = "gpt-4o-mini"
+# model = "gpt-5.4-mini"
 # If omitted, corrections reuse [llm.discovery]. If neither block is set,
-# corrections fall back to legacy PULSE_ANTHROPIC_API_KEY with
-# PULSE_DISCOVERY_MODEL.
+# corrections fall back to legacy PULSE_ANTHROPIC_API_KEY (fixed Sonnet id).
 
 # --- Legacy (still works) ---
 # If you just want Anthropic for everything, set PULSE_ANTHROPIC_API_KEY
-# in .env and skip the [llm] section entirely.
+# in .env and skip the [llm] section entirely (built-in Haiku/Sonnet defaults).

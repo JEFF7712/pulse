@@ -17,14 +17,14 @@ def test_gemini_provider_calls_generate_content():
     class FakeClient:
         models = FakeModels()
 
-    provider = GeminiProvider(api_key="fake", model="gemini-2.0-flash")
+    provider = GeminiProvider(api_key="fake", model="gemini-2.5-flash")
     provider._client = FakeClient()
 
     result = asyncio.run(provider.complete("hello", system_prompt="Be helpful"))
 
     assert result == "gemini response"
     assert len(calls) == 1
-    assert calls[0]["model"] == "gemini-2.0-flash"
+    assert calls[0]["model"] == "gemini-2.5-flash"
     assert calls[0]["contents"] == "hello"
     assert calls[0]["config"].system_instruction == "Be helpful"
 
@@ -45,7 +45,7 @@ def test_gemini_provider_model_override():
     class FakeClient:
         models = FakeModels()
 
-    provider = GeminiProvider(api_key="fake", model="gemini-2.0-flash")
+    provider = GeminiProvider(api_key="fake", model="gemini-2.5-flash")
     provider._client = FakeClient()
 
     asyncio.run(provider.complete("hi", model="gemini-2.5-pro"))
@@ -68,7 +68,7 @@ def test_gemini_provider_no_system_prompt():
     class FakeClient:
         models = FakeModels()
 
-    provider = GeminiProvider(api_key="fake", model="gemini-2.0-flash")
+    provider = GeminiProvider(api_key="fake", model="gemini-2.5-flash")
     provider._client = FakeClient()
 
     asyncio.run(provider.complete("hello"))

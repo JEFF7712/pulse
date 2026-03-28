@@ -140,7 +140,7 @@ The browser history connector is local-only and does not use OAuth.
 
 - leave `[connectors.browser] enabled = true` in `pulse.toml`
 - set the browser type in `pulse.toml` to `chrome` or `firefox`
-- make sure the Pulse process can read the local browser history database, or provide an explicit `db_path`
+- make sure the Pulse process can read the local browser history database, or provide an explicit `db_path` (`pulse configure` prompts for this path when the browser connector is enabled)
 
 If you need to point Pulse at a non-default history file, put it under `[connectors.browser]` in `pulse.toml`:
 

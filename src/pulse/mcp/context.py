@@ -19,6 +19,7 @@ class PulseContext:
     corrections: CorrectionRepository
     sync_state: SyncStateRepository
     vault_path: str
+    database_path: str
     _db: aiosqlite.Connection
     config: PulseConfig | None = None
     correction_applications: CorrectionApplicationRepository | None = None
@@ -41,6 +42,7 @@ async def open_pulse_context(
             correction_applications=CorrectionApplicationRepository(db),
             sync_state=SyncStateRepository(db),
             vault_path=vault_path,
+            database_path=db_path,
             _db=db,
             config=config,
         )

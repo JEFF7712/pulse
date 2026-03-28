@@ -56,8 +56,9 @@ function createEnvironment(fetchImpl) {
       }
     },
     querySelector(selector) {
-      assert.equal(selector, '.signup-note');
-      return signupNote;
+      if (selector === '.signup-note') return signupNote;
+      if (selector === '.about') return null;
+      assert.fail(`unexpected querySelector: ${selector}`);
     },
   };
 

@@ -7,12 +7,15 @@ from uuid import uuid4
 
 from mcp.server.fastmcp import Context, FastMCP
 
-from pulse.analysis.summarizer import DailySummarizer
 from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
+from pulse.jobs.runners import run_aggregation_job, run_daily_digest_job
+from pulse.llm.factory import (
+    create_providers_from_config,
+    summarization_model_for_digest,
+)
 from pulse.mcp.context import PulseContext, open_pulse_context
 from pulse.services.corrections import build_correction_service
-from pulse.vault.writer import write_daily_digest
 
 
 def _parse_day(day: str) -> date | str:
@@ -154,13 +157,23 @@ async def pulse_digest(day: str | None = None, ctx: Context = None) -> str:
     if isinstance(target_date, str):
         return target_date
     pulse_ctx = _get_pulse_ctx(ctx)
+    config = pulse_ctx.config if pulse_ctx.config is not None else load_config()
+    summ_llm, _ = create_providers_from_config(config)
+    model = summarization_model_for_digest(config)
+
+    await run_aggregation_job(
+        day=target_date, database_path=pulse_ctx.database_path
+    )
+    job = await run_daily_digest_job(
+        day=target_date,
+        database_path=pulse_ctx.database_path,
+        vault_path=pulse_ctx.vault_path,
+        llm=summ_llm,
+        summarization_model=model,
+    )
 
     events = await pulse_ctx.events.list_events_for_day(day)
-    summarizer = DailySummarizer()
-    summary = summarizer.summarize(target_date, events)
-    output_path = write_daily_digest(Path(pulse_ctx.vault_path), day, summary.markdown)
-
-    return f"Digest for {day} written to {output_path} ({len(events)} events)."
+    return f"Digest for {day} written to {job.detail} ({len(events)} events)."
 
 
 @mcp.tool()

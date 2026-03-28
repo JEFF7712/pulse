@@ -18,6 +18,24 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `timezone` | `PULSE_TIMEZONE` | `UTC` | Used when resolving the current day for scheduled jobs. |
 | `telegram_bot_token` | `PULSE_TELEGRAM_BOT_TOKEN` | unset | Needed before Telegram notifications can be sent. |
 | `telegram_chat_id` | `PULSE_TELEGRAM_CHAT_ID` | unset | Paired with the bot token for outbound Telegram delivery. |
+| `corrections_webhook_secret` | `PULSE_CORRECTIONS_WEBHOOK_SECRET` | unset | When set, enables `POST /webhooks/corrections` with `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hmac>` (HMAC-SHA256 of the raw body). JSON body: `context_id`, `message`. Returns 404 when unset. |
+| `ntfy_topic` | `PULSE_NTFY_TOPIC` | unset | ntfy topic; set to enable push via [ntfy.sh](https://ntfy.sh) or your own server. |
+| `ntfy_base_url` | `PULSE_NTFY_BASE_URL` | unset | ntfy server root (defaults to `https://ntfy.sh` when topic is set). |
+| `notification_webhook_url` | `PULSE_NOTIFICATION_WEBHOOK_URL` | unset | HTTPS URL that receives JSON `POST` bodies for each outbound notification. |
+| `discord_webhook_url` | `PULSE_DISCORD_WEBHOOK_URL` | unset | Discord incoming webhook URL (embed per notification). |
+| `slack_webhook_url` | `PULSE_SLACK_WEBHOOK_URL` | unset | Slack incoming webhook URL (`text` payload). |
+| `pushover_user_key` | `PULSE_PUSHOVER_USER_KEY` | unset | Pushover user key; enable Pushover only when both user key and API token are set. |
+| `pushover_api_token` | `PULSE_PUSHOVER_API_TOKEN` | unset | Pushover application API token from the Pushover dashboard. |
+| `gotify_url` | `PULSE_GOTIFY_URL` | unset | Gotify server base URL (no trailing path). |
+| `gotify_app_token` | `PULSE_GOTIFY_APP_TOKEN` | unset | Gotify application token; enable Gotify only when both URL and token are set. |
+| `smtp_host` | `PULSE_SMTP_HOST` | unset | Outbound SMTP host for email notifications. |
+| `smtp_port` | `PULSE_SMTP_PORT` | `587` | SMTP port (`587` + STARTTLS is default; use `465` with `smtp_use_ssl`). |
+| `smtp_user` | `PULSE_SMTP_USER` | unset | SMTP username if the server requires auth. |
+| `smtp_password` | `PULSE_SMTP_PASSWORD` | unset | SMTP password. |
+| `smtp_from` | `PULSE_SMTP_FROM` | unset | `From` address for notification email. |
+| `smtp_to` | `PULSE_SMTP_TO` | unset | Recipient(s); comma-separated for multiple. Email channel is enabled when `smtp_host`, `smtp_from`, and `smtp_to` are all set. |
+| `smtp_use_tls` | `PULSE_SMTP_USE_TLS` | `true` | Use STARTTLS after connect (typical for submission on port 587). |
+| `smtp_use_ssl` | `PULSE_SMTP_USE_SSL` | `false` | Use implicit TLS (`SMTP_SSL`, typical for port 465). |
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | Keep in `.env`, never in `pulse.toml`. |
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
@@ -33,35 +51,72 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `plaid_client_id` | `PULSE_PLAID_CLIENT_ID` | unset | Plaid Link + transactions. |
 | `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Keep in `.env`. |
 | `plaid_env` | `PULSE_PLAID_ENV` | unset | `sandbox`, `development`, or `production`. |
-| `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Legacy single-provider fallback for profile structuring, digest summarization, and discovery when `[llm.*]` role config is not set. |
-| `summarization_model` | `PULSE_SUMMARIZATION_MODEL` | `claude-haiku-4-5-20251001` | Legacy Anthropic model id for summarization when `PULSE_ANTHROPIC_API_KEY` is being used. |
-| `discovery_model` | `PULSE_DISCOVERY_MODEL` | `claude-sonnet-4-6` | Legacy Anthropic model id for discovery when `PULSE_ANTHROPIC_API_KEY` is being used. |
+| `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Legacy single-provider fallback for profile structuring, digest summarization, and discovery when `[llm.*]` role config is not set. Uses fixed ids `claude-haiku-4-5-20251001` (summarization) and `claude-sonnet-4-6` (discovery and corrections fallback when no `[llm.*]` is set) — customize models only via `[llm.*]`. |
 | `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization`, `discovery`, and `corrections`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
-
-You can also set `summarization_model` and `discovery_model` as top-level keys in `pulse.toml` (same names, string values); environment variables override file values when both are present.
 
 ### LLM provider configuration
 
 Pulse supports two LLM configuration paths:
 
-1. **Legacy Anthropic fallback** via `PULSE_ANTHROPIC_API_KEY` plus optional `PULSE_SUMMARIZATION_MODEL` / `PULSE_DISCOVERY_MODEL`. This is also what `pulse init` uses for profile structuring.
-2. **Per-role provider config** in `pulse.toml` via `[llm.summarization]`, `[llm.discovery]`, and `[llm.corrections]`. Each block sets `provider`, `model`, and optional `base_url`. If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery.
+1. **Legacy Anthropic fallback** via `PULSE_ANTHROPIC_API_KEY` only (no per-model env vars). Pulse uses `claude-haiku-4-5-20251001` for summarization and `claude-sonnet-4-6` for discovery (see [Anthropic models](https://docs.anthropic.com/en/docs/about-claude/models/overview)). This is also what `pulse init` uses for profile structuring.
+2. **Per-role provider config** in `pulse.toml` via `[llm.summarization]`, `[llm.discovery]`, and `[llm.corrections]`. Each block sets `model` and optional `provider` and `base_url`. You can set **`[llm] provider`** (and optional **`[llm] base_url`**) once, then list only **`model`** under each role — for example Haiku for digest summarization and Opus for discovery on Anthropic, or a smaller vs larger OpenAI model id. If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery. **`[llm] base_url`** is inherited only for `openai` and `ollama` roles so a local Ollama URL is not applied to Anthropic or Gemini.
 
 Supported providers are `anthropic`, `openai`, `gemini`, and `ollama`.
+
+**Same provider, different models** (set `ANTHROPIC_API_KEY` in `.env`). These ids match the current Claude API family ([Anthropic model overview](https://docs.anthropic.com/en/docs/about-claude/models/overview)): Haiku 4.5 for fast summarization, Opus 4.6 for heavier discovery.
+
+```toml
+[llm]
+provider = "anthropic"
+
+[llm.summarization]
+model = "claude-haiku-4-5-20251001"
+
+[llm.discovery]
+model = "claude-opus-4-6"
+```
+
+**OpenAI example** — flagship `gpt-5.4` plus smaller `gpt-5.4-nano` / `gpt-5.4-mini` as documented on [OpenAI Models](https://platform.openai.com/docs/models) (verify ids in your project before deploying):
+
+```toml
+[llm]
+provider = "openai"
+
+[llm.summarization]
+model = "gpt-5.4-nano"
+
+[llm.discovery]
+model = "gpt-5.4"
+```
+
+**Gemini example** (set `GEMINI_API_KEY`; stable ids from [Gemini models](https://ai.google.dev/gemini-api/docs/models)):
+
+```toml
+[llm]
+provider = "gemini"
+
+[llm.summarization]
+model = "gemini-2.5-flash"
+
+[llm.discovery]
+model = "gemini-2.5-pro"
+```
+
+**Mixed providers** (each role supplies its own `provider`):
 
 ```toml
 [llm.summarization]
 provider = "ollama"
-model = "llama3"
+model = "llama3.3"
 base_url = "http://localhost:11434/v1"
 
 [llm.discovery]
 provider = "anthropic"
-model = "claude-sonnet-4-5-20250514"
+model = "claude-sonnet-4-6"
 
 [llm.corrections]
 provider = "openai"
-model = "gpt-4o-mini"
+model = "gpt-5.4-mini"
 ```
 
 Provider API keys come from standard environment variables, not `PULSE_...` names:
@@ -72,7 +127,7 @@ Provider API keys come from standard environment variables, not `PULSE_...` name
 
 `ollama` uses the OpenAI-compatible transport and defaults to a placeholder key when no `OPENAI_API_KEY` is set.
 
-Corrections use a different fallback chain than digest/discovery creation: `llm.corrections` is used first, then `llm.discovery`, then the legacy `PULSE_ANTHROPIC_API_KEY` fallback using `PULSE_DISCOVERY_MODEL`. In short: corrections -> discovery -> legacy `PULSE_ANTHROPIC_API_KEY` fallback.
+Corrections use a different fallback chain than digest/discovery creation: `llm.corrections` is used first, then `llm.discovery`, then the legacy `PULSE_ANTHROPIC_API_KEY` fallback with the same fixed Sonnet model id used for discovery. In short: corrections -> discovery -> legacy `PULSE_ANTHROPIC_API_KEY` fallback.
 
 ## `pulse.toml`
 
@@ -159,20 +214,20 @@ The FastAPI app, CLI, and MCP entrypoint all call the same `load_config()` path.
 
 That matters for the corrections workflow:
 
-- Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`
+- Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`; authenticated `POST /webhooks/corrections` requests do the same
 - both surfaces also initialize the `correction_applications` table and record the correction status there (`applied`, `needs_review`, `skipped`, or `failed`)
 - when a corrections provider is configured, the interpreter may apply one bounded vault update to the resolved target (daily digest note append, pattern notes/status update, `profile.md` learned corrections section replace, or `routines.md` correction updates section replace)
 - when no corrections provider is configured, the raw correction is still stored and the audit/status row explains that application was skipped
 
-The MCP `pulse_digest` tool still uses the non-LLM `DailySummarizer` path.
+The MCP `pulse_digest` tool uses the same aggregation + digest job path as the CLI and scheduler, including the configured summarization provider when one resolves.
 
 ## Runtime consequences
 
 - `/health` only checks that the app booted with a valid config object; it does not prove that external connectors are authenticated
-- the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when Telegram or discovery-provider settings are absent
+- the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when no notification channel or discovery-provider settings are configured
 - the **scheduled** `daily_digest` job still fires every 24 hours; when a summarization provider is configured it passes an LLM into the digest runner, otherwise it uses the non-LLM summarizer
-- `pulse digest` now uses the same summarization-provider path as the scheduler; the web **Digest** action still invokes the digest runner without an LLM client, so browser-triggered digests stay non-LLM today
-- `morning_briefing` needs both Telegram settings to deliver notifications
+- `pulse digest`, the web **Digest** action, and MCP `pulse_digest` use that same summarization-provider path (aggregate first, then digest); when no provider resolves, all of them fall back to the non-LLM summarizer
+- `morning_briefing` uses the same summarization LLM path as the daily digest (then sends the briefing text); it needs at least one outbound channel among Telegram, ntfy, Gotify, SMTP email, generic webhook, Discord webhook, Slack webhook, or Pushover (user key + API token together); when several are set, Pulse broadcasts the same notification to all of them
 - discovery jobs resolve the same way as digest/discovery provider creation: a single configured summarization/discovery role is reused for both, otherwise Pulse uses the legacy `PULSE_ANTHROPIC_API_KEY` fallback; if neither path resolves, discovery skips with a no-provider message
 - corrections application needs `correction_applications`, a vault path, and a corrections provider resolved from `llm.corrections`, then `llm.discovery`, then the legacy Anthropic fallback; otherwise the system keeps the raw correction and records a skipped or needs-review status instead of editing vault files
 
@@ -184,6 +239,24 @@ PULSE_VAULT_PATH=Pulse-Vault
 PULSE_TIMEZONE=UTC
 PULSE_TELEGRAM_BOT_TOKEN=
 PULSE_TELEGRAM_CHAT_ID=
+PULSE_CORRECTIONS_WEBHOOK_SECRET=
+PULSE_NTFY_TOPIC=
+PULSE_NTFY_BASE_URL=
+PULSE_NOTIFICATION_WEBHOOK_URL=
+PULSE_DISCORD_WEBHOOK_URL=
+PULSE_SLACK_WEBHOOK_URL=
+PULSE_PUSHOVER_USER_KEY=
+PULSE_PUSHOVER_API_TOKEN=
+PULSE_GOTIFY_URL=
+PULSE_GOTIFY_APP_TOKEN=
+PULSE_SMTP_HOST=
+PULSE_SMTP_PORT=587
+PULSE_SMTP_USER=
+PULSE_SMTP_PASSWORD=
+PULSE_SMTP_FROM=
+PULSE_SMTP_TO=
+PULSE_SMTP_USE_TLS=true
+PULSE_SMTP_USE_SSL=false
 PULSE_GOOGLE_CLIENT_ID=
 PULSE_GOOGLE_CLIENT_SECRET=
 PULSE_SPOTIFY_CLIENT_ID=
@@ -205,7 +278,4 @@ PULSE_ANTHROPIC_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 GEMINI_API_KEY=
-# Optional legacy overrides:
-# PULSE_SUMMARIZATION_MODEL=claude-haiku-4-5-20251001
-# PULSE_DISCOVERY_MODEL=claude-sonnet-4-6
 ```

@@ -32,14 +32,14 @@ def test_openai_provider_calls_chat_completions():
     class FakeClient:
         chat = FakeChat()
 
-    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-4o")
+    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-5.4")
     provider._client = FakeClient()
 
     result = asyncio.run(provider.complete("hello", system_prompt="Be helpful"))
 
     assert result == "test response"
     assert len(calls) == 1
-    assert calls[0]["model"] == "gpt-4o"
+    assert calls[0]["model"] == "gpt-5.4"
     messages = calls[0]["messages"]
     assert messages[0]["role"] == "system"
     assert messages[0]["content"] == "Be helpful"
@@ -71,11 +71,11 @@ def test_openai_provider_model_override():
     class FakeClient:
         chat = FakeChat()
 
-    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-4o")
+    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-5.4")
     provider._client = FakeClient()
 
-    asyncio.run(provider.complete("hi", model="gpt-4o-mini"))
-    assert calls[0]["model"] == "gpt-4o-mini"
+    asyncio.run(provider.complete("hi", model="gpt-5.4-mini"))
+    assert calls[0]["model"] == "gpt-5.4-mini"
 
 
 def test_openai_provider_no_system_prompt():
@@ -102,7 +102,7 @@ def test_openai_provider_no_system_prompt():
     class FakeClient:
         chat = FakeChat()
 
-    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-4o")
+    provider = OpenAICompatibleProvider(api_key="fake", model="gpt-5.4")
     provider._client = FakeClient()
 
     asyncio.run(provider.complete("hello"))

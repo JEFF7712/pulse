@@ -49,7 +49,7 @@ def _for_one(exc: BaseException) -> str | None:
         detail = _api_error_text(exc)
         base = (
             "Anthropic returned 404 — often an invalid model id. "
-            "Check PULSE_DISCOVERY_MODEL / PULSE_SUMMARIZATION_MODEL (or defaults in pulse.toml / config)."
+            "Check `[llm.*]` model values in pulse.toml (legacy PULSE_ANTHROPIC_API_KEY uses fixed defaults)."
         )
         return f"{base} API said: {detail}" if detail else base
     if isinstance(exc, anthropic.RateLimitError):

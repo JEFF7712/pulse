@@ -17,7 +17,7 @@ Start with the two lowest-cost checks:
 `GET /` returns an HTML home page (bound to the same `--host` / `--port` as the API). It summarizes the configured database path, vault path, timezone, number of registered scheduler jobs, and how many pull vs push connectors are active. Form posts go to:
 
 - `POST /actions/pull` — incremental pull for all active pull connectors
-- `POST /actions/digest` — aggregate and generate the daily digest for the current day in `PULSE_TIMEZONE` (non-LLM digest path; the scheduled `daily_digest` job is what uses the LLM when an API key is configured)
+- `POST /actions/digest` — aggregate and generate the daily digest for the current day in `PULSE_TIMEZONE` (same summarization path as `pulse digest` and the scheduled `daily_digest` job: LLM when a provider resolves, otherwise non-LLM fallback)
 - `POST /actions/discover` — aggregate and run **daily**-cadence discovery for the current day (works when a discovery provider resolves; a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path, and if neither path resolves the action shows an error notice); use `pulse discover --cadence weekly|monthly` from the CLI for other cadences
 - `POST /actions/test-telegram` — send a test notification (requires Telegram env vars)
 
@@ -26,6 +26,10 @@ Redirects return to `/` with a short success or error banner. This complements t
 ## Webhook behavior
 
 The app always mounts `POST /webhooks/telegram`.
+
+When `PULSE_CORRECTIONS_WEBHOOK_SECRET` is set, the app also mounts `POST /webhooks/corrections`. When the secret is unset, that path returns 404 so scanners do not get a generic auth challenge.
+
+- **Corrections webhook:** JSON body `{"context_id": "<id>", "message": "<text>"}`. Authenticate with `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hex>` where `<hex>` is `HMAC_SHA256(secret, raw_body)`. Same correction pipeline as Telegram replies and MCP.
 
 - valid Telegram reply payloads are accepted with HTTP 202
 - malformed payloads fail with HTTP 400 when the message body, reply text, reply target, or extracted context is missing
@@ -37,9 +41,9 @@ The stock `register_all` hook only registers **pull** connectors today, so a def
 
 ## MCP corrections workflow
 
-The MCP tool `pulse_correct` uses the same config loader and correction service as the FastAPI webhook path.
+The MCP tool `pulse_correct` uses the same config loader and correction service as the Telegram and HTTP webhook paths.
 
-- `pulse_correct` stores raw correction text in the same `corrections` table as Telegram replies
+- `pulse_correct` stores raw correction text in the same `corrections` table as Telegram replies and `/webhooks/corrections`
 - it also writes a `correction_applications` record for audit/status tracking
 - if the configured corrections workflow has a safe target plus an LLM interpreter, it may apply the same bounded vault updates as Telegram replies
 - if provider config, vault context, or safe target resolution is missing, the correction is still stored and the status row explains why no vault update happened
@@ -57,9 +61,9 @@ The scheduler always wires these baseline jobs:
 
 Operationally, the key skip conditions are:
 
-- `morning_briefing` skips when Telegram is not configured
+- `morning_briefing` skips when no notification channel is configured (Telegram, ntfy, Gotify, SMTP, generic webhook, Discord webhook, Slack webhook, or Pushover with both user key and API token)
 - discovery jobs use the same provider resolution path as digest/discovery creation: a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path; if neither path resolves, discovery skips
-- the scheduled `daily_digest` job always runs, and both the scheduler and manual `pulse digest` use the configured summarization provider when one resolves; the web Digest action and MCP `pulse_digest` tool still use the non-LLM digest path today
+- the scheduled `daily_digest` job always runs; the scheduler, manual `pulse digest`, the web Digest action, and MCP `pulse_digest` all use the configured summarization provider when one resolves, otherwise the non-LLM digest path
 - connector pull jobs only exist for connectors that are enabled in `pulse.toml`
 - because the cron jobs are created without an explicit APScheduler timezone, their trigger times follow the scheduler host timezone and process timezone
 - `PULSE_TIMEZONE` affects current-day resolution inside jobs, not the cron trigger definitions themselves
@@ -83,7 +87,7 @@ Use this order for normal checks and triage:
 ## Failure patterns
 
 - healthy `/health` plus empty `pulse logs` usually points to disabled connectors, missing credentials, or no scheduled pulls yet
-- successful ingestion plus skipped `morning_briefing` usually means `PULSE_TELEGRAM_BOT_TOKEN` or `PULSE_TELEGRAM_CHAT_ID` is unset
+- successful ingestion plus skipped `morning_briefing` usually means no outbound channel is set (see configuration reference for `PULSE_TELEGRAM_*`, `PULSE_NTFY_TOPIC`, `PULSE_GOTIFY_URL`, `PULSE_SMTP_HOST`, `PULSE_NOTIFICATION_WEBHOOK_URL`, `PULSE_DISCORD_WEBHOOK_URL`, `PULSE_SLACK_WEBHOOK_URL`, and `PULSE_PUSHOVER_*`)
 - successful ingestion plus skipped discovery runs usually means neither a reusable summarization/discovery role nor the legacy `PULSE_ANTHROPIC_API_KEY` fallback is configured
 - Telegram webhook 400 responses usually mean the reply payload is missing the original context-bearing message
 - corrections present in `corrections` but no vault change usually mean `correction_applications` recorded `skipped` or `needs_review`; inspect the latest status/summary before retrying with a different prompt or config
