@@ -63,7 +63,7 @@ class GoogleAuthManager(OAuthManager):
         creds = self._load_credentials()
         if creds is None:
             raise RuntimeError(
-                "Not authorized. Run 'pulse auth google' first."
+                "Not authorized. Run `pulse configure` → Connectors and open a Google-backed source (Gmail, Calendar, YouTube)."
             )
         if creds.expired and creds.refresh_token:
             from google.auth.transport.requests import Request

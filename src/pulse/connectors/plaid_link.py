@@ -1,4 +1,4 @@
-"""Local HTTP server for Plaid Link (used by `pulse auth plaid`)."""
+"""Local HTTP server for Plaid Link (used from `pulse configure` → Connectors → Plaid)."""
 from __future__ import annotations
 
 import hashlib

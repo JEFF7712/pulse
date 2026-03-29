@@ -51,6 +51,11 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `plaid_client_id` | `PULSE_PLAID_CLIENT_ID` | unset | Plaid Link + transactions. |
 | `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Keep in `.env`. |
 | `plaid_env` | `PULSE_PLAID_ENV` | unset | `sandbox`, `development`, or `production`. |
+| `oura_client_id` | `PULSE_OURA_CLIENT_ID` | unset | Oura Cloud API OAuth client id (optional if using PAT). |
+| `oura_client_secret` | `PULSE_OURA_CLIENT_SECRET` | unset | Oura OAuth secret; keep in `.env`. |
+| `oura_personal_access_token` | `PULSE_OURA_PERSONAL_ACCESS_TOKEN` | unset | Oura personal access token; when set, OAuth is not used. |
+| `notion_token` | `PULSE_NOTION_TOKEN` | unset | Notion internal integration secret for workspace search / database query. |
+| `linear_api_key` | `PULSE_LINEAR_API_KEY` | unset | Linear personal API key; syncs issues assigned to the key’s user. |
 | `anthropic_api_key` | `PULSE_ANTHROPIC_API_KEY` | unset | Legacy single-provider fallback for profile structuring, digest summarization, and discovery when `[llm.*]` role config is not set. Uses fixed ids `claude-haiku-4-5-20251001` (summarization) and `claude-sonnet-4-6` (discovery and corrections fallback when no `[llm.*]` is set) — customize models only via `[llm.*]`. |
 | `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization`, `discovery`, and `corrections`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
 
@@ -133,19 +138,19 @@ Corrections use a different fallback chain than digest/discovery creation: `llm.
 
 `config_loader.py` reads `pulse.toml` from the current working directory by default. The file is optional, but when present it is the source of truth for the nested `connectors` map because those settings are not flattened into `PULSE_...` overrides.
 
-The checked-in template matches `pulse.toml.example` (Spotify starts disabled so you opt in after OAuth setup):
+The checked-in template matches `pulse.toml.example`: every connector starts with `enabled = false` so you opt in explicitly.
 
 ```toml
 [connectors.gmail]
-enabled = true
+enabled = false
 poll_interval = "15m"
 
 [connectors.calendar]
-enabled = true
+enabled = false
 poll_interval = "30m"
 
 [connectors.youtube]
-enabled = true
+enabled = false
 poll_interval = "1h"
 
 [connectors.spotify]
@@ -166,6 +171,10 @@ calendar_id = "primary"
 enabled = false
 poll_interval = "30m"
 
+[connectors.linear]
+enabled = false
+poll_interval = "30m"
+
 [connectors.gitlab]
 enabled = false
 poll_interval = "30m"
@@ -177,7 +186,7 @@ poll_interval = "6h"
 omit_amounts_in_digest = false
 
 [connectors.browser]
-enabled = true
+enabled = false
 poll_interval = "15m"
 browser = "chrome"  # or "firefox"
 
@@ -187,13 +196,13 @@ poll_interval = "1h"
 urls = []
 ```
 
-The full checked-in template is `pulse.toml.example` at the repository root. Set `[connectors.spotify] enabled = true` when you are ready to use Spotify. For RSS/Atom feeds, set `[connectors.feeds] enabled = true` and list URLs in `urls` (see [Connectors Index](../connectors/index.md)). `pulse configure` writes a fresh `pulse.toml` from your answers and may enable more connectors than the example file.
+The full checked-in template is `pulse.toml.example` at the repository root. Set `enabled = true` on each connector you want (for example Spotify after OAuth setup, or feeds after adding `urls`). `pulse configure` writes a fresh `pulse.toml` from your answers.
 
 The example file also includes a commented `llm.corrections` block. Leave it out if you want corrections to inherit discovery behavior; add it when correction interpretation should use a different provider or model than discovery.
 
 Each connector entry is parsed into a `ConnectorConfig` model with:
 
-- `enabled` defaulting to `true`
+- `enabled` defaulting to `false` when the key is omitted (opt-in)
 - `poll_interval` defaulting to `15m`
 - extra connector-specific keys preserved as-is
 
@@ -292,6 +301,11 @@ PULSE_GITLAB_TOKEN=
 PULSE_PLAID_CLIENT_ID=
 PULSE_PLAID_SECRET=
 PULSE_PLAID_ENV=
+PULSE_OURA_CLIENT_ID=
+PULSE_OURA_CLIENT_SECRET=
+PULSE_OURA_PERSONAL_ACCESS_TOKEN=
+PULSE_NOTION_TOKEN=
+PULSE_LINEAR_API_KEY=
 # Legacy single-provider fallback:
 PULSE_ANTHROPIC_API_KEY=
 # Per-role provider API keys (used by [llm.*] in pulse.toml):

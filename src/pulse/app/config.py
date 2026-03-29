@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 
 class ConnectorConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
-    enabled: bool = True
+    enabled: bool = False
     poll_interval: str = "15m"
 
 
@@ -64,6 +64,11 @@ class PulseConfig(BaseModel):
     plaid_client_id: str | None = None
     plaid_secret: str | None = None
     plaid_env: str | None = None
+    oura_client_id: str | None = None
+    oura_client_secret: str | None = None
+    oura_personal_access_token: str | None = None
+    notion_token: str | None = None
+    linear_api_key: str | None = None
     companion_token: str | None = None
     fcm_service_account_path: str | None = None
     anthropic_api_key: str | None = None

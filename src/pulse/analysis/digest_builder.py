@@ -5,6 +5,15 @@ from datetime import date
 
 from pulse.analysis.preprocessor import PreprocessedDay
 
+
+def _fmt_hours(seconds: int | None) -> str | None:
+    if seconds is None:
+        return None
+    try:
+        return f"{float(seconds) / 3600:.1f}h"
+    except (TypeError, ValueError):
+        return None
+
 _BLOCK_LABELS = {
     0: "Late Night (12am-2am)",
     1: "Early Morning (2am-4am)",
@@ -58,12 +67,27 @@ class DigestBuilder:
         if preprocessed.finance_summary is not None:
             sections.extend(["## Spending", self._build_spending(preprocessed), ""])
 
+        if preprocessed.health_days or preprocessed.health_workouts:
+            sections.extend(["## Health (Oura)", self._build_health(preprocessed), ""])
+
+        if preprocessed.notion_edits:
+            sections.extend(["## Notion", self._build_notion(preprocessed), ""])
+
         return "\n".join(sections)
 
     def _build_glance(self, narratives: dict[str, str]) -> str:
         # Combine first sentence of each narrative
         parts = []
-        for source in ("calendar", "email", "browsing", "media", "dev", "finance"):
+        for source in (
+            "calendar",
+            "email",
+            "browsing",
+            "media",
+            "dev",
+            "finance",
+            "health",
+            "notion",
+        ):
             text = narratives.get(source, "")
             if text:
                 # Take first sentence
@@ -115,6 +139,37 @@ class DigestBuilder:
                 else f"{fs.transaction_count} transactions, ~${fs.total_outflow:,.2f} outflow"
             )
             items.append((12, f"- Spending: {label}"))
+
+        for h in day.health_days[:3]:
+            parts = []
+            if h.sleep_score is not None:
+                parts.append(f"sleep {h.sleep_score}")
+            if h.readiness_score is not None:
+                parts.append(f"readiness {h.readiness_score}")
+            ah = _fmt_hours(h.sleep_duration_seconds)
+            if ah:
+                parts.append(f"asleep ~{ah}")
+            if h.steps is not None:
+                parts.append(f"{h.steps:,} steps")
+            if parts:
+                items.append((8, f"- Oura ({h.day}): {', '.join(parts)}"))
+
+        for w in day.health_workouts[:8]:
+            time_str = w.start.strftime("%H:%M")
+            dur = f", ~{w.duration_minutes:.0f} min" if w.duration_minutes else ""
+            items.append((
+                w.start.hour,
+                f"- {time_str} Workout: {w.title}{dur}",
+            ))
+
+        for n in day.notion_edits[:15]:
+            time_str = n.timestamp.strftime("%H:%M")
+            kind = n.object_type or "page"
+            src = f" ({n.via})" if n.via else ""
+            items.append((
+                n.timestamp.hour,
+                f"- {time_str} Notion{src}: {n.title} [{kind}]",
+            ))
 
         if not items:
             return ""
@@ -176,6 +231,81 @@ class DigestBuilder:
             repo = f" ({act.repo})" if act.repo else ""
             lines.append(f"- **{act.provider}**{repo}: {act.title}")
         return "\n".join(lines) if lines else "No development activity."
+
+    def _build_notion(self, day: PreprocessedDay) -> str:
+        lines = [
+            f"- **{len(day.notion_edits)} update(s)** in connected pages and databases.",
+            "",
+        ]
+        for n in day.notion_edits[:30]:
+            time_str = n.timestamp.strftime("%H:%M")
+            via = f" _({n.via})_" if n.via else ""
+            kind = f" `{n.object_type}`" if n.object_type else ""
+            link = f" — {n.url}" if n.url else ""
+            lines.append(f"- {time_str}{via}{kind} **{n.title}**{link}")
+        return "\n".join(lines)
+
+    def _build_health(self, day: PreprocessedDay) -> str:
+        blocks: list[str] = []
+
+        if day.health_days:
+            blocks.append("### Daily summary")
+            for h in day.health_days:
+                blocks.append(f"#### {h.day}")
+                if h.sleep_score is not None:
+                    blocks.append(f"- Sleep score **{h.sleep_score}**")
+                asleep = _fmt_hours(h.sleep_duration_seconds)
+                if asleep:
+                    blocks.append(f"- Time asleep **~{asleep}**")
+                in_bed = _fmt_hours(h.time_in_bed_seconds)
+                if in_bed:
+                    blocks.append(f"- Time in bed **~{in_bed}**")
+                if h.sleep_efficiency is not None:
+                    blocks.append(f"- Sleep efficiency **{h.sleep_efficiency}%**")
+                stages: list[str] = []
+                ds = _fmt_hours(h.deep_sleep_seconds)
+                if ds:
+                    stages.append(f"deep {ds}")
+                rs = _fmt_hours(h.rem_sleep_seconds)
+                if rs:
+                    stages.append(f"REM {rs}")
+                ls = _fmt_hours(h.light_sleep_seconds)
+                if ls:
+                    stages.append(f"light {ls}")
+                if stages:
+                    blocks.append("- Stages: " + ", ".join(stages))
+                if h.readiness_score is not None:
+                    blocks.append(f"- Readiness **{h.readiness_score}**")
+                act: list[str] = []
+                if h.activity_score is not None:
+                    act.append(f"activity score **{h.activity_score}**")
+                if h.steps is not None:
+                    act.append(f"**{h.steps:,}** steps")
+                if h.active_calories is not None:
+                    act.append(f"**{h.active_calories}** active kcal")
+                dist = h.equivalent_walking_distance_meters
+                if dist is not None:
+                    act.append(f"~**{dist / 1000:.1f}** km walk equiv.")
+                if act:
+                    blocks.append("- " + " · ".join(act))
+                blocks.append("")
+
+        if day.health_workouts:
+            blocks.append("### Workouts")
+            for w in day.health_workouts:
+                time_str = w.start.strftime("%H:%M")
+                bits = [f"**{w.title}** at {time_str}"]
+                if w.duration_minutes and w.duration_minutes > 0:
+                    bits.append(f"~{w.duration_minutes:.0f} min")
+                if w.calories is not None:
+                    bits.append(f"{w.calories} kcal")
+                if w.intensity:
+                    bits.append(f"intensity {w.intensity}")
+                blocks.append("- " + " · ".join(bits))
+            blocks.append("")
+
+        text = "\n".join(blocks).strip()
+        return text if text else "No Oura data."
 
     def _build_spending(self, day: PreprocessedDay) -> str:
         fs = day.finance_summary

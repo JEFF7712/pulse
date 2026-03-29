@@ -29,7 +29,7 @@ pulse onboard
 
 Before `pulse configure`, the CLI prints a short checklist (working directory, install, OAuth prep, Spotify callback on `localhost:8888`, and other localhost ports for Microsoft, GitHub, GitLab, and Plaid). After `pulse init`, it reminds you to open the app and use `pulse status` / `pulse insights` in another terminal.
 
-By default, `pulse onboard` runs each `pulse auth …` flow only when that service’s credentials are in `.env` and the matching connector is enabled in `pulse.toml` (GitLab skips OAuth when `PULSE_GITLAB_TOKEN` is set; Plaid Link runs only when `plaid_tokens.json` does not exist yet).
+By default, `pulse onboard` runs each OAuth / Plaid / Oura step only when that service’s credentials are in `.env` and the matching connector is enabled in `pulse.toml` (GitLab skips OAuth when `PULSE_GITLAB_TOKEN` is set; Plaid Link runs only when `plaid_tokens.json` does not exist yet).
 
 To always run **all** configured auth and link steps (and exit with an error if a required step fails), use:
 
@@ -54,13 +54,18 @@ Start with the interactive setup flow:
 pulse configure
 ```
 
-`pulse configure` is the real entry point for self-hosting. It walks through:
+`pulse configure` is the self-hosting entry point. The menu:
 
-- core settings such as `PULSE_DATABASE_PATH`, `PULSE_VAULT_PATH`, and `PULSE_TIMEZONE`
-- service credentials for Google, Spotify, Microsoft, GitHub, GitLab, Plaid, Anthropic, Telegram, and optional notification channels (ntfy, Gotify, SMTP, generic webhook, Discord, Slack, Pushover)
-- connector settings in `pulse.toml`
+- **Core** — database path, vault path, timezone.
+- **Connectors** — pick a source: its `.env` keys, `pulse.toml` block, then OAuth / Plaid / Oura when you save with that source enabled (details in §2). Rows show **●**/**○** (enabled in `pulse.toml`), emoji, short name, **✓**/**✗** for `.env` prereqs when ●, poll interval.
+- **Notifications** — **●**/**○** rows per outbound path (Telegram through SMTP, corrections webhook, companion / FCM, …); pick one to edit only its `.env` keys.
+- **Model providers** — vendor API keys in `.env`.
+- **LLM in pulse.toml** — wizard for `[llm]` provider plus summarization and discovery `model` ids (merges into `pulse.toml`; keeps `[llm.corrections]` if present). For Ollama, also prompts for the OpenAI-compatible base URL.
+- **Full wizard** — core, all integrations, model keys, optional LLM roles step (TTY), all notification keys, every connector’s `pulse.toml`, then OAuth for each enabled connector (same coverage as `pulse onboard`’s configure phase).
 
-There is no committed `pulse.toml` in the repo (it is gitignored). Copy `pulse.toml.example` to `pulse.toml` or run `pulse configure`, which writes `pulse.toml` from your answers. The example enables Gmail, Calendar, YouTube, and browser history; Spotify is disabled there so you opt in explicitly. Typical intervals when everything is enabled:
+Arrow keys + Enter in a TTY; otherwise type `0`–`6` (`0` = Done). When `.env` exists, wide prompts can **keep all existing values** for that section in one answer.
+
+There is no committed `pulse.toml` in the repo (it is gitignored). Copy `pulse.toml.example` to `pulse.toml` or run `pulse configure`, which writes `pulse.toml` from your answers. The example file keeps **every** connector `enabled = false` so you opt in explicitly; `pulse configure` does the same for new connector blocks (press `y` to turn sources on). Typical intervals when you enable everything:
 
 - Gmail every `15m`
 - Google Calendar every `30m`
@@ -68,55 +73,11 @@ There is no committed `pulse.toml` in the repo (it is gitignored). Copy `pulse.t
 - Spotify every `30m` with a supplementary pull every `6h`
 - browser history every `15m`
 
-## 2. Authorize external services
+## 2. OAuth, Plaid, and Oura (inside Connectors)
 
-If you enabled Google-backed connectors, run:
+There is no separate `pulse auth …` command. From **`pulse configure` → Connectors**, pick each source you enabled (Gmail, Spotify, Microsoft 365, GitHub, GitLab, Plaid, Oura, …). After you save that connector’s `.env` and `pulse.toml` block with **●** (enabled), Pulse offers the same OAuth, Plaid Link, or Oura browser flows as before (localhost callbacks on `8888`, `8890`, `8891`, `8892`, `8893`, `8894` where applicable).
 
-```bash
-pulse auth google
-```
-
-That flow authorizes the enabled Google connectors in `pulse.toml`, which can include Gmail, Calendar, and YouTube.
-
-If you enabled Spotify, run:
-
-```bash
-pulse auth spotify
-```
-
-Spotify opens a browser-based OAuth flow and saves tokens beside your Pulse database.
-
-If you enabled **Microsoft 365** (`microsoft_mail` / `microsoft_calendar`), run:
-
-```bash
-pulse auth microsoft
-```
-
-(Register `http://localhost:8890/callback` on your Azure app.)
-
-If you enabled **GitHub**, run:
-
-```bash
-pulse auth github
-```
-
-(Register `http://localhost:8891/callback` on the GitHub OAuth app.)
-
-If you enabled **GitLab** without a PAT, run:
-
-```bash
-pulse auth gitlab
-```
-
-(Register `http://localhost:8892/callback` on your GitLab OAuth app, matching `gitlab_base_url`.)
-
-If you enabled **Plaid**, run:
-
-```bash
-pulse auth plaid
-```
-
-This opens Plaid Link on `http://localhost:8893/` and writes `plaid_tokens.json` beside your database.
+Finish those steps **before** `pulse init` if the first pull should hit those APIs. For **Notion**, **Linear** (API key), **browser**, **feeds**, etc., there is nothing to authorize in that menu.
 
 ## 3. Initialize your profile and first data pull
 
@@ -179,19 +140,11 @@ For a normal first-time setup, the happy path is:
 
 ```bash
 pulse configure
-pulse auth google
-pulse auth spotify
-pulse auth microsoft
-pulse auth github
-pulse auth gitlab
-pulse auth plaid
 pulse init
 pulse run
 ```
 
-Run only the `pulse auth …` lines for services you enabled. Complete them before `pulse init` so the first pull can reach those APIs.
-
-Skip the auth commands for services you did not enable.
+Inside the first `pulse configure`, open **Connectors** and walk each OAuth-backed source **before** `pulse init`. Run `pulse configure` again any time you need to re-authorize (pick the same connector) or edit `.env` / `pulse.toml`.
 
 After Pulse has been running for a while, the two fastest health checks are:
 

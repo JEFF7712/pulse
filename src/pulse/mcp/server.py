@@ -220,15 +220,18 @@ async def pulse_connector_status(ctx: Context = None) -> str:
             "event_count": event_counts.get(source, 0),
         }
 
-    # Include known sources that haven't synced yet
-    known_sources = {"gmail", "calendar", "youtube"}
-    for source in known_sources:
-        if source not in statuses:
-            statuses[source] = {
-                "last_sync": "never",
-                "updated_at": None,
-                "event_count": event_counts.get(source, 0),
-            }
+    # Include enabled pull connectors that have not synced yet
+    cfg = pulse_ctx.config
+    if cfg:
+        for name, cc in cfg.connectors.items():
+            if not cc.enabled or name == "companion":
+                continue
+            if name not in statuses:
+                statuses[name] = {
+                    "last_sync": "never",
+                    "updated_at": None,
+                    "event_count": event_counts.get(name, 0),
+                }
 
     return json.dumps(statuses, indent=2)
 

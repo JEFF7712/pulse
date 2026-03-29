@@ -1,6 +1,8 @@
 # Connectors Index
 
-Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Microsoft 365 (Outlook mail and calendar), Spotify, GitHub, GitLab, Plaid (bank transactions), local browser history, and RSS/Atom feeds (no API keys for feeds). There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure`. This page gives the setup path for each connector.
+Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Microsoft 365 (Outlook mail and calendar), Spotify, GitHub, Linear, GitLab, Plaid (bank transactions), Notion, Oura Ring (sleep, readiness, activity, and workouts), local browser history, and RSS/Atom feeds (no API keys for feeds). There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure`. This page gives the setup path for each connector.
+
+OAuth, Plaid Link, and Oura Cloud OAuth run from **`pulse configure` → Connectors**: pick a source, save its `.env` and `pulse.toml` with that connector **enabled** (●); token prompts appear at the end of that flow when needed.
 
 ## Google
 
@@ -10,11 +12,7 @@ Google authentication covers the Google-backed connectors Pulse can enable: Gmai
 
 - set `PULSE_GOOGLE_CLIENT_ID` and `PULSE_GOOGLE_CLIENT_SECRET` in `.env`, usually through `pulse configure`
 - keep at least one Google connector enabled in `pulse.toml` (`gmail`, `calendar`, or `youtube`)
-- complete OAuth with:
-
-```bash
-pulse auth google
-```
+- complete OAuth from `pulse configure` → **Connectors** → a Google-backed source (Gmail, Calendar, or YouTube); saving with the connector enabled starts the Google OAuth flow
 
 ### What Pulse pulls
 
@@ -24,7 +22,7 @@ pulse auth google
 
 ### Caveat
 
-`pulse auth google` exits if no Google connectors are enabled in `pulse.toml`, so enable Gmail, Calendar, or YouTube before starting OAuth.
+Google OAuth requires at least one Google connector enabled in `pulse.toml` before the flow runs.
 
 ## Spotify
 
@@ -34,11 +32,7 @@ Spotify is configured separately from Google and uses its own OAuth flow.
 
 - set `PULSE_SPOTIFY_CLIENT_ID` and `PULSE_SPOTIFY_CLIENT_SECRET` in `.env`, usually through `pulse configure`
 - keep `[connectors.spotify] enabled = true` in `pulse.toml`
-- complete OAuth with:
-
-```bash
-pulse auth spotify
-```
+- complete OAuth from `pulse configure` → **Connectors** → Spotify; save with the connector enabled
 
 ### What Pulse pulls
 
@@ -49,7 +43,7 @@ pulse auth spotify
 
 ### Caveat
 
-`pulse auth spotify` starts a localhost callback server on port `8888`, so the browser redirect must be able to return to the machine running Pulse.
+Spotify OAuth starts a localhost callback server on port `8888`, so the browser redirect must be able to return to the machine running Pulse.
 
 ## Microsoft 365
 
@@ -60,11 +54,7 @@ Microsoft Graph covers Outlook mail and calendar using one token file. Register 
 - set `PULSE_MICROSOFT_CLIENT_ID` and `PULSE_MICROSOFT_CLIENT_SECRET` in `.env`
 - optional: `PULSE_MICROSOFT_TENANT_ID` (defaults to `common` for multi-tenant sign-in)
 - enable `microsoft_mail` and/or `microsoft_calendar` in `pulse.toml`
-- run:
-
-```bash
-pulse auth microsoft
-```
+- authorize from `pulse configure` → **Connectors** → Outlook mail or 365 calendar; save with the connector enabled
 
 ### What Pulse pulls
 
@@ -82,14 +72,31 @@ Use `calendar_id = "primary"` under `[connectors.microsoft_calendar]` for your d
 - GitHub OAuth App with callback `http://localhost:8891/callback`
 - `PULSE_GITHUB_CLIENT_ID` and `PULSE_GITHUB_CLIENT_SECRET` in `.env`
 - `[connectors.github] enabled = true`
-
-```bash
-pulse auth github
-```
+- authorize from `pulse configure` → **Connectors** → GitHub; save with the connector enabled
 
 ### What Pulse pulls
 
 - Recent authenticated user events (pushes, issues, pull requests, etc.) as `dev.*` events for digests.
+
+## Linear
+
+Linear uses a [personal API key](https://developers.linear.app/docs/graphql/working-with-the-graphql-api#personal-api-keys) (no OAuth in Pulse). The connector syncs **issues assigned to you** (the key’s user).
+
+### Prerequisites
+
+- Create an API key in Linear (Settings → API → Personal API keys).
+- Set `PULSE_LINEAR_API_KEY` in `.env` (same value the Linear UI shows; Pulse sends it as the `Authorization` header).
+- Enable `[connectors.linear]` in `pulse.toml`.
+
+There is no OAuth step for Linear.
+
+### What Pulse pulls
+
+- Assigned issues updated since the last sync cursor (or within about the **last 14 days** on the first pull) as `dev.linear.issue` events. They appear under **Development** in digests alongside GitHub/GitLab activity.
+
+### Caveat
+
+Paging assumes issues are ordered by **newest `updatedAt` first** (as requested from the API). If that ordering changes, the 14-day window may be incomplete until the next full scan.
 
 ## GitLab
 
@@ -100,10 +107,7 @@ Use either OAuth or a [personal access token](https://docs.gitlab.com/ee/user/pr
 - GitLab OAuth application with redirect `http://localhost:8892/callback` (must match your `gitlab_base_url` host)
 - `PULSE_GITLAB_CLIENT_ID` and `PULSE_GITLAB_CLIENT_SECRET` in `.env`
 - `[connectors.gitlab]` with `gitlab_base_url` (default `https://gitlab.com`)
-
-```bash
-pulse auth gitlab
-```
+- authorize from `pulse configure` → **Connectors** → GitLab; save with the connector enabled
 
 ### Personal access token
 
@@ -121,16 +125,65 @@ Plaid links a financial institution and syncs transactions. Tokens and Plaid cur
 
 - Plaid developer account; set `PULSE_PLAID_CLIENT_ID`, `PULSE_PLAID_SECRET`, and `PULSE_PLAID_ENV` (`sandbox`, `development`, or `production`)
 - enable `[connectors.plaid]`; optional `omit_amounts_in_digest = true` to hide dollar amounts in digest markdown (events still store amounts)
-
-```bash
-pulse auth plaid
-```
+- run Plaid Link from `pulse configure` → **Connectors** → Plaid; save with the connector enabled
 
 This starts a small server on `http://localhost:8893/`, opens Plaid Link, and exchanges the `public_token` for an `access_token`.
 
 ### What Pulse pulls
 
 - New transactions via Plaid `/transactions/sync` as `finance.transaction` events.
+
+## Notion
+
+Notion uses an [internal integration](https://developers.notion.com/docs/create-a-notion-integration) (API secret). Share any **pages or databases** you want Pulse to see with that integration in the Notion UI.
+
+### Prerequisites
+
+- Create an integration in Notion and copy the **Internal Integration Secret** into `PULSE_NOTION_TOKEN` in `.env`
+- Enable `[connectors.notion]` in `pulse.toml`
+- Share target pages/databases with the integration (Share → invite your integration)
+
+### Optional database list
+
+Add UUIDs under `database_ids` in `[connectors.notion]` to run the [Query a database](https://developers.notion.com/reference/post-database-query) API on each database **in addition to** workspace [search](https://developers.notion.com/reference/post-search). Search already returns recently edited pages the integration can access; explicit IDs help ensure rows from large databases are polled even if they do not surface in search ordering.
+
+### What Pulse pulls
+
+- Recently edited **pages** and **databases** from search, and optionally all rows from listed databases (sorted by `last_edited_time`), as `notion.page_edited` events with title, URL, object type, and whether the row came from `search` or `database` query.
+
+### Caveat
+
+The first successful pull without a prior sync cursor only considers edits within about the **last 14 days** (by `last_edited_time`). Notion rate limits apply; keep a reasonable `poll_interval` (default `45m` in examples).
+
+## Oura Ring
+
+Oura exposes daily sleep and readiness through the [Oura Cloud API v2](https://cloud.ouraring.com/docs/). Use either a **personal access token** (simplest for self-hosting) or **OAuth**.
+
+### Personal access token
+
+- Create a token in the Oura developer / Cloud dashboard (Personal Access Token).
+- Set `PULSE_OURA_PERSONAL_ACCESS_TOKEN` in `.env` and omit OAuth client fields.
+- Enable `[connectors.oura]` in `pulse.toml`
+
+No OAuth step is required when using a PAT.
+
+### OAuth
+
+- Register an API application with redirect URI `http://localhost:8894/callback`.
+- Set `PULSE_OURA_CLIENT_ID` and `PULSE_OURA_CLIENT_SECRET` in `.env`.
+- Enable `[connectors.oura]` in `pulse.toml`.
+- authorize from `pulse configure` → **Connectors** → Oura; save with the connector enabled
+
+### What Pulse pulls
+
+- Daily sleep summaries as `health.sleep` (score, time asleep / in bed, efficiency, deep/REM/light when the API returns them, bedtime hints when present).
+- Daily readiness as `health.readiness` (score and contributor fields when present).
+- Daily activity as `health.activity` (steps, activity score, active calories, walk-equivalent distance when present).
+- Logged workouts as `health.workout` (sport/activity name, start time, duration, calories when present). OAuth uses the **workout** scope alongside **daily**; if you authorized before workouts were added, open **Connectors** → Oura again and re-run OAuth. If the API still returns 403/404 for workouts, Pulse logs a warning and continues without them.
+
+### Caveat
+
+Oura labels each row with a **calendar day**; Pulse stores a noon-UTC timestamp on that day so digests bucket rows consistently with `list_events_for_day`.
 
 ## Browser History
 
@@ -195,13 +248,7 @@ For most operators, the connector flow is:
 
 ```bash
 pulse configure
-pulse auth google
-pulse auth spotify
-pulse auth microsoft
-pulse auth github
-pulse auth gitlab
-pulse auth plaid
 pulse init
 ```
 
-Run only the `pulse auth …` commands for connectors you enabled and configured.
+Inside `pulse configure` → **Connectors**, enable each source and complete OAuth / Plaid / Oura there before `pulse init` when you need those APIs. Skip Oura OAuth when using `PULSE_OURA_PERSONAL_ACCESS_TOKEN`. Notion uses `PULSE_NOTION_TOKEN` only. Linear uses `PULSE_LINEAR_API_KEY` only.

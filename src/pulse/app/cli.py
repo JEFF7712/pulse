@@ -4,7 +4,7 @@ import logging
 import secrets
 import sys
 import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -14,21 +14,30 @@ from pulse.app import cli_ui as ui
 from pulse.app.cli_ui import SITE_ACCENT, SITE_CREAM, SITE_MUTED_FG
 from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
-from pulse.connectors.google_auth import GoogleAuthManager, SCOPES_BY_CONNECTOR
-from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
-from pulse.connectors.spotify_auth import SpotifyAuthManager, SPOTIFY_SCOPES, REDIRECT_URI
-from pulse.connectors.microsoft_auth import MicrosoftAuthManager, MICROSOFT_AUTH_PORT
 from pulse.connectors.github_auth import (
-    GitHubAuthManager,
     GITHUB_AUTH_PORT,
     GITHUB_SCOPES,
+    GitHubAuthManager,
 )
 from pulse.connectors.gitlab_auth import (
-    GitLabAuthManager,
     GITLAB_AUTH_PORT,
     GITLAB_SCOPES,
+    GitLabAuthManager,
+)
+from pulse.connectors.google_auth import SCOPES_BY_CONNECTOR, GoogleAuthManager
+from pulse.connectors.microsoft_auth import MICROSOFT_AUTH_PORT, MicrosoftAuthManager
+from pulse.connectors.oura_auth import (
+    OURA_AUTH_PORT,
+    OURA_SCOPES,
+    OuraAuthManager,
 )
 from pulse.connectors.plaid_link import run_plaid_link_flow
+from pulse.connectors.spotify_auth import (
+    REDIRECT_URI,
+    SPOTIFY_SCOPES,
+    SpotifyAuthManager,
+)
+from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +93,15 @@ def _onboard_should_run_plaid_link(config: PulseConfig) -> bool:
     return pl is not None and pl.enabled
 
 
+def _onboard_should_run_oura_auth(config: PulseConfig) -> bool:
+    if (config.oura_personal_access_token or "").strip():
+        return False
+    if not config.oura_client_id or not config.oura_client_secret:
+        return False
+    ou = config.connectors.get("oura")
+    return ou is not None and ou.enabled
+
+
 def _gitlab_base_url(config: PulseConfig) -> str:
     cc = config.connectors.get("gitlab")
     if cc is None:
@@ -96,11 +114,15 @@ def _gitlab_base_url(config: PulseConfig) -> str:
 
 def _onboard_print_prerequisites() -> None:
     ui.rule("Before you start")
-    ui.muted_line("Run from the directory where .env and pulse.toml should live (usually the repo root).")
-    ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
-    ui.muted_line("For Google, Spotify, Microsoft, GitHub, or GitLab, create OAuth apps as needed.")
     ui.muted_line(
-        "Local callbacks: Spotify :8888, Microsoft :8890, GitHub :8891, GitLab :8892, Plaid Link :8893."
+        "Run from the directory where .env and pulse.toml should live (usually the repo root)."
+    )
+    ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
+    ui.muted_line(
+        "For Google, Spotify, Microsoft, GitHub, or GitLab, create OAuth apps as needed."
+    )
+    ui.muted_line(
+        "Local callbacks: Spotify :8888, Microsoft :8890, GitHub :8891, GitLab :8892, Plaid Link :8893, Oura :8894."
     )
 
 
@@ -109,7 +131,9 @@ def _onboard_print_next_steps(host: str, port: int) -> None:
     ui.muted_line("Starting the server — open the app in a browser on this machine:")
     ui.kv_line("URL", f"http://127.0.0.1:{port}/")
     if host not in ("127.0.0.1", "localhost"):
-        ui.muted_line(f"Listen address is {host} — use your machine's IP or hostname if you browse from elsewhere.")
+        ui.muted_line(
+            f"Listen address is {host} — use your machine's IP or hostname if you browse from elsewhere."
+        )
     ui.step("While Pulse is running")
     ui.muted_line("In another terminal: [cmd]pulse status[/]   [cmd]pulse insights[/]")
 
@@ -125,22 +149,45 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    run_parser = subparsers.add_parser("run", help="Start Pulse (API server + scheduler)")
-    run_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
-    run_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
-    run_parser.add_argument("--log-level", default="info", help="Log level (default: info)")
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Start FastAPI server, scheduler, and operator web UI",
+    )
+    run_parser.add_argument(
+        "--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)"
+    )
+    run_parser.add_argument(
+        "--port", type=int, default=8000, help="Port (default: 8000)"
+    )
+    run_parser.add_argument(
+        "--log-level", default="info", help="Log level (default: info)"
+    )
 
     onboard_parser = subparsers.add_parser(
         "onboard",
-        help="Configure, authorize, initialize, and run (Google/Spotify auth only when applicable)",
+        help=(
+            "First-run pipeline: full configure wizard, connector OAuth when applicable, "
+            "pulse init, then pulse run"
+        ),
     )
-    onboard_parser.add_argument("--host", default="0.0.0.0", help="Bind address for pulse run (default: 0.0.0.0)")
-    onboard_parser.add_argument("--port", type=int, default=8000, help="Port for pulse run (default: 8000)")
-    onboard_parser.add_argument("--log-level", default="info", help="Log level for pulse run (default: info)")
+    onboard_parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Bind address for pulse run (default: 0.0.0.0)",
+    )
+    onboard_parser.add_argument(
+        "--port", type=int, default=8000, help="Port for pulse run (default: 8000)"
+    )
+    onboard_parser.add_argument(
+        "--log-level", default="info", help="Log level for pulse run (default: info)"
+    )
     onboard_parser.add_argument(
         "--strict",
         action="store_true",
-        help="Always run pulse auth google and pulse auth spotify (exit if a step cannot run)",
+        help=(
+            "Always run every onboard auth/link step that applies (Google, Spotify, Microsoft, "
+            "GitHub, GitLab, Plaid, Oura); exit non-zero if a required step fails"
+        ),
     )
     onboard_parser.add_argument(
         "-f",
@@ -156,18 +203,48 @@ def main() -> None:
         help="Same as pulse init: profile text (non-interactive)",
     )
 
-    pull_parser = subparsers.add_parser("pull", help="Run pull cycle immediately")
-    pull_parser.add_argument("sources", nargs="*", help="Connectors to pull (default: all)")
+    pull_parser = subparsers.add_parser(
+        "pull", help="Run connector pull jobs now (omit sources to pull all enabled)"
+    )
+    pull_parser.add_argument(
+        "sources", nargs="*", help="Connectors to pull (default: all)"
+    )
 
-    digest_parser = subparsers.add_parser("digest", help="Run daily digest for a given day")
-    digest_parser.add_argument("--date", default=None, help="Date to digest (YYYY-MM-DD, default: today)")
+    digest_parser = subparsers.add_parser(
+        "digest",
+        help="Build daily digest markdown in the vault for a date (default: today)",
+    )
+    digest_parser.add_argument(
+        "--date", default=None, help="Date to digest (YYYY-MM-DD, default: today)"
+    )
 
-    discover_parser = subparsers.add_parser("discover", help="Run LLM discovery pass")
-    discover_parser.add_argument("--cadence", default="daily", choices=["daily", "weekly", "monthly"])
-    discover_parser.add_argument("--date", default=None, help="Target date (YYYY-MM-DD, default: today)")
+    discover_parser = subparsers.add_parser(
+        "discover",
+        help="Run LLM discovery pass (scheduled jobs use daily cadence only)",
+    )
+    discover_parser.add_argument(
+        "--cadence",
+        default="daily",
+        choices=["daily", "weekly", "monthly"],
+        help="Discovery cadence (default: daily)",
+    )
+    discover_parser.add_argument(
+        "--date",
+        default=None,
+        help="Target date YYYY-MM-DD (default: today)",
+    )
 
-    subparsers.add_parser("configure", help="Interactive setup for .env, connectors, and auth")
-    init_parser = subparsers.add_parser("init", help="Set up profile and run initial data collection")
+    subparsers.add_parser(
+        "configure",
+        help=(
+            "Interactive setup: core, connectors, notifications, model API keys, "
+            "[llm] roles in pulse.toml, full wizard"
+        ),
+    )
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Structure vault profile (optional LLM) and run initial connector pulls",
+    )
     init_parser.add_argument(
         "-f",
         "--profile-file",
@@ -181,29 +258,48 @@ def main() -> None:
         metavar="TEXT",
         help="Free-form profile text (non-interactive; skips paste prompt)",
     )
-    subparsers.add_parser("status", help="Show database stats")
-    subparsers.add_parser("insights", help="List discovered patterns")
-    subparsers.add_parser("test-telegram", help="Send a test message via Telegram")
+    subparsers.add_parser(
+        "status", help="Show database paths, counts, and connector snapshot"
+    )
+    subparsers.add_parser(
+        "insights", help="List stored discovery patterns (from the database)"
+    )
+    subparsers.add_parser(
+        "test-telegram",
+        help="Send one Telegram test message (requires Telegram vars in .env)",
+    )
 
-    reset_parser = subparsers.add_parser("reset", help="Clear sync cursor to re-pull from scratch")
-    reset_parser.add_argument("source", nargs="?", default=None, help="Connector source name (e.g., gmail, browser), or omit for all")
+    reset_parser = subparsers.add_parser(
+        "reset",
+        help="Clear connector sync cursors so the next pull re-fetches from scratch",
+    )
+    reset_parser.add_argument(
+        "source",
+        nargs="?",
+        default=None,
+        help="Connector source name (e.g., gmail, browser), or omit for all",
+    )
 
-    logs_parser = subparsers.add_parser("logs", help="Show recent events from the database")
+    logs_parser = subparsers.add_parser(
+        "logs", help="Print recent rows from the event store (newest first)"
+    )
     logs_parser.add_argument("--source", default=None, help="Filter by source")
-    logs_parser.add_argument("-n", type=int, default=20, help="Number of events (default: 20)")
-    logs_parser.add_argument("--all", action="store_true", help="Include future events (excluded by default)")
+    logs_parser.add_argument(
+        "-n", type=int, default=20, help="Number of events (default: 20)"
+    )
+    logs_parser.add_argument(
+        "--all", action="store_true", help="Include future events (excluded by default)"
+    )
 
-    cleanup_parser = subparsers.add_parser("cleanup", help="Remove events with timestamps in the future")
-    cleanup_parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted without deleting")
-
-    auth_parser = subparsers.add_parser("auth", help="Manage authentication")
-    auth_subparsers = auth_parser.add_subparsers(dest="provider")
-    auth_subparsers.add_parser("google", help="Authorize Google services")
-    auth_subparsers.add_parser("spotify", help="Authorize Spotify")
-    auth_subparsers.add_parser("microsoft", help="Authorize Microsoft 365 (Graph)")
-    auth_subparsers.add_parser("github", help="Authorize GitHub")
-    auth_subparsers.add_parser("gitlab", help="Authorize GitLab (or use PAT in .env)")
-    auth_subparsers.add_parser("plaid", help="Link a bank account via Plaid")
+    cleanup_parser = subparsers.add_parser(
+        "cleanup",
+        help="Delete events with timestamps after now (bad imports or clock skew)",
+    )
+    cleanup_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without deleting",
+    )
 
     args = parser.parse_args()
 
@@ -236,18 +332,6 @@ def main() -> None:
         _cleanup(args)
     elif args.command == "test-telegram":
         _test_telegram()
-    elif args.command == "auth" and args.provider == "google":
-        _auth_google()
-    elif args.command == "auth" and args.provider == "spotify":
-        _auth_spotify()
-    elif args.command == "auth" and args.provider == "microsoft":
-        _auth_microsoft()
-    elif args.command == "auth" and args.provider == "github":
-        _auth_github()
-    elif args.command == "auth" and args.provider == "gitlab":
-        _auth_gitlab()
-    elif args.command == "auth" and args.provider == "plaid":
-        _auth_plaid()
     else:
         parser.print_help()
         sys.exit(1)
@@ -258,7 +342,7 @@ def _onboard(args) -> None:
     ui.banner_tagline()
     ui.rule("pulse onboard")
     _onboard_print_prerequisites()
-    _configure(offer_oauth=False)
+    _configure(offer_oauth=False, interactive_menu=False)
     config = load_config()
     strict = args.strict
 
@@ -294,7 +378,9 @@ def _onboard(args) -> None:
     if strict or _onboard_should_run_gitlab_auth(config):
         _auth_gitlab(show_rule=False)
     else:
-        ui.muted_line("Skipping — GitLab OAuth not needed, PAT in use, or not configured.")
+        ui.muted_line(
+            "Skipping — GitLab OAuth not needed, PAT in use, or not configured."
+        )
 
     ui.onboard_phase("plaid link")
     if strict or _onboard_should_run_plaid_link(config):
@@ -310,6 +396,18 @@ def _onboard(args) -> None:
             ui.muted_line(f"Plaid already linked ({token_path}); skipping Link.")
     else:
         ui.muted_line("Skipping — Plaid not enabled or credentials missing.")
+
+    ui.onboard_phase("auth oura")
+    if _onboard_should_run_oura_auth(config):
+        token_path = Path(config.database_path).parent / "oura_tokens.json"
+        if not token_path.exists():
+            _auth_oura(show_rule=False)
+        else:
+            ui.muted_line(f"Oura already authorized ({token_path}); skipping.")
+    else:
+        ui.muted_line(
+            "Skipping — Oura not enabled, using PAT, or OAuth client not configured."
+        )
 
     ui.onboard_phase("init")
     _init(
@@ -337,7 +435,12 @@ def _run(args) -> None:
     _quiet_noisy_loggers()
 
     config = load_config()
-    logger.info("Loaded config: db=%s, vault=%s, tz=%s", config.database_path, config.vault_path, config.timezone)
+    logger.info(
+        "Loaded config: db=%s, vault=%s, tz=%s",
+        config.database_path,
+        config.vault_path,
+        config.timezone,
+    )
 
     # Ensure data directory exists
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -346,6 +449,7 @@ def _run(args) -> None:
     async def _bootstrap():
         from pulse.store.db import connect_db
         from pulse.store.schema import bootstrap_schema
+
         async with connect_db(config.database_path) as db:
             await bootstrap_schema(db)
 
@@ -407,6 +511,7 @@ def _run(args) -> None:
 
 def _pull(args) -> None:
     from datetime import datetime
+
     from pulse.connectors import register_all
     from pulse.connectors.registry import ConnectorRegistry
     from pulse.store.db import connect_db
@@ -478,7 +583,9 @@ def _mask(value: str) -> str:
     return value
 
 
-def _prompt_env_field(key: str, label: str, current: str, is_secret: bool = False) -> str:
+def _prompt_env_field(
+    key: str, label: str, current: str, is_secret: bool = False
+) -> str:
     """Prompt for an env field. If it already has a value, ask to keep or change."""
     if current:
         display = _mask(current) if is_secret else current
@@ -492,392 +599,1765 @@ def _prompt_env_field(key: str, label: str, current: str, is_secret: bool = Fals
         return value
 
 
-def _configure(*, offer_oauth: bool = True) -> None:
+def _load_dotenv_file(env_path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not env_path.exists():
+        return out
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, val = line.partition("=")
+            out[key.strip()] = val.strip()
+    return out
+
+
+def _write_dotenv_ordered(
+    env_path: Path, env: dict[str, str], key_order: list[str]
+) -> None:
+    seen = set(key_order)
+    lines = [f"{k}={env[k]}" for k in key_order if k in env]
+    for k in sorted(k for k in env if k not in seen):
+        lines.append(f"{k}={env[k]}")
+    env_path.write_text("\n".join(lines) + "\n")
+
+
+# Core, integration, model-provider, and notification keys — .env emit order in configure.
+_CONFIGURE_CORE_FIELDS: list[tuple[str, str, str, bool]] = [
+    ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
+    ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
+    ("PULSE_TIMEZONE", "Timezone (e.g., America/Chicago)", "UTC", False),
+]
+
+# Flat list for full wizard “integrations” pass. Per-connector menus reuse the same keys
+# via _CONNECTOR_ENV_FIELDS (intentional overlap — connector flow is scoped per source).
+_CONFIGURE_INTEGRATION_FIELDS: list[tuple[str, str, bool]] = [
+    ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
+    ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
+    ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
+    ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
+    ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
+    ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
+    ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
+    ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
+    ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
+    ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
+    ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
+    ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
+    ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
+    ("PULSE_PLAID_SECRET", "Plaid secret", True),
+    ("PULSE_PLAID_ENV", "Plaid environment (sandbox or production)", False),
+    ("PULSE_OURA_CLIENT_ID", "Oura OAuth client ID (optional)", True),
+    ("PULSE_OURA_CLIENT_SECRET", "Oura OAuth client secret (optional)", True),
+    (
+        "PULSE_OURA_PERSONAL_ACCESS_TOKEN",
+        "Oura personal access token (optional; skips OAuth if set)",
+        True,
+    ),
+    ("PULSE_NOTION_TOKEN", "Notion integration secret (internal integration)", True),
+    ("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True),
+]
+
+# LLM vendor API keys (see pulse.llm.factory — standard env names, plus legacy PULSE_ANTHROPIC_API_KEY).
+_MODEL_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
+    (
+        "anthropic",
+        "Anthropic",
+        "🅰️",
+        [
+            (
+                "ANTHROPIC_API_KEY",
+                "Anthropic API key (used when [llm.*] provider = anthropic)",
+                True,
+            ),
+            (
+                "PULSE_ANTHROPIC_API_KEY",
+                "Anthropic API key (legacy fallback if [llm] blocks are unset)",
+                True,
+            ),
+        ],
+    ),
+    (
+        "openai",
+        "OpenAI / compatible",
+        "🧠",
+        [
+            (
+                "OPENAI_API_KEY",
+                "OpenAI API key (OpenAI, Azure OpenAI-compatible, or optional for Ollama)",
+                True,
+            ),
+        ],
+    ),
+    (
+        "gemini",
+        "Google Gemini",
+        "✨",
+        [
+            ("GEMINI_API_KEY", "Gemini API key ([llm.*] provider = gemini)", True),
+        ],
+    ),
+    (
+        "ollama",
+        "Ollama (local)",
+        "🦙",
+        [],
+    ),
+]
+
+_CONFIGURE_MODEL_PROVIDER_FIELDS: list[tuple[str, str, bool]] = [
+    fld for *_, flds in _MODEL_PROVIDER_DEFS for fld in flds
+]
+
+# Per-provider notification / webhook env (order preserved for full wizard + .env key order).
+_NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
+    (
+        "telegram",
+        "Telegram",
+        "📱",
+        [
+            ("PULSE_TELEGRAM_BOT_TOKEN", "Telegram Bot Token", True),
+            ("PULSE_TELEGRAM_CHAT_ID", "Telegram Chat ID", False),
+        ],
+    ),
+    (
+        "corrections",
+        "Corrections API",
+        "🛠️",
+        [
+            (
+                "PULSE_CORRECTIONS_WEBHOOK_SECRET",
+                "Corrections webhook secret (optional; enables POST /webhooks/corrections)",
+                True,
+            ),
+        ],
+    ),
+    (
+        "ntfy",
+        "ntfy",
+        "🔔",
+        [
+            ("PULSE_NTFY_TOPIC", "ntfy topic (optional; leave blank to skip)", False),
+            (
+                "PULSE_NTFY_BASE_URL",
+                "ntfy server base URL (optional; blank uses https://ntfy.sh)",
+                False,
+            ),
+        ],
+    ),
+    (
+        "webhook",
+        "JSON webhook",
+        "🔗",
+        [
+            (
+                "PULSE_NOTIFICATION_WEBHOOK_URL",
+                "Notification webhook URL (optional JSON POST)",
+                False,
+            ),
+        ],
+    ),
+    (
+        "discord",
+        "Discord",
+        "🎮",
+        [
+            ("PULSE_DISCORD_WEBHOOK_URL", "Discord incoming webhook URL (optional)", False),
+        ],
+    ),
+    (
+        "slack",
+        "Slack",
+        "💬",
+        [
+            ("PULSE_SLACK_WEBHOOK_URL", "Slack incoming webhook URL (optional)", False),
+        ],
+    ),
+    (
+        "pushover",
+        "Pushover",
+        "📲",
+        [
+            (
+                "PULSE_PUSHOVER_USER_KEY",
+                "Pushover user key (optional; needs API token too)",
+                False,
+            ),
+            ("PULSE_PUSHOVER_API_TOKEN", "Pushover application API token", True),
+        ],
+    ),
+    (
+        "gotify",
+        "Gotify",
+        "📮",
+        [
+            (
+                "PULSE_GOTIFY_URL",
+                "Gotify server URL (optional; e.g. https://gotify.example.com)",
+                False,
+            ),
+            ("PULSE_GOTIFY_APP_TOKEN", "Gotify application token", True),
+        ],
+    ),
+    (
+        "smtp",
+        "SMTP email",
+        "✉️",
+        [
+            ("PULSE_SMTP_HOST", "SMTP host (optional)", False),
+            ("PULSE_SMTP_PORT", "SMTP port", False),
+            ("PULSE_SMTP_USER", "SMTP username (optional)", False),
+            ("PULSE_SMTP_PASSWORD", "SMTP password (optional)", True),
+            ("PULSE_SMTP_USE_TLS", "SMTP STARTTLS after connect (true/false)", False),
+            ("PULSE_SMTP_USE_SSL", "SMTP implicit SSL (true/false)", False),
+            ("PULSE_SMTP_FROM", "SMTP From address (optional)", False),
+            (
+                "PULSE_SMTP_TO",
+                "SMTP To address(es), comma-separated (optional)",
+                False,
+            ),
+        ],
+    ),
+    (
+        "companion",
+        "Companion / FCM",
+        "🤝",
+        [
+            (
+                "PULSE_COMPANION_TOKEN",
+                "Companion API bearer token (POST /webhooks/companion)",
+                True,
+            ),
+            (
+                "PULSE_FCM_SERVICE_ACCOUNT_PATH",
+                "Path to Firebase service account JSON (FCM push)",
+                False,
+            ),
+        ],
+    ),
+]
+
+_CONFIGURE_NOTIFICATION_FIELDS: list[tuple[str, str, bool]] = [
+    fld for *_, flds in _NOTIFICATION_PROVIDER_DEFS for fld in flds
+]
+
+_CONFIGURE_ENV_KEY_ORDER: list[str] = (
+    [t[0] for t in _CONFIGURE_CORE_FIELDS]
+    + [t[0] for t in _CONFIGURE_INTEGRATION_FIELDS]
+    + [t[0] for t in _CONFIGURE_MODEL_PROVIDER_FIELDS]
+    + [t[0] for t in _CONFIGURE_NOTIFICATION_FIELDS]
+)
+
+_CONNECTOR_DEFS: list[tuple[str, str, str]] = [
+    ("gmail", "15m", "Gmail (email)"),
+    ("calendar", "30m", "Google Calendar"),
+    ("youtube", "1h", "YouTube"),
+    ("spotify", "30m", "Spotify"),
+    ("microsoft_mail", "15m", "Microsoft 365 mail (Outlook)"),
+    ("microsoft_calendar", "30m", "Microsoft 365 calendar"),
+    ("github", "30m", "GitHub activity"),
+    ("linear", "30m", "Linear (issues assigned to you)"),
+    ("gitlab", "30m", "GitLab activity"),
+    ("plaid", "6h", "Plaid bank transactions"),
+    ("browser", "15m", "Browser history"),
+    ("feeds", "1h", "RSS/Atom feeds (URLs in pulse.toml)"),
+    ("notion", "45m", "Notion (pages shared with your integration)"),
+    ("oura", "6h", "Oura Ring (sleep & readiness)"),
+]
+
+_CONNECTOR_MENU_EMOJI: dict[str, str] = {
+    "gmail": "📧",
+    "calendar": "📅",
+    "youtube": "▶️",
+    "spotify": "🎵",
+    "microsoft_mail": "✉️",
+    "microsoft_calendar": "📆",
+    "github": "🐙",
+    "linear": "⚡",
+    "gitlab": "🦊",
+    "plaid": "🏦",
+    "browser": "🌍",
+    "feeds": "📡",
+    "notion": "📓",
+    "oura": "💍",
+}
+
+_CONNECTOR_MENU_SHORT: dict[str, str] = {
+    "gmail": "Gmail",
+    "calendar": "G Cal",
+    "youtube": "YouTube",
+    "spotify": "Spotify",
+    "microsoft_mail": "Outlook",
+    "microsoft_calendar": "365 Cal",
+    "github": "GitHub",
+    "linear": "Linear",
+    "gitlab": "GitLab",
+    "plaid": "Plaid",
+    "browser": "Browser",
+    "feeds": "Feeds",
+    "notion": "Notion",
+    "oura": "Oura",
+}
+
+_GOOGLE_ENV_FIELDS: list[tuple[str, str, bool]] = [
+    ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
+    ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
+]
+_MS_ENV_FIELDS: list[tuple[str, str, bool]] = [
+    ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
+    ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
+    ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
+]
+
+_CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
+    "gmail": _GOOGLE_ENV_FIELDS,
+    "calendar": _GOOGLE_ENV_FIELDS,
+    "youtube": _GOOGLE_ENV_FIELDS,
+    "spotify": [
+        ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
+        ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
+    ],
+    "microsoft_mail": _MS_ENV_FIELDS,
+    "microsoft_calendar": _MS_ENV_FIELDS,
+    "github": [
+        ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
+        ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
+    ],
+    "gitlab": [
+        ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
+        ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
+        ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
+    ],
+    "plaid": [
+        ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
+        ("PULSE_PLAID_SECRET", "Plaid secret", True),
+        ("PULSE_PLAID_ENV", "Plaid environment (sandbox or production)", False),
+    ],
+    "oura": [
+        ("PULSE_OURA_CLIENT_ID", "Oura OAuth client ID (optional)", True),
+        ("PULSE_OURA_CLIENT_SECRET", "Oura OAuth client secret (optional)", True),
+        (
+            "PULSE_OURA_PERSONAL_ACCESS_TOKEN",
+            "Oura personal access token (optional; skips OAuth if set)",
+            True,
+        ),
+    ],
+    "notion": [
+        ("PULSE_NOTION_TOKEN", "Notion integration secret (internal integration)", True),
+    ],
+    "linear": [("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True)],
+}
+
+_CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
+    ("core", "Core settings (paths, timezone)"),
+    (
+        "connectors",
+        "Connectors (.env, pulse.toml, OAuth / Plaid / Oura when needed)",
+    ),
+    (
+        "notifications",
+        "Notifications (Telegram, SMTP, webhooks, companion/FCM, …)",
+    ),
+    (
+        "model_providers",
+        "Model providers (Anthropic, OpenAI, Gemini, Ollama …)",
+    ),
+    (
+        "llm_roles",
+        "LLM in pulse.toml (provider + summarization & discovery models)",
+    ),
+    ("full", "Full wizard (all of the above)"),
+    ("done", "Done"),
+]
+
+
+def _pick_configure_menu_action() -> str:
+    """Return menu action key, or ``__invalid__`` for bad numeric fallback input."""
+    non_done = _CONFIGURE_MENU_ITEMS[:-1]
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]What would you like to configure?[/]")
+        for i, (_, label) in enumerate(non_done, start=1):
+            ui.muted_line(f"  {i}) {label}")
+        ui.muted_line("  0) Done")
+        raw = input(
+            f"Choose an option [0-{len(non_done)}]: "
+        ).strip()
+        if raw == "0":
+            return "done"
+        idx_map = {str(i): non_done[i - 1][0] for i in range(1, len(non_done) + 1)}
+        return idx_map.get(raw, "__invalid__")
+
+    import questionary
+    from questionary import Style
+
+    labels = [label for _, label in _CONFIGURE_MENU_ITEMS]
+    label_to_key = {label: key for key, label in _CONFIGURE_MENU_ITEMS}
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "What would you like to configure?",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "done"
+    return label_to_key[chosen]
+
+
+def _configure_section_has_values(env: dict[str, str], fields: list[tuple]) -> bool:
+    keys = [f[0] for f in fields]
+    return any((env.get(k) or "").strip() for k in keys)
+
+
+def _offer_bulk_keep_section(
+    env: dict[str, str],
+    fields: list[tuple],
+    section_label: str,
+) -> bool:
+    """Return True if user wants to keep all existing values for keys in this section."""
+    if not _configure_section_has_values(env, fields):
+        return False
+    ans = input(f"  Keep all existing {section_label}? [Y/n] ").strip().lower()
+    return ans not in ("n", "no")
+
+
+def _prompt_env_field_list(
+    fields: list[tuple[str, str, bool]],
+    working_env: dict[str, str],
+    *,
+    offer_bulk_keep: bool,
+    section_label: str,
+) -> None:
+    if offer_bulk_keep and _offer_bulk_keep_section(working_env, fields, section_label):
+        return
+    for key, label, is_secret in fields:
+        current = working_env.get(key, "")
+        working_env[key] = _prompt_env_field(key, label, current, is_secret)
+
+
+def _save_configure_env(env_path: Path, working_env: dict[str, str]) -> None:
+    if not (working_env.get("PULSE_SMTP_PORT") or "").strip():
+        working_env["PULSE_SMTP_PORT"] = "587"
+    _write_dotenv_ordered(env_path, working_env, _CONFIGURE_ENV_KEY_ORDER)
+
+
+def _connector_prereqs_met(name: str, env: dict[str, str]) -> bool:
+    g = (env.get("PULSE_GOOGLE_CLIENT_ID") or "").strip() and (
+        env.get("PULSE_GOOGLE_CLIENT_SECRET") or ""
+    ).strip()
+    if name in ("gmail", "calendar", "youtube"):
+        return bool(g)
+    if name == "spotify":
+        return bool(
+            (env.get("PULSE_SPOTIFY_CLIENT_ID") or "").strip()
+            and (env.get("PULSE_SPOTIFY_CLIENT_SECRET") or "").strip()
+        )
+    if name in ("microsoft_mail", "microsoft_calendar"):
+        return bool(
+            (env.get("PULSE_MICROSOFT_CLIENT_ID") or "").strip()
+            and (env.get("PULSE_MICROSOFT_CLIENT_SECRET") or "").strip()
+        )
+    if name == "github":
+        return bool(
+            (env.get("PULSE_GITHUB_CLIENT_ID") or "").strip()
+            and (env.get("PULSE_GITHUB_CLIENT_SECRET") or "").strip()
+        )
+    if name == "gitlab":
+        return bool(
+            (env.get("PULSE_GITLAB_TOKEN") or "").strip()
+            or (
+                (env.get("PULSE_GITLAB_CLIENT_ID") or "").strip()
+                and (env.get("PULSE_GITLAB_CLIENT_SECRET") or "").strip()
+            )
+        )
+    if name == "plaid":
+        return bool(
+            (env.get("PULSE_PLAID_CLIENT_ID") or "").strip()
+            and (env.get("PULSE_PLAID_SECRET") or "").strip()
+            and (env.get("PULSE_PLAID_ENV") or "").strip()
+        )
+    if name == "oura":
+        return bool(
+            (env.get("PULSE_OURA_PERSONAL_ACCESS_TOKEN") or "").strip()
+            or (
+                (env.get("PULSE_OURA_CLIENT_ID") or "").strip()
+                and (env.get("PULSE_OURA_CLIENT_SECRET") or "").strip()
+            )
+        )
+    if name == "notion":
+        return bool((env.get("PULSE_NOTION_TOKEN") or "").strip())
+    if name == "linear":
+        return bool((env.get("PULSE_LINEAR_API_KEY") or "").strip())
+    return True
+
+
+def _prompt_enable_connector(
+    label: str,
+    *,
+    creds_ok: bool,
+    was_enabled: bool,
+) -> bool:
+    if was_enabled and not creds_ok:
+        ui.muted_line(
+            "  (Note: connector was enabled but matching .env credentials look missing.)"
+        )
+    # First-time / currently off: opt in (default off) even if .env already has creds.
+    if not was_enabled:
+        yn = input(f"  Enable {label}? [y/N] ").strip().lower()
+        return yn in ("y", "yes")
+    if creds_ok:
+        yn = input(f"  Enable {label}? [Y/n] ").strip().lower()
+        return yn not in ("n", "no")
+    yn = input(f"  Keep {label} enabled (creds look missing)? [y/N] ").strip().lower()
+    return yn in ("y", "yes")
+
+
+def _load_full_pulse_toml(toml_path: Path) -> dict:
+    """Parse pulse.toml into a nested dict (empty if missing)."""
     import tomllib
 
+    if not toml_path.exists():
+        return {}
+    with open(toml_path, "rb") as f:
+        return tomllib.load(f)
+
+
+def _load_connectors_state(toml_path: Path) -> dict[str, dict]:
+    raw_block: dict = {}
+    data = _load_full_pulse_toml(toml_path)
+    cc = data.get("connectors")
+    if isinstance(cc, dict):
+        raw_block = cc
+    state: dict[str, dict] = {}
+    for name, _, _ in _CONNECTOR_DEFS:
+        v = raw_block.get(name)
+        state[name] = dict(v) if isinstance(v, dict) else {}
+    return state
+
+
+def _toml_inline_value(v: object) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int) and not isinstance(v, bool):
+        return str(v)
+    if isinstance(v, float):
+        return repr(v)
+    if isinstance(v, str):
+        esc = v.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{esc}"'
+    raise TypeError(f"Unsupported TOML value type: {type(v)!r}")
+
+
+def _connector_emit_lines(
+    name: str, sec: dict, default_interval: str
+) -> list[str]:
+    lines: list[str] = []
+    enabled = _connector_section_enabled(sec)
+    interval = sec.get("poll_interval") or default_interval
+    if not isinstance(interval, str):
+        interval = str(interval)
+    lines.append(f"[connectors.{name}]")
+    lines.append(f"enabled = {'true' if enabled else 'false'}")
+    lines.append(f'poll_interval = "{interval}"')
+    if name == "spotify":
+        supp = sec.get("supplementary_interval", "6h")
+        if not isinstance(supp, str):
+            supp = str(supp)
+        lines.append(f'supplementary_interval = "{supp}"')
+    if name == "browser":
+        bt = sec.get("browser", "chrome")
+        if not isinstance(bt, str):
+            bt = str(bt)
+        lines.append(f'browser = "{bt}"')
+        dbp = sec.get("db_path")
+        if enabled and isinstance(dbp, str) and dbp.strip():
+            safe = dbp.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'db_path = "{safe}"')
+    if name == "microsoft_calendar":
+        cal_id = sec.get("calendar_id", "primary")
+        if not isinstance(cal_id, str):
+            cal_id = str(cal_id)
+        safe_cal = cal_id.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'calendar_id = "{safe_cal}"')
+    if name == "gitlab":
+        bu = sec.get("gitlab_base_url", "https://gitlab.com")
+        if not isinstance(bu, str):
+            bu = str(bu)
+        escaped = bu.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'gitlab_base_url = "{escaped}"')
+    if name == "plaid":
+        omit = bool(sec.get("omit_amounts_in_digest", False))
+        lines.append(f"omit_amounts_in_digest = {'true' if omit else 'false'}")
+    if name == "notion":
+        prev_dbs = sec.get("database_ids") or []
+        if isinstance(prev_dbs, str):
+            prev_dbs = [prev_dbs] if prev_dbs else []
+        escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_dbs]
+        if escaped:
+            lines.append(
+                "database_ids = [" + ", ".join(f'"{u}"' for u in escaped) + "]"
+            )
+    if name == "feeds":
+        prev_urls = sec.get("urls")
+        if prev_urls is None:
+            prev_urls = []
+        if isinstance(prev_urls, str):
+            prev_urls = [prev_urls] if prev_urls else []
+        escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_urls]
+        if escaped:
+            lines.append("urls = [" + ", ".join(f'"{u}"' for u in escaped) + "]")
+        else:
+            lines.append("urls = []")
+    lines.append("")
+    return lines
+
+
+def _emit_generic_connectors_table(name: str, sec: dict) -> list[str]:
+    """Emit [connectors.X] for keys not in _CONNECTOR_DEFS (e.g. companion)."""
+    lines = [f"[connectors.{name}]"]
+    for k, v in sorted(sec.items()):
+        if isinstance(v, dict):
+            continue
+        if isinstance(v, list):
+            parts = []
+            for x in v:
+                if isinstance(x, str):
+                    sx = x.replace("\\", "\\\\").replace('"', '\\"')
+                    parts.append(f'"{sx}"')
+                else:
+                    parts.append(_toml_inline_value(x))
+            lines.append(f"{k} = [" + ", ".join(parts) + "]")
+        else:
+            lines.append(f"{k} = {_toml_inline_value(v)}")
+    lines.append("")
+    return lines
+
+
+def _emit_llm_sections(llm: dict) -> list[str]:
+    lines: list[str] = []
+    scalars: dict[str, object] = {}
+    nested: dict[str, dict] = {}
+    for k, v in llm.items():
+        if isinstance(v, dict):
+            nested[k] = v
+        else:
+            scalars[k] = v
+    if scalars:
+        lines.append("[llm]")
+        for k in sorted(scalars):
+            lines.append(f"{k} = {_toml_inline_value(scalars[k])}")
+        lines.append("")
+    for sub in ("summarization", "discovery", "corrections"):
+        if sub not in nested:
+            continue
+        blk = nested[sub]
+        if not isinstance(blk, dict) or not blk:
+            continue
+        lines.append(f"[llm.{sub}]")
+        for k in sorted(blk):
+            lines.append(f"{k} = {_toml_inline_value(blk[k])}")
+        lines.append("")
+    for sub, blk in sorted(nested.items()):
+        if sub in ("summarization", "discovery", "corrections"):
+            continue
+        if not isinstance(blk, dict) or not blk:
+            continue
+        lines.append(f"[llm.{sub}]")
+        for k in sorted(blk):
+            lines.append(f"{k} = {_toml_inline_value(blk[k])}")
+        lines.append("")
+    return lines
+
+
+def _serialize_pulse_toml_document(full: dict) -> str:
+    """Emit pulse.toml text: connectors (known + extra), [llm], then other top-level tables."""
+    lines = [
+        "# Pulse connector configuration.",
+        "# Secrets (API keys, tokens) go in .env, not here.",
+        "",
+    ]
+    connectors = full.get("connectors")
+    if not isinstance(connectors, dict):
+        connectors = {}
+    known = {n for n, _, _ in _CONNECTOR_DEFS}
+    for name, default_interval, _label in _CONNECTOR_DEFS:
+        sec = connectors.get(name)
+        if not isinstance(sec, dict):
+            sec = {}
+        lines.extend(_connector_emit_lines(name, sec, default_interval))
+    for name in sorted(k for k in connectors if k not in known):
+        sec = connectors.get(name)
+        if isinstance(sec, dict) and sec:
+            lines.extend(_emit_generic_connectors_table(name, sec))
+    llm = full.get("llm")
+    if isinstance(llm, dict) and llm:
+        lines.append("# --- LLM (digest summarization, discovery, corrections) ---")
+        lines.append("")
+        lines.extend(_emit_llm_sections(llm))
+    for top_key in sorted(k for k in full if k not in ("connectors", "llm")):
+        # Forward-compat: extra top-level sections as [key] with flat scalars only.
+        block = full[top_key]
+        if not isinstance(block, dict):
+            continue
+        if not block or any(isinstance(v, dict) for v in block.values()):
+            continue
+        lines.append(f"[{top_key}]")
+        for k in sorted(block):
+            lines.append(f"{k} = {_toml_inline_value(block[k])}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _write_connectors_state(state: dict[str, dict], toml_path: Path) -> None:
+    full = _load_full_pulse_toml(toml_path)
+    old_c = full.get("connectors")
+    if not isinstance(old_c, dict):
+        old_c = {}
+    merged = dict(old_c)
+    for name, _, _ in _CONNECTOR_DEFS:
+        merged[name] = state.get(name) or {}
+    full["connectors"] = merged
+    toml_path.write_text(_serialize_pulse_toml_document(full))
+
+
+def _connector_section_enabled(section: dict) -> bool:
+    """True only when this connector block is turned on in pulse.toml.
+
+    Avoid ``bool("false")`` which is True in Python — some hand-edited files use strings.
+    """
+    if not section:
+        return False
+    raw = section.get("enabled")
+    if raw is True:
+        return True
+    if raw is False or raw is None:
+        return False
+    if isinstance(raw, str):
+        t = raw.strip().lower()
+        return t in ("true", "1", "yes", "on")
+    if isinstance(raw, (int, float)):
+        return raw != 0
+    return False
+
+
+def _prompt_one_connector_toml_section(
+    name: str,
+    default_interval: str,
+    label: str,
+    existing: dict,
+    working_env: dict[str, str],
+) -> dict:
+    was_enabled = existing.get("enabled", True) if existing else False
+    if not isinstance(was_enabled, bool):
+        was_enabled = bool(was_enabled)
+    interval = existing.get("poll_interval", default_interval)
+    if not isinstance(interval, str):
+        interval = str(interval)
+    creds_ok = _connector_prereqs_met(name, working_env)
+
+    if existing:
+        status = "enabled" if was_enabled else "disabled"
+        answer = (
+            input(f"  {label}: {status}, poll {interval} — keep? [Y/n] ").strip().lower()
+        )
+        if answer in ("n", "no"):
+            enabled = _prompt_enable_connector(
+                label, creds_ok=creds_ok, was_enabled=was_enabled
+            )
+            new_interval = input(f"    Poll interval [{interval}]: ").strip()
+            if new_interval:
+                interval = new_interval
+        else:
+            enabled = was_enabled
+            if enabled and not creds_ok:
+                ui.muted_line(
+                    "  (Note: still enabled, but matching .env credentials look missing.)"
+                )
+    else:
+        enabled = _prompt_enable_connector(
+            label, creds_ok=creds_ok, was_enabled=False
+        )
+        if enabled:
+            new_interval = input(f"    Poll interval [{interval}]: ").strip()
+            if new_interval:
+                interval = new_interval
+
+    enabled = bool(enabled)
+    section: dict = {"enabled": enabled, "poll_interval": interval}
+
+    if name == "spotify":
+        supp = existing.get("supplementary_interval", "6h")
+        section["supplementary_interval"] = str(supp) if supp is not None else "6h"
+
+    if name == "browser":
+        browser_type = existing.get("browser", "chrome")
+        if not isinstance(browser_type, str):
+            browser_type = str(browser_type)
+        if existing:
+            answer = (
+                input(f"    Browser: {browser_type} — keep? [Y/n] ").strip().lower()
+            )
+            if answer in ("n", "no"):
+                choice = input("    Browser type (chrome/firefox): ").strip()
+                browser_type = choice if choice else browser_type
+        else:
+            choice = input(f"    Browser type [{browser_type}]: ").strip()
+            browser_type = choice if choice else browser_type
+        section["browser"] = browser_type
+
+        db_path_existing = ""
+        if existing:
+            raw_db = existing.get("db_path")
+            if isinstance(raw_db, str):
+                db_path_existing = raw_db.strip()
+        db_path_val = db_path_existing
+        if enabled:
+            if db_path_existing:
+                answer = (
+                    input(
+                        f"    Browser history SQLite path [{db_path_existing}] — keep? [Y/n] "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if answer in ("n", "no"):
+                    db_path_val = input(
+                        "    Path to browser history DB (blank = default for OS): "
+                    ).strip()
+            else:
+                db_path_val = input(
+                    "    Path to browser history SQLite (optional; blank = default): "
+                ).strip()
+        if enabled and db_path_val:
+            section["db_path"] = db_path_val
+
+    if name == "microsoft_calendar":
+        cal_id = (existing.get("calendar_id") if existing else None) or "primary"
+        if not isinstance(cal_id, str):
+            cal_id = str(cal_id)
+        if enabled:
+            if existing:
+                answer = (
+                    input(f"    Calendar ID [{cal_id}] — keep? [Y/n] ").strip().lower()
+                )
+                if answer in ("n", "no"):
+                    cal_id = (
+                        input(
+                            "    Graph calendar id (primary or calendar UUID): "
+                        ).strip()
+                        or cal_id
+                    )
+            else:
+                cal_id = (
+                    input("    Graph calendar id [primary]: ").strip() or "primary"
+                )
+        section["calendar_id"] = cal_id
+
+    if name == "gitlab":
+        base_url = (
+            (existing.get("gitlab_base_url") if existing else None)
+            or "https://gitlab.com"
+        )
+        if not isinstance(base_url, str):
+            base_url = str(base_url)
+        if enabled:
+            if existing:
+                answer = (
+                    input(f"    GitLab base URL [{base_url}] — keep? [Y/n] ")
+                    .strip()
+                    .lower()
+                )
+                if answer in ("n", "no"):
+                    base_url = input("    GitLab base URL: ").strip() or base_url
+            else:
+                base_url = (
+                    input("    GitLab base URL [https://gitlab.com]: ").strip()
+                    or base_url
+                )
+        section["gitlab_base_url"] = base_url
+
+    if name == "plaid":
+        omit = bool((existing or {}).get("omit_amounts_in_digest", False))
+        if enabled:
+            yn = (
+                input("    Omit transaction amounts from digest markdown? [y/N] ")
+                .strip()
+                .lower()
+            )
+            if yn in ("y", "yes"):
+                omit = True
+        section["omit_amounts_in_digest"] = omit
+
+    if name == "notion":
+        prev_dbs: list = list(existing.get("database_ids", [])) if existing else []
+        if isinstance(prev_dbs, str):
+            prev_dbs = [prev_dbs] if prev_dbs else []
+        if enabled:
+            if prev_dbs:
+                preview = ", ".join(str(x) for x in prev_dbs[:2])
+                if len(prev_dbs) > 2:
+                    preview += "…"
+                keep = (
+                    input(f"    Keep Notion database_ids ({preview})? [Y/n] ")
+                    .strip()
+                    .lower()
+                )
+                if keep in ("n", "no"):
+                    prev_dbs = []
+            if not prev_dbs:
+                line = input(
+                    "    Optional database UUIDs (comma-separated) to query in addition "
+                    "to workspace search; leave empty for search only: "
+                ).strip()
+                prev_dbs = [u.strip() for u in line.split(",") if u.strip()]
+        section["database_ids"] = prev_dbs
+
+    if name == "feeds":
+        prev_urls: list = list(existing.get("urls", [])) if existing else []
+        if isinstance(prev_urls, str):
+            prev_urls = [prev_urls] if prev_urls else []
+        if enabled:
+            if prev_urls:
+                preview = ", ".join(prev_urls[:2]) + (
+                    "…" if len(prev_urls) > 2 else ""
+                )
+                keep = (
+                    input(f"    Keep feed URLs ({preview})? [Y/n] ").strip().lower()
+                )
+                if keep in ("n", "no"):
+                    prev_urls = []
+            if not prev_urls:
+                line = input(
+                    "    Feed URLs (comma-separated RSS/Atom URLs; leave empty to add later): "
+                ).strip()
+                prev_urls = [u.strip() for u in line.split(",") if u.strip()]
+        section["urls"] = prev_urls
+
+    return section
+
+
+def _configure_connectors_toml(
+    working_env: dict[str, str],
+    toml_path: Path,
+) -> list[str]:
+    state = _load_connectors_state(toml_path)
+    for name, default_interval, label in _CONNECTOR_DEFS:
+        existing = state.get(name, {})
+        state[name] = _prompt_one_connector_toml_section(
+            name, default_interval, label, existing, working_env
+        )
+    _write_connectors_state(state, toml_path)
+    return [n for n, _, _ in _CONNECTOR_DEFS if _connector_section_enabled(state[n])]
+
+
+def _connector_submenu_row_label(
+    name: str,
+    default_interval: str,
+    working_env: dict[str, str],
+    state: dict[str, dict],
+) -> str:
+    """Compact row: ●/○ (pulse.toml enabled) · emoji · short · ✓/✗ only when ● · poll."""
+    creds = _connector_prereqs_met(name, working_env)
+    st = state.get(name, {})
+    en = _connector_section_enabled(st)
+    poll = st.get("poll_interval", default_interval)
+    if not isinstance(poll, str):
+        poll = str(poll)
+    circle = "●" if en else "○"
+    emoji = _CONNECTOR_MENU_EMOJI[name]
+    short = _CONNECTOR_MENU_SHORT[name]
+    cred_mark = f" {'✓' if creds else '✗'}" if en else ""
+    return f"{circle} {emoji} {short}{cred_mark} {poll}"
+
+
+def _pick_connector_submenu(
+    working_env: dict[str, str],
+    state: dict[str, dict],
+) -> str | None:
+    rows: list[tuple[str, str]] = []
+    for name, default_interval, _label in _CONNECTOR_DEFS:
+        disp = _connector_submenu_row_label(
+            name, default_interval, working_env, state
+        )
+        rows.append((name, disp))
+    rows.append(("__back__", "← Back"))
+
+    labels = [r[1] for r in rows]
+    val_by_label = {r[1]: r[0] for r in rows}
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]Pick a connector to configure[/]")
+        for i, (_, disp) in enumerate(rows, start=1):
+            ui.muted_line(f"  {i}) {disp}")
+        raw = input(f"Choose [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            return "__invalid__"
+        if idx < 1 or idx > len(rows):
+            return "__invalid__"
+        return rows[idx - 1][0]
+
+    import questionary
+    from questionary import Style
+
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "Connectors",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "__back__"
+    return val_by_label[chosen]
+
+
+def _configure_connectors_hub(
+    working_env: dict[str, str],
+    env_path: Path,
+    toml_path: Path,
+    *,
+    offer_oauth: bool,
+) -> None:
+    showed_connector_legend = False
+    while True:
+        state = _load_connectors_state(toml_path)
+        if not showed_connector_legend:
+            ui.muted_line(
+                "● = enabled in pulse.toml · ○ = disabled · ✓/✗ = .env prereqs (only when ●). "
+                "Pick a source to edit its credentials and block; when you save with ●, "
+                "OAuth / Plaid Link / Oura run here if that source needs tokens."
+            )
+            showed_connector_legend = True
+        pick = _pick_connector_submenu(working_env, state)
+        if pick is None or pick == "__back__":
+            break
+        if pick == "__invalid__":
+            ui.warning("Invalid choice.")
+            continue
+        name = pick
+        _triple = next(t for t in _CONNECTOR_DEFS if t[0] == name)
+        _, default_interval, label = _triple
+        ui.step(label)
+        fields = _CONNECTOR_ENV_FIELDS.get(name, [])
+        if fields:
+            ui.muted_line(".env variables for this connector (leave blank to skip).")
+            _prompt_env_field_list(
+                fields,
+                working_env,
+                offer_bulk_keep=env_path.exists(),
+                section_label=f"{label} credentials",
+            )
+            _save_configure_env(env_path, working_env)
+            ui.success(f"Saved {env_path}")
+        state = _load_connectors_state(toml_path)
+        existing = state.get(name, {})
+        state[name] = _prompt_one_connector_toml_section(
+            name, default_interval, label, existing, working_env
+        )
+        _write_connectors_state(state, toml_path)
+        ui.success(f"Saved {toml_path}")
+        enabled_now = [
+            n for n, _, _ in _CONNECTOR_DEFS if _connector_section_enabled(state[n])
+        ]
+        ui.kv_line("Enabled connectors", ", ".join(enabled_now) or "none")
+        if offer_oauth and _connector_section_enabled(state[name]):
+            _configure_oauth_prompts(working_env, [name])
+
+
+def _configure_oauth_prompts(
+    env_values: dict[str, str], enabled_connectors: list[str]
+) -> None:
+    google_connectors = [
+        c for c in enabled_connectors if c in ("gmail", "calendar", "youtube")
+    ]
+    has_google_creds = env_values.get("PULSE_GOOGLE_CLIENT_ID") and env_values.get(
+        "PULSE_GOOGLE_CLIENT_SECRET"
+    )
+    has_spotify_creds = env_values.get("PULSE_SPOTIFY_CLIENT_ID") and env_values.get(
+        "PULSE_SPOTIFY_CLIENT_SECRET"
+    )
+
+    data_dir = Path(env_values.get("PULSE_DATABASE_PATH", "data/pulse.db")).parent
+    google_tokens = data_dir / "google_tokens.json"
+    spotify_tokens = data_dir / "spotify_tokens.json"
+
+    if google_connectors and has_google_creds:
+        if google_tokens.exists():
+            ui.muted_line(f"Google: already authorized ({google_tokens})")
+            answer = input("  Re-authorize? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_google()
+        else:
+            ui.step("Google authorization")
+            ui.kv_line("Connectors", ", ".join(google_connectors))
+            answer = input("  Run Google OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_google()
+
+    if "spotify" in enabled_connectors and has_spotify_creds:
+        if spotify_tokens.exists():
+            ui.muted_line(f"Spotify: already authorized ({spotify_tokens})")
+            answer = input("  Re-authorize? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_spotify()
+        else:
+            ui.step("Spotify authorization")
+            answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_spotify()
+
+    ms_connectors = [
+        c for c in enabled_connectors if c in ("microsoft_mail", "microsoft_calendar")
+    ]
+    has_ms_creds = env_values.get("PULSE_MICROSOFT_CLIENT_ID") and env_values.get(
+        "PULSE_MICROSOFT_CLIENT_SECRET"
+    )
+    microsoft_tokens = data_dir / "microsoft_tokens.json"
+    if ms_connectors and has_ms_creds:
+        if microsoft_tokens.exists():
+            ui.muted_line(f"Microsoft 365: already authorized ({microsoft_tokens})")
+            answer = input("  Re-authorize? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_microsoft()
+        else:
+            ui.step("Microsoft 365 authorization")
+            ui.kv_line("Connectors", ", ".join(ms_connectors))
+            answer = input("  Run Microsoft OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_microsoft()
+
+    gh_enabled = "github" in enabled_connectors
+    has_gh = env_values.get("PULSE_GITHUB_CLIENT_ID") and env_values.get(
+        "PULSE_GITHUB_CLIENT_SECRET"
+    )
+    github_tokens = data_dir / "github_tokens.json"
+    if gh_enabled and has_gh:
+        if github_tokens.exists():
+            ui.muted_line(f"GitHub: already authorized ({github_tokens})")
+            answer = input("  Re-authorize GitHub? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_github()
+        else:
+            ui.step("GitHub authorization")
+            answer = input("  Run GitHub OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_github()
+
+    gl_enabled = "gitlab" in enabled_connectors
+    has_gl_oauth = env_values.get("PULSE_GITLAB_CLIENT_ID") and env_values.get(
+        "PULSE_GITLAB_CLIENT_SECRET"
+    )
+    has_gl_pat = bool(env_values.get("PULSE_GITLAB_TOKEN"))
+    gitlab_tokens = data_dir / "gitlab_tokens.json"
+    if gl_enabled and has_gl_oauth and not has_gl_pat:
+        if gitlab_tokens.exists():
+            ui.muted_line(f"GitLab: already authorized ({gitlab_tokens})")
+            answer = input("  Re-authorize GitLab? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_gitlab()
+        else:
+            ui.step("GitLab authorization")
+            answer = input("  Run GitLab OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_gitlab()
+    elif gl_enabled and has_gl_pat:
+        ui.muted_line("GitLab: using PULSE_GITLAB_TOKEN — OAuth skipped.")
+
+    plaid_enabled = "plaid" in enabled_connectors
+    has_plaid = env_values.get("PULSE_PLAID_CLIENT_ID") and env_values.get(
+        "PULSE_PLAID_SECRET"
+    )
+    plaid_tokens = data_dir / "plaid_tokens.json"
+    if plaid_enabled and has_plaid:
+        if plaid_tokens.exists():
+            ui.muted_line(f"Plaid: already linked ({plaid_tokens})")
+            answer = input("  Re-link Plaid? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_plaid()
+        else:
+            ui.step("Plaid Link")
+            answer = input("  Open Plaid Link now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_plaid()
+
+    oura_enabled = "oura" in enabled_connectors
+    has_oura_oauth = env_values.get("PULSE_OURA_CLIENT_ID") and env_values.get(
+        "PULSE_OURA_CLIENT_SECRET"
+    )
+    has_oura_pat = bool(env_values.get("PULSE_OURA_PERSONAL_ACCESS_TOKEN"))
+    oura_tokens = data_dir / "oura_tokens.json"
+    if oura_enabled and has_oura_oauth and not has_oura_pat:
+        if oura_tokens.exists():
+            ui.muted_line(f"Oura: already authorized ({oura_tokens})")
+            answer = input("  Re-authorize Oura? [y/N] ").strip().lower()
+            if answer in ("y", "yes"):
+                _auth_oura()
+        else:
+            ui.step("Oura authorization")
+            answer = input("  Run Oura OAuth now? [Y/n] ").strip().lower()
+            if answer not in ("n", "no"):
+                _auth_oura()
+    elif oura_enabled and has_oura_pat:
+        ui.muted_line("Oura: using PULSE_OURA_PERSONAL_ACCESS_TOKEN — OAuth skipped.")
+
+
+def _configure_core_only(working_env: dict[str, str]) -> None:
+    ui.step("Core settings")
+    for key, label, default, is_secret in _CONFIGURE_CORE_FIELDS:
+        current = working_env.get(key, "") or default
+        working_env[key] = _prompt_env_field(key, label, current, is_secret)
+
+
+def _configure_integrations_only(working_env: dict[str, str], env_path: Path) -> None:
+    ui.step("Credentials (integrations)")
+    ui.muted_line("OAuth clients and API keys for data sources. Leave blank to skip.")
+    _prompt_env_field_list(
+        _CONFIGURE_INTEGRATION_FIELDS,
+        working_env,
+        offer_bulk_keep=env_path.exists(),
+        section_label="integration credentials",
+    )
+
+
+def _model_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
+    """True when typical env creds exist for that LLM vendor (Ollama is pulse.toml + optional key)."""
+
+    def g(key: str) -> str:
+        return (env.get(key) or "").strip()
+
+    if provider_id == "anthropic":
+        return bool(g("ANTHROPIC_API_KEY") or g("PULSE_ANTHROPIC_API_KEY"))
+    if provider_id == "openai":
+        return bool(g("OPENAI_API_KEY"))
+    if provider_id == "gemini":
+        return bool(g("GEMINI_API_KEY"))
+    if provider_id == "ollama":
+        return False
+    return False
+
+
+def _model_provider_submenu_row_label(
+    provider_id: str, short: str, emoji: str, working_env: dict[str, str]
+) -> str:
+    circle = "●" if _model_provider_ready(provider_id, working_env) else "○"
+    return f"{circle} {emoji} {short}"
+
+
+def _pick_model_provider_submenu(working_env: dict[str, str]) -> str | None:
+    rows: list[tuple[str, str]] = []
+    for pid, short, emoji, _fields in _MODEL_PROVIDER_DEFS:
+        disp = _model_provider_submenu_row_label(pid, short, emoji, working_env)
+        rows.append((pid, disp))
+    rows.append(("__back__", "← Back"))
+
+    labels = [r[1] for r in rows]
+    val_by_label = {r[1]: r[0] for r in rows}
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]Pick a model provider to configure[/]")
+        for i, (_, disp) in enumerate(rows, start=1):
+            ui.muted_line(f"  {i}) {disp}")
+        raw = input(f"Choose [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            return "__invalid__"
+        if idx < 1 or idx > len(rows):
+            return "__invalid__"
+        return rows[idx - 1][0]
+
+    import questionary
+    from questionary import Style
+
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "Model providers",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "__back__"
+    return val_by_label[chosen]
+
+
+def _configure_model_providers_hub(working_env: dict[str, str], env_path: Path) -> None:
+    showed_legend = False
+    while True:
+        if not showed_legend:
+            ui.muted_line(
+                "● = API key set in .env for that vendor · ○ = missing · "
+                "Match [llm] / [llm.summarization] / … provider values in pulse.toml."
+            )
+            showed_legend = True
+        pick = _pick_model_provider_submenu(working_env)
+        if pick is None or pick == "__back__":
+            break
+        if pick == "__invalid__":
+            ui.warning("Invalid choice.")
+            continue
+        row = next(r for r in _MODEL_PROVIDER_DEFS if r[0] == pick)
+        _pid, label, _emoji, fields = row
+        ui.step(label)
+        if not fields:
+            ui.muted_line(
+                "Uses the OpenAI-compatible client. In pulse.toml set provider = \"ollama\", "
+                "base_url (e.g. http://127.0.0.1:11434/v1), and a model id under [llm] or a role. "
+                "OPENAI_API_KEY can stay blank; Pulse uses a placeholder when unset."
+            )
+            continue
+        ui.muted_line(".env API keys for this vendor (leave blank to skip).")
+        _prompt_env_field_list(
+            fields,
+            working_env,
+            offer_bulk_keep=env_path.exists(),
+            section_label=f"{label} API keys",
+        )
+        _save_configure_env(env_path, working_env)
+        ui.success(f"Saved {env_path}")
+
+
+def _configure_model_providers_only(working_env: dict[str, str], env_path: Path) -> None:
+    ui.step("Model providers")
+    ui.muted_line(
+        "Provider choice and model ids live in pulse.toml under [llm] / [llm.summarization] / …; "
+        "this pass only writes vendor API keys to .env. Leave blank to skip."
+    )
+    _prompt_env_field_list(
+        _CONFIGURE_MODEL_PROVIDER_FIELDS,
+        working_env,
+        offer_bulk_keep=env_path.exists(),
+        section_label="model provider API keys",
+    )
+
+
+def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
+    """● row hint: outbound channel ready, corrections secret set, or companion/FCM partially configured."""
+
+    def g(key: str) -> str:
+        return (env.get(key) or "").strip()
+
+    if provider_id == "telegram":
+        return bool(g("PULSE_TELEGRAM_BOT_TOKEN") and g("PULSE_TELEGRAM_CHAT_ID"))
+    if provider_id == "ntfy":
+        return bool(g("PULSE_NTFY_TOPIC"))
+    if provider_id == "webhook":
+        return bool(g("PULSE_NOTIFICATION_WEBHOOK_URL"))
+    if provider_id == "discord":
+        return bool(g("PULSE_DISCORD_WEBHOOK_URL"))
+    if provider_id == "slack":
+        return bool(g("PULSE_SLACK_WEBHOOK_URL"))
+    if provider_id == "pushover":
+        return bool(g("PULSE_PUSHOVER_USER_KEY") and g("PULSE_PUSHOVER_API_TOKEN"))
+    if provider_id == "gotify":
+        return bool(g("PULSE_GOTIFY_URL") and g("PULSE_GOTIFY_APP_TOKEN"))
+    if provider_id == "smtp":
+        if not (g("PULSE_SMTP_HOST") and g("PULSE_SMTP_FROM") and g("PULSE_SMTP_TO")):
+            return False
+        to_list = [x.strip() for x in g("PULSE_SMTP_TO").split(",") if x.strip()]
+        return bool(to_list)
+    if provider_id == "corrections":
+        return bool(g("PULSE_CORRECTIONS_WEBHOOK_SECRET"))
+    if provider_id == "companion":
+        return bool(g("PULSE_COMPANION_TOKEN") or g("PULSE_FCM_SERVICE_ACCOUNT_PATH"))
+    return False
+
+
+def _notification_submenu_row_label(
+    provider_id: str, short: str, emoji: str, working_env: dict[str, str]
+) -> str:
+    circle = "●" if _notification_provider_ready(provider_id, working_env) else "○"
+    return f"{circle} {emoji} {short}"
+
+
+def _pick_notification_provider_submenu(working_env: dict[str, str]) -> str | None:
+    rows: list[tuple[str, str]] = []
+    for pid, short, emoji, _fields in _NOTIFICATION_PROVIDER_DEFS:
+        disp = _notification_submenu_row_label(pid, short, emoji, working_env)
+        rows.append((pid, disp))
+    rows.append(("__back__", "← Back"))
+
+    labels = [r[1] for r in rows]
+    val_by_label = {r[1]: r[0] for r in rows}
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]Pick a notification provider to configure[/]")
+        for i, (_, disp) in enumerate(rows, start=1):
+            ui.muted_line(f"  {i}) {disp}")
+        raw = input(f"Choose [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            return "__invalid__"
+        if idx < 1 or idx > len(rows):
+            return "__invalid__"
+        return rows[idx - 1][0]
+
+    import questionary
+    from questionary import Style
+
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "Notification providers",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "__back__"
+    return val_by_label[chosen]
+
+
+def _configure_notifications_hub(working_env: dict[str, str], env_path: Path) -> None:
+    showed_legend = False
+    while True:
+        if not showed_legend:
+            ui.muted_line(
+                "● = required .env values set for that channel · ○ = incomplete · "
+                "Several channels can be active; digests broadcast to all that are ready."
+            )
+            showed_legend = True
+        pick = _pick_notification_provider_submenu(working_env)
+        if pick is None or pick == "__back__":
+            break
+        if pick == "__invalid__":
+            ui.warning("Invalid choice.")
+            continue
+        row = next(r for r in _NOTIFICATION_PROVIDER_DEFS if r[0] == pick)
+        _pid, label, _emoji, fields = row
+        ui.step(label)
+        ui.muted_line(".env variables for this channel (leave blank to skip).")
+        _prompt_env_field_list(
+            fields,
+            working_env,
+            offer_bulk_keep=env_path.exists(),
+            section_label=f"{label} notifications",
+        )
+        _save_configure_env(env_path, working_env)
+        ui.success(f"Saved {env_path}")
+
+
+def _configure_notifications_only(working_env: dict[str, str], env_path: Path) -> None:
+    ui.step("Notifications")
+    ui.muted_line("Telegram, webhooks, and SMTP. Leave blank to skip.")
+    _prompt_env_field_list(
+        _CONFIGURE_NOTIFICATION_FIELDS,
+        working_env,
+        offer_bulk_keep=env_path.exists(),
+        section_label="notification settings",
+    )
+
+
+_LLM_ROLES_PROVIDERS: tuple[str, ...] = ("anthropic", "openai", "gemini", "ollama")
+_OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
+
+
+def _configure_llm_roles_wizard(toml_path: Path) -> None:
+    """Prompt for [llm] provider, summarization model, discovery model; merge into pulse.toml."""
+    from pulse.llm.factory import (
+        LEGACY_ANTHROPIC_DISCOVERY_MODEL,
+        LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+    )
+
+    defaults_map: dict[str, tuple[str, str]] = {
+        "anthropic": (
+            LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
+            LEGACY_ANTHROPIC_DISCOVERY_MODEL,
+        ),
+        "openai": ("gpt-4.1-mini", "gpt-4.1"),
+        "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
+        "ollama": ("llama3.2", "llama3.2"),
+    }
+
+    full = _load_full_pulse_toml(toml_path)
+    cur = full.get("llm") if isinstance(full.get("llm"), dict) else {}
+    summ_blk = (
+        cur.get("summarization") if isinstance(cur.get("summarization"), dict) else {}
+    )
+    disc_blk = cur.get("discovery") if isinstance(cur.get("discovery"), dict) else {}
+    summ_m = (summ_blk.get("model") or "").strip()
+    disc_m = (disc_blk.get("model") or "").strip()
+    cur_prov = (cur.get("provider") or "").strip().lower()
+    if cur_prov not in _LLM_ROLES_PROVIDERS:
+        cur_prov = ""
+
+    ui.step("LLM roles in pulse.toml")
+    ui.muted_line(
+        "Sets [llm] provider plus [llm.summarization] and [llm.discovery] model ids. "
+        "API keys stay in .env (Model providers menu). Existing [llm.corrections] is kept."
+    )
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]LLM provider[/]")
+        for i, p in enumerate(_LLM_ROLES_PROVIDERS, start=1):
+            ui.muted_line(f"  {i}) {p}")
+        ui.muted_line("  0) Cancel")
+        raw = input(f"Choose [0-{len(_LLM_ROLES_PROVIDERS)}]: ").strip()
+        if raw == "0":
+            return
+        try:
+            idx = int(raw)
+        except ValueError:
+            ui.warning("Invalid choice.")
+            return
+        if idx < 1 or idx > len(_LLM_ROLES_PROVIDERS):
+            ui.warning("Invalid choice.")
+            return
+        provider = _LLM_ROLES_PROVIDERS[idx - 1]
+    else:
+        import questionary
+        from questionary import Style
+
+        style = Style(
+            [
+                ("qmark", "fg:default"),
+                ("question", "bold"),
+                ("answer", "fg:cyan bold"),
+                ("pointer", "fg:cyan bold"),
+                ("highlighted", "fg:cyan bold"),
+            ]
+        )
+        choices = list(_LLM_ROLES_PROVIDERS) + ["← Back"]
+        chosen = questionary.select(
+            "LLM provider (one for summarization and discovery)",
+            choices=choices,
+            qmark="›",
+            style=style,
+            instruction=" (↑↓ move · Enter to select)",
+        ).ask()
+        if chosen is None or chosen == "← Back":
+            return
+        provider = chosen
+
+    d0, d1 = defaults_map[provider]
+    summ_def = summ_m or d0
+    disc_def = disc_m or d1
+
+    base_url = ""
+    if provider == "ollama":
+        existing_bu = cur.get("base_url")
+        if isinstance(existing_bu, str):
+            base_url = existing_bu.strip()
+        bu_default = base_url or _OLLAMA_DEFAULT_BASE_URL
+        if not sys.stdin.isatty():
+            bu_in = input(f"  OpenAI-compatible base URL [{bu_default}]: ").strip()
+            base_url = bu_in or bu_default
+        else:
+            import questionary
+            from questionary import Style
+
+            style = Style(
+                [
+                    ("qmark", "fg:default"),
+                    ("question", "bold"),
+                    ("answer", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan bold"),
+                ]
+            )
+            bu_in = questionary.text(
+                "Ollama base URL (OpenAI-compatible)",
+                default=bu_default,
+                qmark="›",
+                style=style,
+            ).ask()
+            if bu_in is None:
+                return
+            base_url = (bu_in or bu_default).strip()
+
+    if not sys.stdin.isatty():
+        s_in = input(f"  Summarization model [{summ_def}]: ").strip()
+        summ = s_in or summ_def
+        d_in = input(f"  Discovery model [{disc_def}]: ").strip()
+        disc = d_in or disc_def
+    else:
+        import questionary
+        from questionary import Style
+
+        style = Style(
+            [
+                ("qmark", "fg:default"),
+                ("question", "bold"),
+                ("answer", "fg:cyan bold"),
+                ("pointer", "fg:cyan bold"),
+                ("highlighted", "fg:cyan bold"),
+            ]
+        )
+        s_in = questionary.text(
+            "Summarization model id",
+            default=summ_def,
+            qmark="›",
+            style=style,
+        ).ask()
+        if s_in is None:
+            return
+        summ = s_in.strip() or summ_def
+        d_in = questionary.text(
+            "Discovery model id",
+            default=disc_def,
+            qmark="›",
+            style=style,
+        ).ask()
+        if d_in is None:
+            return
+        disc = d_in.strip() or disc_def
+
+    managed = {"provider", "base_url", "summarization", "discovery", "corrections"}
+    new_llm: dict = {}
+    for k, v in cur.items():
+        if k in managed:
+            continue
+        new_llm[k] = v
+    corr = cur.get("corrections")
+    if isinstance(corr, dict) and corr:
+        new_llm["corrections"] = dict(corr)
+
+    new_summ = dict(summ_blk)
+    new_summ["model"] = summ
+    new_disc = dict(disc_blk)
+    new_disc["model"] = disc
+
+    new_llm["provider"] = provider
+    new_llm["summarization"] = new_summ
+    new_llm["discovery"] = new_disc
+    if provider == "ollama":
+        new_llm["base_url"] = base_url
+    elif provider == "openai":
+        old_bu = cur.get("base_url")
+        if isinstance(old_bu, str) and old_bu.strip():
+            new_llm["base_url"] = old_bu.strip()
+
+    full["llm"] = new_llm
+    toml_path.write_text(_serialize_pulse_toml_document(full))
+    ui.success(f"Saved {toml_path}")
+
+
+def _run_configure_full_wizard(
+    working_env: dict[str, str],
+    env_path: Path,
+    toml_path: Path,
+    *,
+    offer_oauth: bool,
+) -> None:
+    _configure_core_only(working_env)
+    _configure_integrations_only(working_env, env_path)
+    _configure_model_providers_only(working_env, env_path)
+    if sys.stdin.isatty():
+        llm_ans = input(
+            "  Configure [llm] provider and model roles in pulse.toml now? [y/N] "
+        ).strip().lower()
+        if llm_ans in ("y", "yes"):
+            _configure_llm_roles_wizard(toml_path)
+    _configure_notifications_only(working_env, env_path)
+    _save_configure_env(env_path, working_env)
+    ui.success(f"Saved {env_path}")
+
+    ui.step("Connector configuration")
+    enabled = _configure_connectors_toml(working_env, toml_path)
+    ui.success(f"Saved {toml_path}")
+    ui.kv_line("Enabled", ", ".join(enabled) or "none")
+
+    if offer_oauth:
+        _configure_oauth_prompts(working_env, enabled)
+
+    ui.rule("Configuration complete")
+    if offer_oauth:
+        ui.say("[accent]Next steps[/]")
+        ui.kv_line("Profile + first pull", "[cmd]pulse init[/]")
+        ui.kv_line("Server + scheduler", "[cmd]pulse run[/]")
+
+
+def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True) -> None:
     env_path = Path(".env")
     toml_path = Path("pulse.toml")
 
     ui.banner_tagline()
     ui.rule("Pulse configuration")
 
-    # Load existing .env
-    existing_env: dict[str, str] = {}
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, val = line.partition("=")
-                existing_env[key.strip()] = val.strip()
+    working_env = _load_dotenv_file(env_path)
 
-    # --- Step 1: Core settings ---
-    ui.step("Step 1: Core settings")
-
-    env_values: dict[str, str] = {}
-    core_fields = [
-        ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
-        ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
-        ("PULSE_TIMEZONE", "Timezone (e.g., America/Chicago)", "UTC", False),
-    ]
-    for key, label, default, is_secret in core_fields:
-        current = existing_env.get(key, "") or default
-        env_values[key] = _prompt_env_field(key, label, current, is_secret)
-
-    # --- Step 2: Service credentials ---
-    ui.step("Step 2: Service credentials")
-    ui.muted_line("Leave blank to skip a service.")
-
-    credential_fields = [
-        ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
-        ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
-        ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
-        ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
-        ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
-        ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
-        ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
-        ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
-        ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
-        ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
-        ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
-        ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
-        ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
-        ("PULSE_PLAID_SECRET", "Plaid secret", True),
-        ("PULSE_PLAID_ENV", "Plaid environment (sandbox or production)", False),
-        ("PULSE_ANTHROPIC_API_KEY", "Anthropic API Key", True),
-        ("PULSE_TELEGRAM_BOT_TOKEN", "Telegram Bot Token", True),
-        ("PULSE_TELEGRAM_CHAT_ID", "Telegram Chat ID", False),
-        (
-            "PULSE_CORRECTIONS_WEBHOOK_SECRET",
-            "Corrections webhook secret (optional; enables POST /webhooks/corrections)",
-            True,
-        ),
-        ("PULSE_NTFY_TOPIC", "ntfy topic (optional; leave blank to skip)", False),
-        (
-            "PULSE_NTFY_BASE_URL",
-            "ntfy server base URL (optional; blank uses https://ntfy.sh)",
-            False,
-        ),
-        (
-            "PULSE_NOTIFICATION_WEBHOOK_URL",
-            "Notification webhook URL (optional JSON POST)",
-            False,
-        ),
-        ("PULSE_DISCORD_WEBHOOK_URL", "Discord incoming webhook URL (optional)", False),
-        ("PULSE_SLACK_WEBHOOK_URL", "Slack incoming webhook URL (optional)", False),
-        ("PULSE_PUSHOVER_USER_KEY", "Pushover user key (optional; needs API token too)", False),
-        ("PULSE_PUSHOVER_API_TOKEN", "Pushover application API token", True),
-        (
-            "PULSE_GOTIFY_URL",
-            "Gotify server URL (optional; e.g. https://gotify.example.com)",
-            False,
-        ),
-        ("PULSE_GOTIFY_APP_TOKEN", "Gotify application token", True),
-        ("PULSE_SMTP_HOST", "SMTP host (optional)", False),
-        ("PULSE_SMTP_PORT", "SMTP port", False),
-        ("PULSE_SMTP_USER", "SMTP username (optional)", False),
-        ("PULSE_SMTP_PASSWORD", "SMTP password (optional)", True),
-        ("PULSE_SMTP_FROM", "SMTP From address (optional)", False),
-        (
-            "PULSE_SMTP_TO",
-            "SMTP To address(es), comma-separated (optional)",
-            False,
-        ),
-    ]
-    for key, label, is_secret in credential_fields:
-        current = existing_env.get(key, "")
-        env_values[key] = _prompt_env_field(key, label, current, is_secret)
-
-    if not env_values.get("PULSE_SMTP_PORT", "").strip():
-        env_values["PULSE_SMTP_PORT"] = "587"
-
-    # Write .env
-    env_lines = [f"{key}={val}" for key, val in env_values.items()]
-    env_path.write_text("\n".join(env_lines) + "\n")
-    ui.success(f"Saved {env_path}")
-
-    # --- Step 3: Connector config (pulse.toml) ---
-    ui.step("Step 3: Connector configuration")
-
-    existing_toml: dict = {}
-    if toml_path.exists():
-        with open(toml_path, "rb") as f:
-            existing_toml = tomllib.load(f)
-
-    connectors_config = existing_toml.get("connectors", {})
-
-    connector_defs = [
-        ("gmail", "15m", "Gmail (email)"),
-        ("calendar", "30m", "Google Calendar"),
-        ("youtube", "1h", "YouTube"),
-        ("spotify", "30m", "Spotify"),
-        ("microsoft_mail", "15m", "Microsoft 365 mail (Outlook)"),
-        ("microsoft_calendar", "30m", "Microsoft 365 calendar"),
-        ("github", "30m", "GitHub activity"),
-        ("gitlab", "30m", "GitLab activity"),
-        ("plaid", "6h", "Plaid bank transactions"),
-        ("browser", "15m", "Browser history"),
-        ("feeds", "1h", "RSS/Atom feeds (URLs in pulse.toml)"),
-    ]
-
-    enabled_connectors: list[str] = []
-    toml_lines = [
-        "# Pulse connector configuration.",
-        "# Secrets (API keys, tokens) go in .env, not here.",
-        "",
-    ]
-
-    for name, default_interval, label in connector_defs:
-        existing = connectors_config.get(name, {})
-        was_enabled = existing.get("enabled", True) if existing else False
-        interval = existing.get("poll_interval", default_interval)
-
-        if existing:
-            status = "enabled" if was_enabled else "disabled"
-            answer = input(f"  {label}: {status}, poll {interval} — keep? [Y/n] ").strip().lower()
-            if answer in ("n", "no"):
-                yn = input(f"    Enable {label}? [Y/n] ").strip().lower()
-                enabled = yn not in ("n", "no")
-                new_interval = input(f"    Poll interval [{interval}]: ").strip()
-                if new_interval:
-                    interval = new_interval
-            else:
-                enabled = was_enabled
-        else:
-            yn = input(f"  Enable {label}? [Y/n] ").strip().lower()
-            enabled = yn not in ("n", "no")
-            if enabled:
-                new_interval = input(f"    Poll interval [{interval}]: ").strip()
-                if new_interval:
-                    interval = new_interval
-
-        toml_lines.append(f"[connectors.{name}]")
-        toml_lines.append(f"enabled = {'true' if enabled else 'false'}")
-        toml_lines.append(f'poll_interval = "{interval}"')
-
-        if name == "spotify":
-            supp = existing.get("supplementary_interval", "6h")
-            toml_lines.append(f'supplementary_interval = "{supp}"')
-        if name == "browser":
-            browser_type = existing.get("browser", "chrome")
-            if existing:
-                answer = input(f"    Browser: {browser_type} — keep? [Y/n] ").strip().lower()
-                if answer in ("n", "no"):
-                    choice = input(f"    Browser type (chrome/firefox): ").strip()
-                    browser_type = choice if choice else browser_type
-            else:
-                choice = input(f"    Browser type [{browser_type}]: ").strip()
-                browser_type = choice if choice else browser_type
-            toml_lines.append(f'browser = "{browser_type}"')
-
-            db_path_existing = ""
-            if existing:
-                raw_db = existing.get("db_path")
-                if isinstance(raw_db, str):
-                    db_path_existing = raw_db.strip()
-            db_path_val = db_path_existing
-            if enabled:
-                if db_path_existing:
-                    answer = input(
-                        f"    Browser history SQLite path [{db_path_existing}] — keep? [Y/n] "
-                    ).strip().lower()
-                    if answer in ("n", "no"):
-                        db_path_val = input(
-                            "    Path to browser history DB (blank = default for OS): "
-                        ).strip()
-                else:
-                    db_path_val = input(
-                        "    Path to browser history SQLite (optional; blank = default): "
-                    ).strip()
-            if enabled and db_path_val:
-                safe_db = db_path_val.replace("\\", "\\\\").replace('"', '\\"')
-                toml_lines.append(f'db_path = "{safe_db}"')
-
-        if name == "microsoft_calendar":
-            cal_id = (existing.get("calendar_id") if existing else None) or "primary"
-            if enabled:
-                if existing:
-                    answer = input(f"    Calendar ID [{cal_id}] — keep? [Y/n] ").strip().lower()
-                    if answer in ("n", "no"):
-                        cal_id = (
-                            input("    Graph calendar id (primary or calendar UUID): ").strip()
-                            or cal_id
-                        )
-                else:
-                    cal_id = input("    Graph calendar id [primary]: ").strip() or "primary"
-            safe_cal = cal_id.replace("\\", "\\\\").replace('"', '\\"')
-            toml_lines.append(f'calendar_id = "{safe_cal}"')
-
-        if name == "gitlab":
-            base_url = (existing.get("gitlab_base_url") if existing else None) or "https://gitlab.com"
-            if enabled:
-                if existing:
-                    answer = input(f"    GitLab base URL [{base_url}] — keep? [Y/n] ").strip().lower()
-                    if answer in ("n", "no"):
-                        base_url = input("    GitLab base URL: ").strip() or base_url
-                else:
-                    base_url = (
-                        input("    GitLab base URL [https://gitlab.com]: ").strip() or base_url
-                    )
-            escaped = base_url.replace("\\", "\\\\").replace('"', '\\"')
-            toml_lines.append(f'gitlab_base_url = "{escaped}"')
-
-        if name == "plaid":
-            omit = bool((existing or {}).get("omit_amounts_in_digest", False))
-            if enabled:
-                yn = input("    Omit transaction amounts from digest markdown? [y/N] ").strip().lower()
-                if yn in ("y", "yes"):
-                    omit = True
-            toml_lines.append(f"omit_amounts_in_digest = {'true' if omit else 'false'}")
-
-        if name == "feeds":
-            prev_urls: list = list(existing.get("urls", [])) if existing else []
-            if isinstance(prev_urls, str):
-                prev_urls = [prev_urls] if prev_urls else []
-            if enabled:
-                if prev_urls:
-                    preview = ", ".join(prev_urls[:2]) + ("…" if len(prev_urls) > 2 else "")
-                    keep = input(f"    Keep feed URLs ({preview})? [Y/n] ").strip().lower()
-                    if keep in ("n", "no"):
-                        prev_urls = []
-                if not prev_urls:
-                    line = input(
-                        "    Feed URLs (comma-separated RSS/Atom URLs; leave empty to add later): "
-                    ).strip()
-                    prev_urls = [u.strip() for u in line.split(",") if u.strip()]
-            escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_urls]
-            if escaped:
-                toml_lines.append("urls = [" + ", ".join(f'"{u}"' for u in escaped) + "]")
-            else:
-                toml_lines.append("urls = []")
-
-        toml_lines.append("")
-        if enabled:
-            enabled_connectors.append(name)
-
-    toml_path.write_text("\n".join(toml_lines))
-    ui.success(f"Saved {toml_path}")
-    ui.kv_line("Enabled", ", ".join(enabled_connectors) or "none")
-
-    # --- Step 4: OAuth flows ---
-    if offer_oauth:
-        google_connectors = [c for c in enabled_connectors if c in ("gmail", "calendar", "youtube")]
-        has_google_creds = env_values.get("PULSE_GOOGLE_CLIENT_ID") and env_values.get(
-            "PULSE_GOOGLE_CLIENT_SECRET"
+    if not interactive_menu:
+        _run_configure_full_wizard(
+            working_env, env_path, toml_path, offer_oauth=offer_oauth
         )
-        has_spotify_creds = env_values.get("PULSE_SPOTIFY_CLIENT_ID") and env_values.get(
-            "PULSE_SPOTIFY_CLIENT_SECRET"
-        )
+        return
 
-        # Check if tokens already exist
-        data_dir = Path(env_values.get("PULSE_DATABASE_PATH", "data/pulse.db")).parent
-        google_tokens = data_dir / "google_tokens.json"
-        spotify_tokens = data_dir / "spotify_tokens.json"
-
-        if google_connectors and has_google_creds:
-            if google_tokens.exists():
-                ui.muted_line(f"Google: already authorized ({google_tokens})")
-                answer = input("  Re-authorize? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_google()
-            else:
-                ui.step("Google authorization")
-                ui.kv_line("Connectors", ", ".join(google_connectors))
-                answer = input("  Run Google OAuth now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_google()
-
-        if "spotify" in enabled_connectors and has_spotify_creds:
-            if spotify_tokens.exists():
-                ui.muted_line(f"Spotify: already authorized ({spotify_tokens})")
-                answer = input("  Re-authorize? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_spotify()
-            else:
-                ui.step("Spotify authorization")
-                answer = input("  Run Spotify OAuth now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_spotify()
-
-        ms_connectors = [
-            c for c in enabled_connectors if c in ("microsoft_mail", "microsoft_calendar")
-        ]
-        has_ms_creds = env_values.get("PULSE_MICROSOFT_CLIENT_ID") and env_values.get(
-            "PULSE_MICROSOFT_CLIENT_SECRET"
-        )
-        microsoft_tokens = data_dir / "microsoft_tokens.json"
-        if ms_connectors and has_ms_creds:
-            if microsoft_tokens.exists():
-                ui.muted_line(f"Microsoft 365: already authorized ({microsoft_tokens})")
-                answer = input("  Re-authorize? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_microsoft()
-            else:
-                ui.step("Microsoft 365 authorization")
-                ui.kv_line("Connectors", ", ".join(ms_connectors))
-                answer = input("  Run Microsoft OAuth now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_microsoft()
-
-        gh_enabled = "github" in enabled_connectors
-        has_gh = env_values.get("PULSE_GITHUB_CLIENT_ID") and env_values.get(
-            "PULSE_GITHUB_CLIENT_SECRET"
-        )
-        github_tokens = data_dir / "github_tokens.json"
-        if gh_enabled and has_gh:
-            if github_tokens.exists():
-                ui.muted_line(f"GitHub: already authorized ({github_tokens})")
-                answer = input("  Re-authorize GitHub? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_github()
-            else:
-                ui.step("GitHub authorization")
-                answer = input("  Run GitHub OAuth now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_github()
-
-        gl_enabled = "gitlab" in enabled_connectors
-        has_gl_oauth = env_values.get("PULSE_GITLAB_CLIENT_ID") and env_values.get(
-            "PULSE_GITLAB_CLIENT_SECRET"
-        )
-        has_gl_pat = bool(env_values.get("PULSE_GITLAB_TOKEN"))
-        gitlab_tokens = data_dir / "gitlab_tokens.json"
-        if gl_enabled and has_gl_oauth and not has_gl_pat:
-            if gitlab_tokens.exists():
-                ui.muted_line(f"GitLab: already authorized ({gitlab_tokens})")
-                answer = input("  Re-authorize GitLab? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_gitlab()
-            else:
-                ui.step("GitLab authorization")
-                answer = input("  Run GitLab OAuth now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_gitlab()
-        elif gl_enabled and has_gl_pat:
-            ui.muted_line("GitLab: using PULSE_GITLAB_TOKEN — OAuth skipped.")
-
-        plaid_enabled = "plaid" in enabled_connectors
-        has_plaid = env_values.get("PULSE_PLAID_CLIENT_ID") and env_values.get(
-            "PULSE_PLAID_SECRET"
-        )
-        plaid_tokens = data_dir / "plaid_tokens.json"
-        if plaid_enabled and has_plaid:
-            if plaid_tokens.exists():
-                ui.muted_line(f"Plaid: already linked ({plaid_tokens})")
-                answer = input("  Re-link Plaid? [y/N] ").strip().lower()
-                if answer in ("y", "yes"):
-                    _auth_plaid()
-            else:
-                ui.step("Plaid Link")
-                answer = input("  Open Plaid Link now? [Y/n] ").strip().lower()
-                if answer not in ("n", "no"):
-                    _auth_plaid()
-
-    # --- Done ---
-    ui.rule("Configuration complete")
-    if offer_oauth:
-        ui.say("[accent]Next steps[/]")
-        ui.kv_line("Profile + first pull", "[cmd]pulse init[/]")
-        ui.kv_line("Server + scheduler", "[cmd]pulse run[/]")
+    while True:
+        choice = _pick_configure_menu_action()
+        if choice == "__invalid__":
+            ui.warning(f"Invalid choice. Enter 0–{len(_CONFIGURE_MENU_ITEMS) - 1}.")
+            continue
+        if choice == "done":
+            ui.rule("Done")
+            break
+        if choice == "core":
+            _configure_core_only(working_env)
+            _save_configure_env(env_path, working_env)
+            ui.success(f"Saved {env_path}")
+        elif choice == "connectors":
+            ui.step("Connectors")
+            _configure_connectors_hub(
+                working_env,
+                env_path,
+                toml_path,
+                offer_oauth=offer_oauth,
+            )
+        elif choice == "notifications":
+            ui.step("Notifications")
+            _configure_notifications_hub(working_env, env_path)
+        elif choice == "model_providers":
+            ui.step("Model providers")
+            _configure_model_providers_hub(working_env, env_path)
+        elif choice == "llm_roles":
+            ui.step("LLM roles in pulse.toml")
+            _configure_llm_roles_wizard(toml_path)
+        elif choice == "full":
+            _run_configure_full_wizard(
+                working_env, env_path, toml_path, offer_oauth=offer_oauth
+            )
+            break
 
 
 _PROFILE_STRUCTURE_MODEL = "claude-haiku-4-5-20251001"
@@ -907,7 +2387,9 @@ Rules:
 - If the input is sparse, keep the file short rather than padding with guesses."""
 
 
-def _read_profile_raw_text(*, profile_file: Path | None, profile_text: str | None) -> str:
+def _read_profile_raw_text(
+    *, profile_file: Path | None, profile_text: str | None
+) -> str:
     """Load free-form profile source: explicit args, then stdin if piped, else interactive paste."""
     if profile_text is not None:
         return profile_text.strip()
@@ -932,11 +2414,7 @@ def _read_profile_raw_text(*, profile_file: Path | None, profile_text: str | Non
 
 def _profile_markdown_without_llm(raw: str) -> str:
     """Wrap raw text when no LLM is configured."""
-    return (
-        "# User Profile\n\n"
-        "## Self description\n\n"
-        f"{raw.strip()}\n"
-    )
+    return f"# User Profile\n\n## Self description\n\n{raw.strip()}\n"
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -969,14 +2447,15 @@ def _init(
     profile_text: str | None = None,
 ) -> None:
     from datetime import date, datetime
+
     from pulse.analysis.vault_memory import VaultMemory
     from pulse.connectors import register_all
     from pulse.connectors.registry import ConnectorRegistry
+    from pulse.jobs.runners import run_aggregation_job
     from pulse.store.db import connect_db
     from pulse.store.events import EventRepository
     from pulse.store.schema import bootstrap_schema
     from pulse.store.sync_state import SyncStateRepository
-    from pulse.jobs.runners import run_aggregation_job
 
     _quiet_noisy_loggers()
     logging.basicConfig(
@@ -1021,8 +2500,11 @@ def _init(
 
     active = registry.get_pull_connectors()
     if not active:
-        ui.warning("No active connectors. Run [cmd]pulse auth[/] first to set up credentials.")
+        ui.warning(
+            "No active connectors. Run [cmd]pulse configure[/] → Connectors to enable sources."
+        )
     else:
+
         async def _run_pulls():
             async with connect_db(config.database_path) as db:
                 await bootstrap_schema(db)
@@ -1057,7 +2539,9 @@ def _init(
     # --- Step 3: Aggregate ---
     ui.step("Aggregating stats")
     today = date.today()
-    result = asyncio.run(run_aggregation_job(day=today, database_path=config.database_path))
+    result = asyncio.run(
+        run_aggregation_job(day=today, database_path=config.database_path)
+    )
     ui.muted_line(result.detail)
 
     # --- Step 4: Initial discovery (if LLM available) ---
@@ -1066,12 +2550,12 @@ def _init(
         discovery_model_for_discovery,
         summarization_model_for_digest,
     )
+
     _, disc_llm = create_providers_from_config(config)
 
     if disc_llm is not None:
         ui.step("Running initial discovery")
         from pulse.jobs.runners import run_discovery_job
-
         from pulse.notifications.factory import build_notification_channel
 
         channel = build_notification_channel(config)
@@ -1100,7 +2584,9 @@ def _init(
     else:
         ui.muted_line("Skipping discovery (no LLM provider configured).")
 
-    ui.success("Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler.")
+    ui.success(
+        "Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler."
+    )
 
 
 def _collect_profile(
@@ -1111,7 +2597,9 @@ def _collect_profile(
     profile_text: str | None = None,
 ) -> None:
     ui.step("User profile")
-    ui.muted_line("Describe yourself in free form; Pulse will structure it for your vault.")
+    ui.muted_line(
+        "Describe yourself in free form; Pulse will structure it for your vault."
+    )
 
     raw = _read_profile_raw_text(profile_file=profile_file, profile_text=profile_text)
     if not raw:
@@ -1129,7 +2617,9 @@ def _collect_profile(
             if um:
                 ui.warning(f"{um} Saving raw text under a single section instead.")
             else:
-                ui.warning(f"LLM error ({e}); saving raw text under a single section instead.")
+                ui.warning(
+                    f"LLM error ({e}); saving raw text under a single section instead."
+                )
             profile_content = _profile_markdown_without_llm(raw)
     else:
         ui.muted_line(
@@ -1143,7 +2633,8 @@ def _collect_profile(
 
 def _digest(args) -> None:
     from datetime import date
-    from pulse.jobs.runners import run_daily_digest_job, run_aggregation_job
+
+    from pulse.jobs.runners import run_aggregation_job, run_daily_digest_job
     from pulse.llm.factory import (
         create_providers_from_config,
         summarization_model_for_digest,
@@ -1154,25 +2645,30 @@ def _digest(args) -> None:
 
     ui.rule("pulse digest")
     ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
-    result = asyncio.run(run_aggregation_job(day=target, database_path=config.database_path))
+    result = asyncio.run(
+        run_aggregation_job(day=target, database_path=config.database_path)
+    )
     ui.muted_line(result.detail)
 
     summ_llm, _ = create_providers_from_config(config)
 
     ui.say(f"[accent]Generating digest[/] for [bold]{target.isoformat()}[/]…")
-    result = asyncio.run(run_daily_digest_job(
-        day=target,
-        database_path=config.database_path,
-        vault_path=config.vault_path,
-        llm=summ_llm,
-        summarization_model=summarization_model_for_digest(config),
-    ))
+    result = asyncio.run(
+        run_daily_digest_job(
+            day=target,
+            database_path=config.database_path,
+            vault_path=config.vault_path,
+            llm=summ_llm,
+            summarization_model=summarization_model_for_digest(config),
+        )
+    )
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
 
 def _discover(args) -> None:
     from datetime import date
-    from pulse.jobs.runners import run_discovery_job, run_aggregation_job
+
+    from pulse.jobs.runners import run_aggregation_job, run_discovery_job
     from pulse.llm.factory import (
         create_providers_from_config,
         discovery_model_for_discovery,
@@ -1184,7 +2680,9 @@ def _discover(args) -> None:
 
     _, disc_llm = create_providers_from_config(config)
     if disc_llm is None:
-        ui.error("No LLM provider configured. Set [llm.discovery] in pulse.toml or PULSE_ANTHROPIC_API_KEY.")
+        ui.error(
+            "No LLM provider configured. Set [llm.discovery] in pulse.toml or PULSE_ANTHROPIC_API_KEY."
+        )
         sys.exit(1)
 
     ui.rule("pulse discover")
@@ -1242,7 +2740,9 @@ def _status() -> None:
             cur3 = await db.execute("SELECT MIN(timestamp), MAX(timestamp) FROM events")
             mn, mx = await cur3.fetchone()
 
-            cur4 = await db.execute("SELECT source, cursor, updated_at FROM connector_sync_state ORDER BY source")
+            cur4 = await db.execute(
+                "SELECT source, cursor, updated_at FROM connector_sync_state ORDER BY source"
+            )
             sync_rows = await cur4.fetchall()
 
             ui.rule("pulse status")
@@ -1258,9 +2758,9 @@ def _status() -> None:
 
 
 def _insights() -> None:
+    from pulse.store.analytics import AnalyticsRepository
     from pulse.store.db import connect_db
     from pulse.store.schema import bootstrap_schema
-    from pulse.store.analytics import AnalyticsRepository
 
     config = load_config()
 
@@ -1276,7 +2776,9 @@ def _insights() -> None:
 
             ui.rule("pulse insights")
             if not insights:
-                ui.warning("No patterns discovered yet. Run [cmd]pulse discover[/] first.")
+                ui.warning(
+                    "No patterns discovered yet. Run [cmd]pulse discover[/] first."
+                )
                 return
 
             ui.say(f"[accent]Discovered patterns[/] [bold]({len(insights)})[/]\n")
@@ -1288,6 +2790,7 @@ def _insights() -> None:
 def _logs(args) -> None:
     import json as json_mod
     from datetime import UTC, datetime
+
     from pulse.store.db import connect_db
     from pulse.store.schema import bootstrap_schema
 
@@ -1367,7 +2870,9 @@ def _reset(args) -> None:
             ui.rule("pulse reset")
             if source is None:
                 # Reset all cursors
-                cur = await db.execute("SELECT source, cursor FROM connector_sync_state ORDER BY source")
+                cur = await db.execute(
+                    "SELECT source, cursor FROM connector_sync_state ORDER BY source"
+                )
                 rows = await cur.fetchall()
                 if not rows:
                     ui.muted_line("No sync cursors found.")
@@ -1377,7 +2882,13 @@ def _reset(args) -> None:
                 for s, c in rows:
                     ui.kv_line(str(s), str(c))
 
-                confirm = input("\nReset ALL sync cursors? This will re-pull all data. [y/N] ").strip().lower()
+                confirm = (
+                    input(
+                        "\nReset ALL sync cursors? This will re-pull all data. [y/N] "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirm not in ("y", "yes"):
                     ui.warning("Cancelled.")
                     return
@@ -1392,7 +2903,13 @@ def _reset(args) -> None:
                     return
 
                 ui.kv_line(f"Cursor ({source})", str(cursor))
-                confirm = input(f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] ").strip().lower()
+                confirm = (
+                    input(
+                        f"Reset sync cursor for '{source}'? This will re-pull all data. [y/N] "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirm not in ("y", "yes"):
                     ui.warning("Cancelled.")
                     return
@@ -1402,13 +2919,16 @@ def _reset(args) -> None:
                     (source,),
                 )
                 await db.commit()
-                ui.success(f"Cursor for '{source}' cleared. Next pull will fetch all data.")
+                ui.success(
+                    f"Cursor for '{source}' cleared. Next pull will fetch all data."
+                )
 
     asyncio.run(_do_reset())
 
 
 def _cleanup(args) -> None:
     from datetime import UTC, datetime
+
     from pulse.store.db import connect_db
     from pulse.store.schema import bootstrap_schema
 
@@ -1451,9 +2971,7 @@ def _cleanup(args) -> None:
                 ui.warning("Cancelled.")
                 return
 
-            await db.execute(
-                "DELETE FROM events WHERE timestamp > ?", (now_iso,)
-            )
+            await db.execute("DELETE FROM events WHERE timestamp > ?", (now_iso,))
             await db.commit()
             ui.success(f"Deleted {total} future-dated events.")
 
@@ -1461,13 +2979,15 @@ def _cleanup(args) -> None:
 
 
 def _test_telegram() -> None:
-    from pulse.notifications.telegram import TelegramChannel
     from pulse.domain.notifications import Notification
+    from pulse.notifications.telegram import TelegramChannel
 
     config = load_config()
 
     if not config.telegram_bot_token or not config.telegram_chat_id:
-        ui.error("PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in .env")
+        ui.error(
+            "PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in .env"
+        )
         sys.exit(1)
 
     channel = TelegramChannel(
@@ -1505,17 +3025,20 @@ def _auth_google(*, show_rule: bool = True) -> None:
     )
 
     google_connectors = [
-        name for name in config.connectors
+        name
+        for name in config.connectors
         if name in SCOPES_BY_CONNECTOR and config.connectors[name].enabled
     ]
 
     if not google_connectors:
-        ui.error("No Google connectors enabled in pulse.toml. Enable gmail, calendar, or youtube.")
+        ui.error(
+            "No Google connectors enabled in pulse.toml. Enable gmail, calendar, or youtube."
+        )
         sys.exit(1)
 
     scopes = auth_manager.get_required_scopes(google_connectors)
     if show_rule:
-        ui.rule("pulse auth google")
+        ui.rule("Google OAuth")
     ui.kv_line("Authorizing for", ", ".join(google_connectors))
     ui.muted_line("Scopes: " + ", ".join(scopes))
 
@@ -1541,7 +3064,7 @@ def _auth_spotify(*, show_rule: bool = True) -> None:
     auth_url = auth_manager._get_auth_url(SPOTIFY_SCOPES, state)
 
     if show_rule:
-        ui.rule("pulse auth spotify")
+        ui.rule("Spotify OAuth")
     ui.say("[accent]Opening browser[/] for Spotify authorization…")
     ui.muted_line(f"If it doesn't open, visit: {auth_url}")
     webbrowser.open(auth_url)
@@ -1590,7 +3113,9 @@ def _auth_microsoft(*, show_rule: bool = True) -> None:
     config = load_config()
 
     if not config.microsoft_client_id or not config.microsoft_client_secret:
-        ui.error("PULSE_MICROSOFT_CLIENT_ID and PULSE_MICROSOFT_CLIENT_SECRET must be set.")
+        ui.error(
+            "PULSE_MICROSOFT_CLIENT_ID and PULSE_MICROSOFT_CLIENT_SECRET must be set."
+        )
         sys.exit(1)
 
     token_path = Path(config.database_path).parent / "microsoft_tokens.json"
@@ -1618,7 +3143,7 @@ def _auth_microsoft(*, show_rule: bool = True) -> None:
     auth_url = auth_manager._get_auth_url(scopes, state)
 
     if show_rule:
-        ui.rule("pulse auth microsoft")
+        ui.rule("Microsoft 365 OAuth")
     ui.kv_line("Authorizing for", ", ".join(active))
     ui.muted_line("Scopes: " + " ".join(scopes))
     ui.say("[accent]Opening browser[/] for Microsoft sign-in…")
@@ -1643,11 +3168,11 @@ def _auth_microsoft(*, show_rule: bool = True) -> None:
                 received_code.append(code)
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(
-                    b"Authorization successful! You can close this tab."
-                )
+                self.wfile.write(b"Authorization successful! You can close this tab.")
             else:
-                err = query.get("error_description", query.get("error", ["Unknown error"]))
+                err = query.get(
+                    "error_description", query.get("error", ["Unknown error"])
+                )
                 self.send_response(400)
                 self.end_headers()
                 msg = (err[0] if err else "No code").encode("utf-8", errors="replace")
@@ -1675,7 +3200,9 @@ def _auth_github(*, show_rule: bool = True) -> None:
         sys.exit(1)
     gh = config.connectors.get("github")
     if gh is None or not gh.enabled:
-        ui.error("Enable [connectors.github] in pulse.toml before running GitHub OAuth.")
+        ui.error(
+            "Enable [connectors.github] in pulse.toml before running GitHub OAuth."
+        )
         sys.exit(1)
 
     token_path = Path(config.database_path).parent / "github_tokens.json"
@@ -1687,7 +3214,7 @@ def _auth_github(*, show_rule: bool = True) -> None:
     state = secrets.token_urlsafe(32)
     auth_url = auth_manager._get_auth_url(GITHUB_SCOPES, state)
     if show_rule:
-        ui.rule("pulse auth github")
+        ui.rule("GitHub OAuth")
     ui.say("[accent]Opening browser[/] for GitHub authorization…")
     ui.muted_line(f"If it doesn't open, visit: {auth_url}")
     webbrowser.open(auth_url)
@@ -1729,14 +3256,18 @@ def _auth_github(*, show_rule: bool = True) -> None:
 def _auth_gitlab(*, show_rule: bool = True) -> None:
     config = load_config()
     if config.gitlab_token:
-        ui.error("PULSE_GITLAB_TOKEN is set — OAuth is not used. Unset it to use GitLab OAuth.")
+        ui.error(
+            "PULSE_GITLAB_TOKEN is set — OAuth is not used. Unset it to use GitLab OAuth."
+        )
         sys.exit(1)
     if not config.gitlab_client_id or not config.gitlab_client_secret:
         ui.error("PULSE_GITLAB_CLIENT_ID and PULSE_GITLAB_CLIENT_SECRET must be set.")
         sys.exit(1)
     gl = config.connectors.get("gitlab")
     if gl is None or not gl.enabled:
-        ui.error("Enable [connectors.gitlab] in pulse.toml before running GitLab OAuth.")
+        ui.error(
+            "Enable [connectors.gitlab] in pulse.toml before running GitLab OAuth."
+        )
         sys.exit(1)
 
     base = _gitlab_base_url(config)
@@ -1750,7 +3281,7 @@ def _auth_gitlab(*, show_rule: bool = True) -> None:
     state = secrets.token_urlsafe(32)
     auth_url = auth_manager._get_auth_url(GITLAB_SCOPES, state)
     if show_rule:
-        ui.rule("pulse auth gitlab")
+        ui.rule("GitLab OAuth")
     ui.kv_line("GitLab base URL", base)
     ui.say("[accent]Opening browser[/] for GitLab authorization…")
     ui.muted_line(f"If it doesn't open, visit: {auth_url}")
@@ -1800,7 +3331,7 @@ def _auth_plaid(*, show_rule: bool = True) -> None:
         ui.error("Enable [connectors.plaid] in pulse.toml before running Plaid Link.")
         sys.exit(1)
     if show_rule:
-        ui.rule("pulse auth plaid")
+        ui.rule("Plaid Link")
     ui.say("[accent]Opening browser[/] for Plaid Link (http://localhost:8893/)…")
     token_path = Path(config.database_path).parent / "plaid_tokens.json"
     try:
@@ -1809,3 +3340,69 @@ def _auth_plaid(*, show_rule: bool = True) -> None:
         ui.error(str(e))
         sys.exit(1)
     ui.success("Plaid linked — tokens saved beside your database.")
+
+
+def _auth_oura(*, show_rule: bool = True) -> None:
+    config = load_config()
+    if (config.oura_personal_access_token or "").strip():
+        ui.error(
+            "PULSE_OURA_PERSONAL_ACCESS_TOKEN is set — OAuth is not used. Unset it to use Oura OAuth."
+        )
+        sys.exit(1)
+    if not config.oura_client_id or not config.oura_client_secret:
+        ui.error("PULSE_OURA_CLIENT_ID and PULSE_OURA_CLIENT_SECRET must be set.")
+        sys.exit(1)
+    ou = config.connectors.get("oura")
+    if ou is None or not ou.enabled:
+        ui.error("Enable [connectors.oura] in pulse.toml before running Oura OAuth.")
+        sys.exit(1)
+
+    token_path = Path(config.database_path).parent / "oura_tokens.json"
+    auth_manager = OuraAuthManager(
+        client_id=config.oura_client_id,
+        client_secret=config.oura_client_secret,
+        token_path=token_path,
+    )
+    state = secrets.token_urlsafe(32)
+    auth_url = auth_manager._get_auth_url(OURA_SCOPES, state)
+    if show_rule:
+        ui.rule("Oura OAuth")
+    ui.say("[accent]Opening browser[/] for Oura authorization…")
+    ui.muted_line(f"If it doesn't open, visit: {auth_url}")
+    ui.muted_line(
+        f"Register redirect URI [bold]http://localhost:{OURA_AUTH_PORT}/callback[/] on your Oura app."
+    )
+    webbrowser.open(auth_url)
+
+    received_code: list[str] = []
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            query = parse_qs(urlparse(self.path).query)
+            if query.get("state", [None])[0] != state:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"State mismatch.")
+                return
+            code = query.get("code", [None])[0]
+            if code:
+                received_code.append(code)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK - you can close this tab.")
+            else:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"No code received.")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("localhost", OURA_AUTH_PORT), CallbackHandler)
+    server.handle_request()
+    if not received_code:
+        ui.error("No authorization code received.")
+        sys.exit(1)
+    tokens = auth_manager._exchange_code(received_code[0])
+    auth_manager.save_tokens(tokens)
+    ui.success("Oura authorization complete!")

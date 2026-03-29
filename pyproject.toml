@@ -23,6 +23,7 @@ dependencies = [
     "plaid-python>=24",
     "anthropic",
     "uvicorn[standard]",
+    "questionary>=2.1.1",
 ]
 
 [project.scripts]

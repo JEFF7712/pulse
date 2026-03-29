@@ -27,6 +27,10 @@ class SourceSummarizer:
             tasks.append(("dev", self._summarize_dev(day)))
         if day.finance_summary is not None:
             tasks.append(("finance", self._summarize_finance(day)))
+        if day.health_days or day.health_workouts:
+            tasks.append(("health", self._summarize_health(day)))
+        if day.notion_edits:
+            tasks.append(("notion", self._summarize_notion(day)))
 
         if not tasks:
             return {}
@@ -115,8 +119,55 @@ class SourceSummarizer:
         for act in day.dev_activities[:20]:
             lines.append(f"- [{act.provider}] {act.title}")
         prompt = (
-            "Summarize this person's development activity (GitHub/GitLab) in 1-2 paragraphs. "
+            "Summarize this person's development activity (GitHub, GitLab, Linear) in 1-2 paragraphs. "
             "Focus on what they shipped, reviewed, or discussed.\n\n"
+            + "\n".join(lines)
+        )
+        return await self._llm.complete(prompt, model=self._model)
+
+    async def _summarize_notion(self, day: PreprocessedDay) -> str:
+        lines = []
+        for n in day.notion_edits[:25]:
+            lines.append(
+                f"- {n.timestamp.strftime('%H:%M')} {n.object_type} ({n.via}): {n.title}"
+            )
+        prompt = (
+            "Summarize this person's Notion activity for the day in 1-2 short paragraphs. "
+            "Note which pages or databases changed and any themes — stay factual.\n\n"
+            + "\n".join(lines)
+        )
+        return await self._llm.complete(prompt, model=self._model)
+
+    async def _summarize_health(self, day: PreprocessedDay) -> str:
+        lines = []
+        for h in day.health_days:
+            bits = []
+            if h.sleep_score is not None:
+                bits.append(f"sleep {h.sleep_score}")
+            if h.readiness_score is not None:
+                bits.append(f"readiness {h.readiness_score}")
+            if h.sleep_duration_seconds is not None:
+                bits.append(f"~{h.sleep_duration_seconds / 3600:.1f}h asleep")
+            if h.deep_sleep_seconds is not None:
+                bits.append(f"deep {h.deep_sleep_seconds / 3600:.1f}h")
+            if h.rem_sleep_seconds is not None:
+                bits.append(f"REM {h.rem_sleep_seconds / 3600:.1f}h")
+            if h.activity_score is not None:
+                bits.append(f"activity {h.activity_score}")
+            if h.steps is not None:
+                bits.append(f"{h.steps} steps")
+            if h.active_calories is not None:
+                bits.append(f"{h.active_calories} active kcal")
+            lines.append(f"- {h.day}: {', '.join(bits) if bits else 'data'}")
+        for w in day.health_workouts[:12]:
+            wc = f"{w.calories} kcal" if w.calories is not None else ""
+            lines.append(
+                f"- workout {w.start.strftime('%H:%M')} {w.title} "
+                f"~{w.duration_minutes:.0f}m {wc}".strip()
+            )
+        prompt = (
+            "Summarize this person's sleep, readiness, daily activity, and workouts in 2-3 short factual paragraphs. "
+            "Do not diagnose; describe scores and patterns only.\n\n"
             + "\n".join(lines)
         )
         return await self._llm.complete(prompt, model=self._model)

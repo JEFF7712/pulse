@@ -7,7 +7,7 @@ The core philosophy: big data companies already collect and exploit your persona
 ## How it works
 
 ```
-Data Sources (Gmail, Calendar, ...)
+Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
         ↓
   Event Store (SQLite)
         ↓
@@ -85,6 +85,10 @@ cp .env.example .env
 | `PULSE_GITLAB_TOKEN` | GitLab personal access token (skips OAuth when set) | _(optional)_ |
 | `PULSE_PLAID_CLIENT_ID` / `PULSE_PLAID_SECRET` | Plaid API credentials for bank transactions | _(optional)_ |
 | `PULSE_PLAID_ENV` | `sandbox`, `development`, or `production` | _(optional)_ |
+| `PULSE_OURA_CLIENT_ID` / `PULSE_OURA_CLIENT_SECRET` | Oura Cloud API OAuth (or set `PULSE_OURA_PERSONAL_ACCESS_TOKEN`) | _(optional)_ |
+| `PULSE_OURA_PERSONAL_ACCESS_TOKEN` | Oura personal access token (skips OAuth when set) | _(optional)_ |
+| `PULSE_NOTION_TOKEN` | Notion internal integration secret for the Notion connector | _(optional)_ |
+| `PULSE_LINEAR_API_KEY` | Linear personal API key for assigned-issue sync | _(optional)_ |
 | `PULSE_ANTHROPIC_API_KEY` | Legacy single-provider fallback for profile structuring, digest summarization, and discovery | _(optional)_ |
 
 Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`.

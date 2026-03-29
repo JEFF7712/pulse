@@ -19,6 +19,17 @@ poll_interval = "1h"
     assert config.connectors["youtube"].enabled is False
 
 
+def test_load_config_omitted_connector_enabled_defaults_false(tmp_path):
+    toml_file = tmp_path / "pulse.toml"
+    toml_file.write_text("""
+[connectors.gmail]
+poll_interval = "10m"
+""")
+    config = load_config(config_path=toml_file)
+    assert config.connectors["gmail"].enabled is False
+    assert config.connectors["gmail"].poll_interval == "10m"
+
+
 def test_load_config_env_overrides_defaults(monkeypatch, tmp_path):
     toml_file = tmp_path / "pulse.toml"
     toml_file.write_text("")

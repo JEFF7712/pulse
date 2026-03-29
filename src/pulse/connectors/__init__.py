@@ -5,6 +5,17 @@ from pulse.connectors.google_auth import GoogleAuthManager
 from pulse.connectors.registry import ConnectorRegistry
 
 
+def _notion_database_ids(cc: ConnectorConfig | None) -> list[str]:
+    if cc is None:
+        return []
+    raw = cc.model_dump(mode="python").get("database_ids")
+    if isinstance(raw, str) and raw.strip():
+        return [raw.strip()]
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    return []
+
+
 def _urls_from_connector_config(cc: ConnectorConfig | None) -> list[str]:
     if cc is None:
         return []
@@ -155,5 +166,47 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
     )
 
     from pulse.connectors.companion import CompanionConnector
+    from pulse.connectors.linear import LinearConnector
+    from pulse.connectors.notion import NotionConnector
+
+    registry.register_pull(
+        "linear",
+        lambda: LinearConnector(api_key=config.linear_api_key),
+    )
+
+    from pulse.connectors.oura_auth import OuraAuthManager
+    from pulse.connectors.oura import OuraConnector
+
+    notion_cc = config.connectors.get("notion")
+    notion_db_ids = _notion_database_ids(notion_cc)
+    registry.register_pull(
+        "notion",
+        lambda: NotionConnector(
+            token=config.notion_token,
+            database_ids=notion_db_ids,
+        ),
+    )
+
+    oura_auth: OuraAuthManager | None = None
+    if (
+        config.oura_client_id
+        and config.oura_client_secret
+        and not (config.oura_personal_access_token or "").strip()
+    ):
+        oura_tok = Path(config.database_path).parent / "oura_tokens.json"
+        oura_auth = OuraAuthManager(
+            client_id=config.oura_client_id,
+            client_secret=config.oura_client_secret,
+            token_path=oura_tok,
+        )
+
+    oura_pat = (config.oura_personal_access_token or "").strip() or None
+    registry.register_pull(
+        "oura",
+        lambda: OuraConnector(
+            auth_manager=oura_auth,
+            personal_access_token=oura_pat,
+        ),
+    )
 
     registry.register_push("companion", CompanionConnector)

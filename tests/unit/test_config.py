@@ -25,7 +25,7 @@ def test_settings_alias_is_pulse_config():
 
 def test_connector_config_defaults():
     cc = ConnectorConfig()
-    assert cc.enabled is True
+    assert cc.enabled is False
     assert cc.poll_interval == "15m"
 
 

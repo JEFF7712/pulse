@@ -1,17 +1,18 @@
 # Pulse connector configuration.
 # Copy to pulse.toml and adjust to your setup.
 # Secrets (API keys, tokens) go in .env, not here.
+# All connectors default to enabled = false — set true only for sources you want.
 
 [connectors.gmail]
-enabled = true
+enabled = false
 poll_interval = "15m"
 
 [connectors.calendar]
-enabled = true
+enabled = false
 poll_interval = "30m"
 
 [connectors.youtube]
-enabled = true
+enabled = false
 poll_interval = "1h"
 
 [connectors.spotify]
@@ -32,6 +33,10 @@ calendar_id = "primary"
 enabled = false
 poll_interval = "30m"
 
+[connectors.linear]
+enabled = false
+poll_interval = "30m"
+
 [connectors.gitlab]
 enabled = false
 poll_interval = "30m"
@@ -43,7 +48,7 @@ poll_interval = "6h"
 omit_amounts_in_digest = false
 
 [connectors.browser]
-enabled = true
+enabled = false
 poll_interval = "15m"
 browser = "chrome"  # or "firefox"
 
@@ -53,6 +58,16 @@ poll_interval = "1h"
 # List RSS or Atom feed URLs (no API keys). Example:
 # urls = ["https://hnrss.org/newest"]
 urls = []
+
+[connectors.notion]
+enabled = false
+poll_interval = "45m"
+# Optional: query specific databases (UUIDs) in addition to workspace search.
+# database_ids = ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]
+
+[connectors.oura]
+enabled = false
+poll_interval = "6h"
 
 [connectors.companion]
 enabled = false

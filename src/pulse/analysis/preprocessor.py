@@ -9,6 +9,15 @@ from urllib.parse import urlparse
 from pulse.domain.events import Event
 
 
+def _maybe_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass(slots=True)
 class TopicCluster:
     domain: str
@@ -69,12 +78,48 @@ class FinanceDaySummary:
     omit_amounts: bool
 
 
+@dataclass(slots=True)
+class HealthDay:
+    day: str
+    sleep_score: int | None = None
+    sleep_duration_seconds: int | None = None
+    time_in_bed_seconds: int | None = None
+    sleep_efficiency: int | None = None
+    deep_sleep_seconds: int | None = None
+    rem_sleep_seconds: int | None = None
+    light_sleep_seconds: int | None = None
+    readiness_score: int | None = None
+    activity_score: int | None = None
+    steps: int | None = None
+    active_calories: int | None = None
+    equivalent_walking_distance_meters: int | None = None
+
+
+@dataclass(slots=True)
+class HealthWorkout:
+    title: str
+    start: datetime
+    duration_minutes: float
+    calories: int | None
+    intensity: str | None
+
+
+@dataclass(slots=True)
+class NotionEdit:
+    title: str
+    url: str
+    timestamp: datetime
+    object_type: str
+    via: str
+
+
 _DEV_EVENT_TYPES = frozenset({
     "dev.push",
     "dev.issue",
     "dev.pull_request",
     "dev.comment",
     "dev.repo_activity",
+    "dev.linear.issue",
 })
 
 
@@ -86,6 +131,9 @@ class PreprocessedDay:
     media_sessions: list[MediaSession] = field(default_factory=list)
     dev_activities: list[DevActivity] = field(default_factory=list)
     finance_summary: FinanceDaySummary | None = None
+    health_days: list[HealthDay] = field(default_factory=list)
+    health_workouts: list[HealthWorkout] = field(default_factory=list)
+    notion_edits: list[NotionEdit] = field(default_factory=list)
     time_blocks: list[TimeBlock] = field(default_factory=list)
     raw_stats: dict[str, int] = field(default_factory=dict)
 
@@ -109,6 +157,15 @@ class EventPreprocessor:
             media_sessions=self._build_media_sessions(sorted_events),
             dev_activities=self._build_dev_activities(sorted_events),
             finance_summary=self._build_finance_summary(finance_events),
+            health_days=self._build_health_days(
+                by_type.get("health.sleep", []),
+                by_type.get("health.readiness", []),
+                by_type.get("health.activity", []),
+            ),
+            health_workouts=self._build_health_workouts(
+                by_type.get("health.workout", []),
+            ),
+            notion_edits=self._build_notion_edits(by_type.get("notion.page_edited", [])),
             time_blocks=self._build_time_blocks(sorted_events),
             raw_stats=dict(source_counts),
         )
@@ -296,6 +353,108 @@ class EventPreprocessor:
             )
         rows.sort(key=lambda r: r.timestamp, reverse=True)
         return rows[:40]
+
+    def _build_notion_edits(self, events: list[Event]) -> list[NotionEdit]:
+        rows: list[NotionEdit] = []
+        for e in events:
+            rows.append(
+                NotionEdit(
+                    title=str(e.data.get("title") or "").strip() or "(untitled)",
+                    url=str(e.data.get("url") or "").strip(),
+                    timestamp=e.timestamp,
+                    object_type=str(e.data.get("object_type") or ""),
+                    via=str(e.data.get("via") or ""),
+                )
+            )
+        rows.sort(key=lambda r: r.timestamp, reverse=True)
+        return rows[:40]
+
+    def _build_health_days(
+        self,
+        sleep_events: list[Event],
+        readiness_events: list[Event],
+        activity_events: list[Event],
+    ) -> list[HealthDay]:
+        sleep_by_day: dict[str, Event] = {}
+        for e in sleep_events:
+            day = e.data.get("day")
+            if isinstance(day, str) and day:
+                sleep_by_day[day] = e
+        readiness_by_day: dict[str, Event] = {}
+        for e in readiness_events:
+            day = e.data.get("day")
+            if isinstance(day, str) and day:
+                readiness_by_day[day] = e
+        activity_by_day: dict[str, Event] = {}
+        for e in activity_events:
+            day = e.data.get("day")
+            if isinstance(day, str) and day:
+                activity_by_day[day] = e
+        all_days = sorted(
+            set(sleep_by_day) | set(readiness_by_day) | set(activity_by_day),
+            reverse=True,
+        )
+        out: list[HealthDay] = []
+        for d in all_days[:14]:
+            se = sleep_by_day.get(d)
+            re = readiness_by_day.get(d)
+            ae = activity_by_day.get(d)
+            out.append(
+                HealthDay(
+                    day=d,
+                    sleep_score=_maybe_int(se.data.get("score") if se else None),
+                    sleep_duration_seconds=_maybe_int(
+                        se.data.get("total_sleep_seconds") if se else None
+                    ),
+                    time_in_bed_seconds=_maybe_int(
+                        se.data.get("time_in_bed_seconds") if se else None
+                    ),
+                    sleep_efficiency=_maybe_int(
+                        se.data.get("efficiency") if se else None
+                    ),
+                    deep_sleep_seconds=_maybe_int(
+                        se.data.get("deep_sleep_seconds") if se else None
+                    ),
+                    rem_sleep_seconds=_maybe_int(
+                        se.data.get("rem_sleep_seconds") if se else None
+                    ),
+                    light_sleep_seconds=_maybe_int(
+                        se.data.get("light_sleep_seconds") if se else None
+                    ),
+                    readiness_score=_maybe_int(re.data.get("score") if re else None),
+                    activity_score=_maybe_int(ae.data.get("score") if ae else None),
+                    steps=_maybe_int(ae.data.get("steps") if ae else None),
+                    active_calories=_maybe_int(
+                        ae.data.get("active_calories") if ae else None
+                    ),
+                    equivalent_walking_distance_meters=_maybe_int(
+                        ae.data.get("equivalent_walking_distance_meters") if ae else None
+                    ),
+                )
+            )
+        return out
+
+    def _build_health_workouts(self, events: list[Event]) -> list[HealthWorkout]:
+        rows: list[HealthWorkout] = []
+        for e in events:
+            dur_s = e.data.get("duration_seconds")
+            try:
+                dm = float(dur_s) / 60.0 if dur_s is not None else 0.0
+            except (TypeError, ValueError):
+                dm = 0.0
+            intens = e.data.get("intensity")
+            intens_s = str(intens) if intens is not None and str(intens).strip() else None
+            rows.append(
+                HealthWorkout(
+                    title=str(e.data.get("title") or "Workout"),
+                    start=e.timestamp,
+                    duration_minutes=round(dm, 1),
+                    calories=_maybe_int(e.data.get("calories")),
+                    intensity=intens_s,
+                )
+            )
+        rows.sort(key=lambda r: r.start, reverse=True)
+        return rows[:20]
 
     def _build_finance_summary(self, events: list[Event]) -> FinanceDaySummary | None:
         if not events:

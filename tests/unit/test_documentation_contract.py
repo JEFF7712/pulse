@@ -16,8 +16,7 @@ DOC_PATHS = [
 QUICKSTART_REQUIRED_SNIPPETS = [
     "pip install -e .",
     "pulse configure",
-    "pulse auth google",
-    "pulse auth spotify",
+    "**Connectors**",
     "pulse init",
     "pulse run",
     "pulse status",
@@ -33,9 +32,8 @@ CONNECTOR_REQUIRED_SNIPPETS = [
     "Plaid",
     "browser history",
     "RSS",
-    "pulse auth google",
-    "pulse auth spotify",
-    "pulse auth microsoft",
+    "pulse configure",
+    "→ **Connectors**",
     "db_path",
     "[connectors.browser]",
     'db_path = "/path/to/browser-history.sqlite"',
@@ -44,9 +42,8 @@ CONNECTOR_REQUIRED_SNIPPETS = [
 ]
 
 QUICKSTART_OPTIONAL_AUTH_SNIPPETS = [
-    "If you enabled Google-backed connectors, run:",
-    "If you enabled Spotify, run:",
-    "Skip the auth commands for services you did not enable.",
+    "nothing to authorize",
+    "Notion",
 ]
 
 QUICKSTART_ONBOARD_SNIPPETS = [
@@ -244,26 +241,7 @@ def test_quickstart_marks_auth_commands_as_optional() -> None:
     )
 
 
-def test_quickstart_common_operator_flow_orders_auth_before_init() -> None:
-    quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
-        encoding="utf-8"
-    )
-
-    common_operator_flow = quickstart.split("## Common operator flow", maxsplit=1)[1]
-
-    auth_google_index = common_operator_flow.index("pulse auth google")
-    auth_spotify_index = common_operator_flow.index("pulse auth spotify")
-    init_index = common_operator_flow.index("pulse init")
-
-    assert auth_google_index < init_index, (
-        "quickstart.md should show Google auth before pulse init in the common operator flow"
-    )
-    assert auth_spotify_index < init_index, (
-        "quickstart.md should show Spotify auth before pulse init in the common operator flow"
-    )
-
-
-def test_quickstart_common_operator_flow_lists_each_auth_step_once() -> None:
+def test_quickstart_common_operator_flow_orders_configure_before_init() -> None:
     quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
         encoding="utf-8"
     )
@@ -273,11 +251,27 @@ def test_quickstart_common_operator_flow_lists_each_auth_step_once() -> None:
         1
     ].split("```", maxsplit=1)[0]
 
-    assert common_operator_flow_block.count("pulse auth google") == 1, (
-        "quickstart.md should list Google auth once in the common operator flow"
+    configure_index = common_operator_flow_block.index("pulse configure")
+    init_index = common_operator_flow_block.index("pulse init")
+    run_index = common_operator_flow_block.index("pulse run")
+
+    assert configure_index < init_index < run_index, (
+        "quickstart.md common operator flow should list configure, then init, then run"
     )
-    assert common_operator_flow_block.count("pulse auth spotify") == 1, (
-        "quickstart.md should list Spotify auth once in the common operator flow"
+
+
+def test_quickstart_common_operator_flow_has_no_pulse_auth_commands() -> None:
+    quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
+        encoding="utf-8"
+    )
+
+    common_operator_flow = quickstart.split("## Common operator flow", maxsplit=1)[1]
+    common_operator_flow_block = common_operator_flow.split("```bash", maxsplit=1)[
+        1
+    ].split("```", maxsplit=1)[0]
+
+    assert "pulse auth" not in common_operator_flow_block, (
+        "quickstart.md common operator flow should not reference removed pulse auth commands"
     )
 
 
