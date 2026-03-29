@@ -45,6 +45,24 @@
             pkgs.sqlite
           ];
         };
+
+        packages.default = pythonPkgs.buildPythonApplication {
+          pname = "pulse-agent";
+          version = "0.1.0";
+          pyproject = true;
+          src = ./.;
+          nativeBuildInputs = [ pythonPkgs.setuptools ];
+          propagatedBuildInputs = with pythonPkgs; [
+            rich rich-argparse fastapi pydantic aiosqlite apscheduler httpx
+            feedparser mcp google-auth-oauthlib google-api-python-client anthropic
+            uvicorn plaid-python
+          ];
+        };
+
+        apps.pulse = flake-utils.lib.mkApp {
+          drv = self.packages.${system}.default;
+          exePath = "/bin/pulse";
+        };
       }
     );
 }

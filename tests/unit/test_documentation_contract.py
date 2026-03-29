@@ -14,7 +14,9 @@ DOC_PATHS = [
 ]
 
 QUICKSTART_REQUIRED_SNIPPETS = [
-    "pip install -e .",
+    "pipx install pulse-agent",
+    "uv tool install pulse-agent",
+    "pip install pulse-agent",
     "pulse configure",
     "**Connectors**",
     "pulse init",
@@ -149,6 +151,9 @@ README_REQUIRED_SNIPPETS = [
     "`PULSE_VAULT_PATH`",
     "`pulse.toml` + `.env` config path",
     "day boundaries",
+    "pulse-agent",
+    "`PULSE_CONFIG_DIR`",
+    "`pulse` and `pulse-mcp`",
 ]
 
 DOCS_APP_README_REQUIRED_SNIPPETS = [
@@ -306,6 +311,19 @@ def test_configuration_reference_covers_runtime_config_surface() -> None:
     assert not missing_snippets, (
         "configuration.md is missing required runtime config guidance: "
         f"{missing_snippets}"
+    )
+
+
+def test_configuration_reference_documents_install_safe_paths() -> None:
+    configuration_reference = (REPO_ROOT / "docs/reference/configuration.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "~/.config/pulse" in configuration_reference, (
+        "configuration.md should document ~/.config/pulse as the default installed config location"
+    )
+    assert "~/.local/share/pulse" in configuration_reference, (
+        "configuration.md should document ~/.local/share/pulse as the default installed data location"
     )
 
 

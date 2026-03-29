@@ -13,7 +13,8 @@ from rich_argparse import RichHelpFormatter
 from pulse.app import cli_ui as ui
 from pulse.app.cli_ui import SITE_ACCENT, SITE_CREAM, SITE_MUTED_FG
 from pulse.app.config import PulseConfig
-from pulse.app.config_loader import load_config
+from pulse.app.config_loader import PulseConfigNotFoundError, load_config
+from pulse.app.paths import PulsePaths, resolve_pulse_paths
 from pulse.connectors.github_auth import (
     GITHUB_AUTH_PORT,
     GITHUB_SCOPES,
@@ -138,7 +139,7 @@ def _onboard_print_next_steps(host: str, port: int) -> None:
     ui.muted_line("In another terminal: [cmd]pulse status[/]   [cmd]pulse insights[/]")
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pulse",
         description=(
@@ -149,8 +150,18 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command")
 
+    # Shared parent parser for --config-dir
+    config_parent = argparse.ArgumentParser(add_help=False)
+    config_parent.add_argument(
+        "--config-dir",
+        type=Path,
+        default=None,
+        help="Directory containing .env and pulse.toml",
+    )
+
     run_parser = subparsers.add_parser(
         "run",
+        parents=[config_parent],
         help="Start FastAPI server, scheduler, and operator web UI",
     )
     run_parser.add_argument(
@@ -165,6 +176,7 @@ def main() -> None:
 
     onboard_parser = subparsers.add_parser(
         "onboard",
+        parents=[config_parent],
         help=(
             "First-run pipeline: full configure wizard, connector OAuth when applicable, "
             "pulse init, then pulse run"
@@ -204,7 +216,7 @@ def main() -> None:
     )
 
     pull_parser = subparsers.add_parser(
-        "pull", help="Run connector pull jobs now (omit sources to pull all enabled)"
+        "pull", parents=[config_parent], help="Run connector pull jobs now (omit sources to pull all enabled)"
     )
     pull_parser.add_argument(
         "sources", nargs="*", help="Connectors to pull (default: all)"
@@ -212,6 +224,7 @@ def main() -> None:
 
     digest_parser = subparsers.add_parser(
         "digest",
+        parents=[config_parent],
         help="Build daily digest markdown in the vault for a date (default: today)",
     )
     digest_parser.add_argument(
@@ -220,6 +233,7 @@ def main() -> None:
 
     discover_parser = subparsers.add_parser(
         "discover",
+        parents=[config_parent],
         help="Run LLM discovery pass (scheduled jobs use daily cadence only)",
     )
     discover_parser.add_argument(
@@ -236,6 +250,7 @@ def main() -> None:
 
     subparsers.add_parser(
         "configure",
+        parents=[config_parent],
         help=(
             "Interactive setup: core, connectors, notifications, model API keys, "
             "[llm] roles in pulse.toml, full wizard"
@@ -243,6 +258,7 @@ def main() -> None:
     )
     init_parser = subparsers.add_parser(
         "init",
+        parents=[config_parent],
         help="Structure vault profile (optional LLM) and run initial connector pulls",
     )
     init_parser.add_argument(
@@ -259,18 +275,20 @@ def main() -> None:
         help="Free-form profile text (non-interactive; skips paste prompt)",
     )
     subparsers.add_parser(
-        "status", help="Show database paths, counts, and connector snapshot"
+        "status", parents=[config_parent], help="Show database paths, counts, and connector snapshot"
     )
     subparsers.add_parser(
-        "insights", help="List stored discovery patterns (from the database)"
+        "insights", parents=[config_parent], help="List stored discovery patterns (from the database)"
     )
     subparsers.add_parser(
         "test-telegram",
+        parents=[config_parent],
         help="Send one Telegram test message (requires Telegram vars in .env)",
     )
 
     reset_parser = subparsers.add_parser(
         "reset",
+        parents=[config_parent],
         help="Clear connector sync cursors so the next pull re-fetches from scratch",
     )
     reset_parser.add_argument(
@@ -281,7 +299,7 @@ def main() -> None:
     )
 
     logs_parser = subparsers.add_parser(
-        "logs", help="Print recent rows from the event store (newest first)"
+        "logs", parents=[config_parent], help="Print recent rows from the event store (newest first)"
     )
     logs_parser.add_argument("--source", default=None, help="Filter by source")
     logs_parser.add_argument(
@@ -293,6 +311,7 @@ def main() -> None:
 
     cleanup_parser = subparsers.add_parser(
         "cleanup",
+        parents=[config_parent],
         help="Delete events with timestamps after now (bad imports or clock skew)",
     )
     cleanup_parser.add_argument(
@@ -301,6 +320,11 @@ def main() -> None:
         help="Show what would be deleted without deleting",
     )
 
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     if args.command == "run":
@@ -314,14 +338,15 @@ def main() -> None:
     elif args.command == "discover":
         _discover(args)
     elif args.command == "configure":
-        _configure(offer_oauth=True)
+        _configure(offer_oauth=True, config_dir=getattr(args, "config_dir", None))
     elif args.command == "init":
         _init(
             profile_file=getattr(args, "profile_file", None),
             profile_text=getattr(args, "profile_text", None),
+            config_dir=getattr(args, "config_dir", None),
         )
     elif args.command == "status":
-        _status()
+        _status(config_dir=getattr(args, "config_dir", None))
     elif args.command == "insights":
         _insights()
     elif args.command == "logs":
@@ -342,8 +367,9 @@ def _onboard(args) -> None:
     ui.banner_tagline()
     ui.rule("pulse onboard")
     _onboard_print_prerequisites()
-    _configure(offer_oauth=False, interactive_menu=False)
-    config = load_config()
+    config_dir = getattr(args, "config_dir", None)
+    _configure(offer_oauth=False, interactive_menu=False, config_dir=config_dir)
+    config = load_config(config_dir=config_dir)
     strict = args.strict
 
     ui.onboard_phase("auth google")
@@ -434,7 +460,7 @@ def _run(args) -> None:
     )
     _quiet_noisy_loggers()
 
-    config = load_config()
+    config = load_config(config_dir=getattr(args, "config_dir", None))
     logger.info(
         "Loaded config: db=%s, vault=%s, tz=%s",
         config.database_path,
@@ -2309,9 +2335,20 @@ def _run_configure_full_wizard(
         ui.kv_line("Server + scheduler", "[cmd]pulse run[/]")
 
 
-def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True) -> None:
-    env_path = Path(".env")
-    toml_path = Path("pulse.toml")
+def _default_env_values(paths: PulsePaths) -> dict[str, str]:
+    return {
+        "PULSE_DATABASE_PATH": str(paths.data_dir / "pulse.db"),
+        "PULSE_VAULT_PATH": str(paths.data_dir / "Pulse-Vault"),
+        "PULSE_TIMEZONE": "UTC",
+    }
+
+
+def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True, config_dir: Path | None = None) -> None:
+    paths = resolve_pulse_paths(config_dir=config_dir)
+    paths.config_dir.mkdir(parents=True, exist_ok=True)
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    env_path = paths.env_path
+    toml_path = paths.toml_path
 
     ui.banner_tagline()
     ui.rule("Pulse configuration")
@@ -2445,6 +2482,7 @@ def _init(
     *,
     profile_file: Path | None = None,
     profile_text: str | None = None,
+    config_dir: Path | None = None,
 ) -> None:
     from datetime import date, datetime
 
@@ -2463,7 +2501,7 @@ def _init(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    config = load_config()
+    config = load_config(config_dir=config_dir)
     vault = VaultMemory(config.vault_path)
 
     ui.rule("pulse init")
@@ -2714,11 +2752,15 @@ def _discover(args) -> None:
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
 
-def _status() -> None:
+def _status(config_dir: Path | None = None) -> None:
     from pulse.store.db import connect_db
     from pulse.store.schema import bootstrap_schema
 
-    config = load_config()
+    try:
+        config = load_config(config_dir=config_dir, require_files=True)
+    except PulseConfigNotFoundError as exc:
+        print(str(exc))
+        sys.exit(1)
 
     if not Path(config.database_path).exists():
         ui.error("No database found. Run [cmd]pulse pull[/] first.")

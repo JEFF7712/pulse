@@ -28,7 +28,7 @@ def _parse_day(day: str) -> date | str:
 
 @asynccontextmanager
 async def pulse_lifespan(server: FastMCP) -> AsyncIterator[PulseContext]:
-    config = load_config()
+    config = load_config(require_files=True)
     async with open_pulse_context(
         db_path=config.database_path,
         vault_path=config.vault_path,

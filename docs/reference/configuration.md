@@ -7,6 +7,23 @@ Pulse builds its runtime configuration from two places:
 
 If the same top-level setting is present in both places, the `PULSE_...` environment variable wins.
 
+## Installed vs repo-checkout layout
+
+When you install `pulse-agent` from PyPI, config and data live under standard XDG directories rather than inside the repository:
+
+| Purpose | Default path |
+| --- | --- |
+| Config files (`pulse.toml`, `.env`) | `~/.config/pulse` |
+| Data files (database, vault, OAuth token files) | `~/.local/share/pulse` |
+
+`PULSE_CONFIG_DIR` overrides the config directory. Set it when you want Pulse to read config from a non-default location (for example a Docker bind-mount or a shared NFS path):
+
+```bash
+PULSE_CONFIG_DIR=/etc/pulse pulse run
+```
+
+Repo-root `.env` and `pulse.toml` lookup still works as a compatibility fallback when `PULSE_CONFIG_DIR` is not set and the current working directory looks like a checkout (i.e. a `pulse.toml` or `.env` exists there). This means existing developer workflows and Docker setups using `--env-file` continue to work without change.
+
 ## Runtime model
 
 The live config model in `src/pulse/app/config.py` currently exposes these top-level fields:

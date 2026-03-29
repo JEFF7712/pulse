@@ -1,23 +1,42 @@
 # Self-Hosting Quickstart
 
-Use this guide when you want the shortest real path from a fresh checkout to a running self-hosted Pulse instance.
+Use this guide when you want the shortest real path from a fresh install to a running self-hosted Pulse instance.
 
-## Before you start
+## Install
 
-- Run these commands from the repository root.
-- Install the project so the `pulse` CLI is available. Either:
+Install `pulse-agent` from PyPI. The package provides two commands: `pulse` and `pulse-mcp`.
 
-```bash
-pip install -e .
-```
-
-or, if you use [uv](https://github.com/astral-sh/uv):
+**Recommended — pipx** (installs in an isolated environment and puts both commands on your PATH):
 
 ```bash
-uv sync
+pipx install pulse-agent
 ```
 
-- If you plan to use Google, Spotify, Microsoft 365, GitHub, or GitLab, create those OAuth apps first so you have client credentials ready for `.env`. For Plaid, create a Plaid developer application.
+**Alternative — uv tool** (similar isolation, uv-managed):
+
+```bash
+uv tool install pulse-agent
+```
+
+**Alternative — pip** (installs into the active Python environment):
+
+```bash
+pip install pulse-agent
+```
+
+After installing, `pulse --help` should print the command list.
+
+## Developer setup (alternative)
+
+If you are working on Pulse itself or prefer a checkout-based workflow, use one of these instead of a PyPI install:
+
+- **uv** (recommended): `uv sync` from the repo root. Include dev tools with `uv sync --group dev`.
+- **Nix**: `nix develop` from the repo root drops you into a shell with Python, uv, and a `.venv` kept in sync via `uv sync --group dev`.
+- **Classic venv**: `python3 -m venv .venv`, activate, then `pip install -e .`.
+
+## Before you configure
+
+- If you plan to use Google, Spotify, Microsoft 365, GitHub, or GitLab, create those OAuth apps first so you have client credentials ready. For Plaid, create a Plaid developer application.
 
 ## One-command onboard (optional)
 

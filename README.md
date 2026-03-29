@@ -31,7 +31,21 @@ Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
 
 **Agent integration** — Pulse exposes an [MCP server](https://modelcontextprotocol.io/) so any compatible agent (Claude Code, OpenClaw, etc.) can query your events, generate digests, and record corrections using its own scheduling and LLM capabilities.
 
-## Setup
+## Installation
+
+Install `pulse-agent` from PyPI. The package provides `pulse` and `pulse-mcp` commands.
+
+```bash
+pipx install pulse-agent   # recommended — isolated environment
+# or
+uv tool install pulse-agent
+# or
+pip install pulse-agent
+```
+
+Config defaults to `~/.config/pulse` (config files, `pulse.toml`) and `~/.local/share/pulse` (database, vault, token files). Override the config directory with `PULSE_CONFIG_DIR`.
+
+## Developer setup
 
 **With [uv](https://docs.astral.sh/uv/) (recommended)**
 
@@ -43,7 +57,7 @@ Include dev tools (pytest): `uv sync --group dev`.
 
 **With Nix** — from the repo root, `nix develop` drops you into a shell with Python, uv, and a `.venv` kept in sync via `uv sync --group dev`.
 
-**Classic venv** — `python3 -m venv .venv`, activate, then `pip install -e .` (and `pip install pytest` if you run tests). The [self-hosting quickstart](docs/self-hosting/quickstart.md) still documents a pip-oriented path for operators who prefer it.
+**Classic venv** — `python3 -m venv .venv`, activate, then `pip install -e .` (and `pip install pytest` if you run tests).
 
 Copy `.env.example` and set any values you need:
 
