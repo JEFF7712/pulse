@@ -18,6 +18,18 @@ cleanup() {
 
 trap cleanup EXIT
 
+# CI (e.g. GitHub Actions + Docker) can briefly reset connections while nginx
+# binds the port; curl (56) otherwise fails the single-shot requests below.
+curl_nginx() {
+  curl -fsS \
+    --connect-timeout 5 \
+    --max-time 60 \
+    --retry 12 \
+    --retry-delay 1 \
+    --retry-all-errors \
+    "$@"
+}
+
 [[ -f index.html ]]
 [[ -f ../scripts/install.sh ]]
 [[ -f ../docs/index.md ]]
@@ -67,33 +79,33 @@ port_line="$(docker port "$container" 8080/tcp)"
 port="${port_line##*:}"
 
 for _ in {1..20}; do
-  if html="$(curl -fsS "http://127.0.0.1:$port/")"; then
+  if html="$(curl_nginx "http://127.0.0.1:$port/")"; then
     break
   fi
   sleep 1
 done
 
 for _ in {1..20}; do
-  if docs_bridge_html="$(curl -fsS "http://127.0.0.1:$port/docs/")"; then
+  if docs_bridge_html="$(curl_nginx "http://127.0.0.1:$port/docs/")"; then
     break
   fi
   sleep 1
 done
 
 docs_html="$docs_bridge_html"
-quickstart_html="$(curl -fsS "http://127.0.0.1:$port/docs/self-hosting/quickstart.html")"
-install_sh_body="$(curl -fsS "http://127.0.0.1:$port/install.sh")"
-configuration_html="$(curl -fsS "http://127.0.0.1:$port/docs/reference/configuration.html")"
-runbook_html="$(curl -fsS "http://127.0.0.1:$port/docs/operations/runbook.html")"
-connectors_html="$(curl -fsS "http://127.0.0.1:$port/docs/connectors/")"
+quickstart_html="$(curl_nginx "http://127.0.0.1:$port/docs/self-hosting/quickstart.html")"
+install_sh_body="$(curl_nginx "http://127.0.0.1:$port/install.sh")"
+configuration_html="$(curl_nginx "http://127.0.0.1:$port/docs/reference/configuration.html")"
+runbook_html="$(curl_nginx "http://127.0.0.1:$port/docs/operations/runbook.html")"
+connectors_html="$(curl_nginx "http://127.0.0.1:$port/docs/connectors/")"
 docs_asset_path="$(grep -Eo '/docs/assets/[^"[:space:]]*' <<<"$docs_html" | head -n 1)"
 docs_nav_path="$(grep -Eo '/docs/self-hosting/quickstart\.html[^"[:space:]]*' <<<"$docs_html" | head -n 1)"
 
 [[ -n "$docs_asset_path" ]]
 [[ -n "$docs_nav_path" ]]
 
-curl -fsS "http://127.0.0.1:$port$docs_asset_path" >/dev/null
-curl -fsS "http://127.0.0.1:$port$docs_nav_path" >/dev/null
+curl_nginx "http://127.0.0.1:$port$docs_asset_path" >/dev/null
+curl_nginx "http://127.0.0.1:$port$docs_nav_path" >/dev/null
 
 [[ -n "${html:-}" ]]
 [[ -n "${docs_html:-}" ]]
