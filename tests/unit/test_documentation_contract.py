@@ -127,7 +127,6 @@ QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
 PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
     "[llm.corrections]",
     "# If omitted, corrections reuse [llm.discovery].",
-    "[connectors.companion]",
 ]
 
 README_REQUIRED_SNIPPETS = [

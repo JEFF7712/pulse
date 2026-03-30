@@ -1,150 +1,27 @@
-# Pulse configuration (TOML).
-# Install as ``.config/pulse.toml`` in your project (preferred) or as ``pulse.toml``
-# in the repo root (fallback layout). Put secrets here (gitignored) or use environment
-# variables: PULSE_* overrides this file; ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
-# are also read when the matching pulse.toml field is empty.
-#
-# Core paths and timezone (defaults — uncomment to override at file root):
-#   database_path = "data/pulse.db"
-#   vault_path = "Pulse-Vault"
-#   timezone = "UTC"
-#
-# OAuth and API credentials are still root keys in this file (not nested under
-# [connectors.*]) so one place matches PulseConfig and PULSE_* env overrides.
-# Comments below sit next to the connectors that use each key.
-#
-# Notifications — Telegram (root keys; not a connector table):
-#   telegram_bot_token = "..."
-#   telegram_chat_id = "..."
-#
-# All connectors default to enabled = false — set true only for sources you want.
+# Pulse configuration — run `pulse configure` for interactive setup.
+# See docs/reference/configuration.md for all options.
 
-# Google OAuth (root keys; shared by Gmail, Calendar, and YouTube connectors):
-#   google_client_id = "..."
-#   google_client_secret = "..."
+timezone = "America/Chicago"
+
+google_client_id = ""
+google_client_secret = ""
+anthropic_api_key = ""
 
 [connectors.gmail]
-enabled = false
+enabled = true
 poll_interval = "15m"
 
 [connectors.calendar]
-enabled = false
+enabled = true
 poll_interval = "30m"
-
-[connectors.youtube]
-enabled = false
-poll_interval = "1h"
-
-# Spotify OAuth (root keys):
-#   spotify_client_id = "..."
-#   spotify_client_secret = "..."
-
-[connectors.spotify]
-enabled = false
-poll_interval = "30m"
-supplementary_interval = "6h"
-
-# Microsoft 365 OAuth (root keys):
-#   microsoft_client_id = "..."
-#   microsoft_client_secret = "..."
-#   microsoft_tenant_id = "common"
-
-[connectors.microsoft_mail]
-enabled = false
-poll_interval = "15m"
-
-[connectors.microsoft_calendar]
-enabled = false
-poll_interval = "30m"
-calendar_id = "primary"
-
-# GitHub OAuth (root keys; or use a PAT via CLI where supported):
-#   github_client_id = "..."
-#   github_client_secret = "..."
-
-[connectors.github]
-enabled = false
-poll_interval = "30m"
-
-# Linear API (root key):
-#   linear_api_key = "..."
-
-[connectors.linear]
-enabled = false
-poll_interval = "30m"
-
-# GitLab OAuth or PAT (root keys):
-#   gitlab_client_id = "..."
-#   gitlab_client_secret = "..."
-#   gitlab_token = "..."
-
-[connectors.gitlab]
-enabled = false
-poll_interval = "30m"
-gitlab_base_url = "https://gitlab.com"
-
-# Plaid (root keys):
-#   plaid_client_id = "..."
-#   plaid_secret = "..."
-#   plaid_env = "sandbox"
-
-[connectors.plaid]
-enabled = false
-poll_interval = "6h"
-omit_amounts_in_digest = false
-
-[connectors.browser]
-enabled = false
-poll_interval = "15m"
-browser = "chrome"  # or "firefox"
 
 [connectors.feeds]
-enabled = false
+enabled = true
 poll_interval = "1h"
-# List RSS or Atom feed URLs (no API keys). Example:
-# urls = ["https://hnrss.org/newest"]
-urls = []
+urls = ["https://hnrss.org/newest"]
 
-# Notion (root key):
-#   notion_token = "..."
-
-[connectors.notion]
-enabled = false
-poll_interval = "45m"
-# Optional: query specific databases (UUIDs) in addition to workspace search.
-# database_ids = ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]
-
-# Oura Cloud (root keys; PAT skips OAuth):
-#   oura_client_id = "..."
-#   oura_client_secret = "..."
-#   oura_personal_access_token = "..."
-
-[connectors.oura]
-enabled = false
-poll_interval = "6h"
-
-[connectors.companion]
-enabled = false
-# The companion app pushes location and health events to /webhooks/companion.
-# Set companion_token here (or PULSE_COMPANION_TOKEN in the environment) to enable API auth.
-
-# --- LLM Configuration ---
-# Configure providers for summarization (digest narratives),
-# discovery (cross-source pattern detection), and corrections
-# (interpreting Telegram / MCP feedback into bounded vault updates)
-# independently.
-#
-# Supported providers: anthropic, openai, gemini, ollama
-# API keys (root keys in this file, or vendor env vars when empty):
-#   anthropic_api_key = "..."   # or ANTHROPIC_API_KEY
-#   openai_api_key = "..."      # or OPENAI_API_KEY
-#   gemini_api_key = "..."      # or GEMINI_API_KEY
-#
-# Summarization and discovery can reuse each other when only one of those
-# two roles is configured. Corrections follow the separate fallback below.
-#
-# Option A — one provider, pick models per role (API key in this file or env for that vendor).
-# Model ids: see Anthropic / OpenAI / Gemini docs (linked from docs/reference/configuration.md).
+# LLM roles — provider defaults to "anthropic" when anthropic_api_key is set.
+# If omitted, corrections reuse [llm.discovery].
 # [llm]
 # provider = "anthropic"
 #
@@ -152,19 +29,7 @@ enabled = false
 # model = "claude-haiku-4-5-20251001"
 #
 # [llm.discovery]
-# model = "claude-opus-4-6"
-#
-# Option B — mixed vendors (each block sets provider + model):
-# [llm.summarization]
-# provider = "ollama"
-# model = "llama3.3"
-# base_url = "http://localhost:11434/v1"
-#
-# [llm.discovery]
-# provider = "anthropic"
 # model = "claude-sonnet-4-6"
 #
 # [llm.corrections]
-# provider = "openai"
-# model = "gpt-5.4-mini"
-# If omitted, corrections reuse [llm.discovery].
+# model = "claude-sonnet-4-6"
