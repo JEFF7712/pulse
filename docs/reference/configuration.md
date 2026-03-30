@@ -2,7 +2,7 @@
 
 Pulse builds its runtime configuration primarily from a **TOML file named `pulse.toml`**, by default at **`.config/pulse.toml`** in the current working directory. A **repo-root `pulse.toml`** is still used when that path does not exist but `./pulse.toml` does (fallback layout). Set **`PULSE_CONFIG_FILE`** to point at a specific TOML file, or **`PULSE_CONFIG_DIR`** if the file lives at ``<dir>/pulse.toml``. The file holds root keys (paths, secrets, notifications, OAuth clients, LLM API keys), `[connectors.*]` blocks, and `[llm]` / `[llm.*]`.
 
-Merge order: values from the resolved `pulse.toml` file, then **`PULSE_*`** environment variables (which override the file), then **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, and **`GEMINI_API_KEY`** only for the matching field when that field is still empty after the previous steps. Pulse does **not** read a `.env` file; set variables in your shell, process manager, or container instead.
+Merge order: XDG defaults, then `.env` file from the config directory, then the resolved `pulse.toml` file, then **`PULSE_*`** environment variables (which override everything), then **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, and **`GEMINI_API_KEY`** only for the matching field when that field is still empty after the previous steps.
 
 ## Installed vs repo-checkout layout
 
