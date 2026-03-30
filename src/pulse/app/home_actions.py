@@ -94,7 +94,7 @@ async def run_digest_action(settings: PulseConfig) -> ActionResult:
             database_path=settings.database_path,
             vault_path=settings.vault_path,
             llm=summ_llm,
-            summarization_model=summarization_model_for_digest(settings),
+            summarization_model=summarization_model_for_digest(settings) or "",
         )
     except Exception as e:
         logger.exception("Digest action failed")
@@ -127,8 +127,8 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
             vault_path=settings.vault_path,
             llm=disc_llm,
             notification_channel=notification_channel,
-            summarization_model=summarization_model_for_digest(settings),
-            discovery_model=discovery_model_for_discovery(settings),
+            summarization_model=summarization_model_for_digest(settings) or "",
+            discovery_model=discovery_model_for_discovery(settings) or "",
         )
     except Exception as e:
         logger.exception("Discovery action failed")

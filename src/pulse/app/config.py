@@ -72,6 +72,8 @@ class PulseConfig(BaseModel):
     companion_token: str | None = None
     fcm_service_account_path: str | None = None
     anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
     llm: LLMConfig | None = None
     connectors: dict[str, ConnectorConfig] = {}
 

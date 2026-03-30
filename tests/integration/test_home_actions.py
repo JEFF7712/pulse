@@ -5,7 +5,7 @@ import anthropic
 
 import pulse.app.home_actions as home_actions
 import pulse.llm.anthropic as anthropic_module
-from pulse.app.config import Settings
+from pulse.app.config import LLMConfig, LLMRoleConfig, Settings
 from pulse.app.dependencies import get_settings
 from pulse.app.main import create_app
 
@@ -61,6 +61,11 @@ def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
         database_path=str(tmp_path / "pulse.db"),
         vault_path=str(tmp_path / "vault"),
         anthropic_api_key="test-key",
+        llm=LLMConfig(
+            discovery=LLMRoleConfig(
+                provider="anthropic", model="claude-sonnet-4-6"
+            ),
+        ),
     )
     client = TestClient(app)
 
@@ -159,6 +164,11 @@ def test_discover_action_creates_database_parent_directory_on_fresh_setup(
         database_path=str(database_path_obj),
         vault_path=str(tmp_path / "vault"),
         anthropic_api_key="test-key",
+        llm=LLMConfig(
+            discovery=LLMRoleConfig(
+                provider="anthropic", model="claude-sonnet-4-6"
+            ),
+        ),
     )
     client = TestClient(app)
 

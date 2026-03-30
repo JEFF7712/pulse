@@ -18,7 +18,7 @@ Start with the two lowest-cost checks:
 
 - `POST /actions/pull` — incremental pull for all active pull connectors
 - `POST /actions/digest` — aggregate and generate the daily digest for the current day in `PULSE_TIMEZONE` (same summarization path as `pulse digest` and the scheduled `daily_digest` job: LLM when a provider resolves, otherwise non-LLM fallback)
-- `POST /actions/discover` — aggregate and run **daily**-cadence discovery for the current day (works when a discovery provider resolves; a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path, and if neither path resolves the action shows an error notice); use `pulse discover --cadence weekly|monthly` from the CLI for other cadences
+- `POST /actions/discover` — aggregate and run **daily**-cadence discovery for the current day (works when a discovery provider resolves; a single configured summarization/discovery role is reused for both, and if no role resolves the action shows an error notice); use `pulse discover --cadence weekly|monthly` from the CLI for other cadences
 - `POST /actions/test-telegram` — send a test notification (requires Telegram env vars)
 
 Redirects return to `/` with a short success or error banner. This complements the CLI; it does not replace `pulse status`, `pulse logs`, or `pulse insights` for inspection.
@@ -75,7 +75,7 @@ The scheduler always wires these baseline jobs:
 Operationally, the key skip conditions are:
 
 - `morning_briefing` skips when no notification channel is configured (Telegram, ntfy, Gotify, SMTP, generic webhook, Discord webhook, Slack webhook, or Pushover with both user key and API token)
-- discovery jobs use the same provider resolution path as digest/discovery creation: a single configured summarization/discovery role is reused for both, otherwise Pulse falls back to the legacy `PULSE_ANTHROPIC_API_KEY` path; if neither path resolves, discovery skips
+- discovery jobs use the same provider resolution path as digest/discovery creation: a single configured summarization/discovery role is reused for both; if no role resolves, discovery skips
 - the scheduled `daily_digest` job always runs; the scheduler, manual `pulse digest`, the web Digest action, and MCP `pulse_digest` all use the configured summarization provider when one resolves, otherwise the non-LLM digest path
 - connector pull jobs only exist for connectors that are enabled in `pulse.toml`
 - because the cron jobs are created without an explicit APScheduler timezone, their trigger times follow the scheduler host timezone and process timezone
@@ -88,7 +88,7 @@ Use this order for normal checks and triage:
 1. hit `/health`
 2. run `pulse status`
 3. run `pulse logs -n 20` or `pulse logs --source <connector>` (add `--all` if you need rows with timestamps after “now”, for example clock skew or imported data)
-4. inspect `pulse.toml` and `.env` if jobs are skipping unexpectedly
+4. inspect `pulse.toml` (and process environment overrides) if jobs are skipping unexpectedly
 
 ## Recovery commands
 
@@ -101,6 +101,6 @@ Use this order for normal checks and triage:
 
 - healthy `/health` plus empty `pulse logs` usually points to disabled connectors, missing credentials, or no scheduled pulls yet
 - successful ingestion plus skipped `morning_briefing` usually means no outbound channel is set (see configuration reference for `PULSE_TELEGRAM_*`, `PULSE_NTFY_TOPIC`, `PULSE_GOTIFY_URL`, `PULSE_SMTP_HOST`, `PULSE_NOTIFICATION_WEBHOOK_URL`, `PULSE_DISCORD_WEBHOOK_URL`, `PULSE_SLACK_WEBHOOK_URL`, and `PULSE_PUSHOVER_*`)
-- successful ingestion plus skipped discovery runs usually means neither a reusable summarization/discovery role nor the legacy `PULSE_ANTHROPIC_API_KEY` fallback is configured
+- successful ingestion plus skipped discovery runs usually means no summarization/discovery LLM role is configured (or keys are missing for the configured provider)
 - Telegram webhook 400 responses usually mean the reply payload is missing the original context-bearing message
 - corrections present in `corrections` but no vault change usually mean `correction_applications` recorded `skipped` or `needs_review`; inspect the latest status/summary before retrying with a different prompt or config

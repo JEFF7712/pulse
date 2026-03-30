@@ -138,9 +138,8 @@ Resolution order:
 
 1. `llm.corrections`
 2. `llm.discovery`
-3. legacy `PULSE_ANTHROPIC_API_KEY`
 
-This keeps corrections configurable without forcing a brand-new provider choice.
+If neither resolves a provider, corrections are stored but vault application is skipped (no API-key-only LLM path).
 
 ## Audit and persistence
 

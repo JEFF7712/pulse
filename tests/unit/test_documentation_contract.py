@@ -80,12 +80,12 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "microsoft_tokens.json",
     "plaid_tokens.json",
     "llm.corrections",
-    "corrections -> discovery -> legacy `PULSE_ANTHROPIC_API_KEY` fallback",
+    "corrections stay stored but vault application is skipped",
     "`correction_applications`",
     "Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`",
     "bounded vault update",
-    "MCP server now loads the same `pulse.toml` + `.env` config path as the app/CLI",
-    "If you configure only one of summarization/discovery, Pulse reuses it for both summarization and discovery.",
+    "The FastAPI app, CLI, and MCP server call the same `load_config()` path",
+    "If you configure only one of summarization/discovery, Pulse reuses it for both.",
     "PULSE_COMPANION_TOKEN",
     "PULSE_FCM_SERVICE_ACCOUNT_PATH",
     "[connectors.companion]",
@@ -130,17 +130,6 @@ PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
     "[connectors.companion]",
 ]
 
-ENV_EXAMPLE_REQUIRED_SNIPPETS = [
-    "PULSE_CORRECTIONS_WEBHOOK_SECRET=",
-    "PULSE_GOTIFY_URL=",
-    "PULSE_DISCORD_WEBHOOK_URL=",
-    "PULSE_NTFY_TOPIC=",
-    "PULSE_SPOTIFY_CLIENT_ID=",
-    "PULSE_SPOTIFY_CLIENT_SECRET=",
-    "PULSE_COMPANION_TOKEN=",
-    "PULSE_FCM_SERVICE_ACCOUNT_PATH=",
-]
-
 README_REQUIRED_SNIPPETS = [
     "(/docs/)",
     "[docs/index.md](docs/index.md)",
@@ -149,7 +138,7 @@ README_REQUIRED_SNIPPETS = [
     "`PULSE_DATABASE_PATH`",
     "Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`.",
     "`PULSE_VAULT_PATH`",
-    "`pulse.toml` + `.env` config path",
+    "`.config/pulse.toml`",
     "day boundaries",
     "pulse-agent",
     "`PULSE_CONFIG_DIR`",
@@ -346,10 +335,9 @@ def test_operations_runbook_covers_runtime_health_and_recovery() -> None:
         "runbook.md should not claim cron trigger timezones the scheduler does not configure"
     )
 
-    assert (
-        "discovery jobs skip when neither `[llm.discovery]` nor the legacy `PULSE_ANTHROPIC_API_KEY` fallback is configured"
-        not in runbook
-    ), "runbook.md should not ignore summarization-to-discovery role reuse"
+    assert "legacy `PULSE_ANTHROPIC_API_KEY`" not in runbook, (
+        "runbook.md should not describe removed API-key-only LLM fallback"
+    )
 
 
 def test_pulse_toml_example_covers_corrections_role() -> None:
@@ -363,21 +351,6 @@ def test_pulse_toml_example_covers_corrections_role() -> None:
 
     assert not missing_snippets, (
         f"pulse.toml.example is missing corrections-role guidance: {missing_snippets}"
-    )
-
-
-def test_env_example_lists_spotify_credentials() -> None:
-    env_example = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
-
-    missing_snippets = [
-        snippet
-        for snippet in ENV_EXAMPLE_REQUIRED_SNIPPETS
-        if snippet not in env_example
-    ]
-
-    assert not missing_snippets, (
-        ".env.example is missing required Spotify credential entries: "
-        f"{missing_snippets}"
     )
 
 

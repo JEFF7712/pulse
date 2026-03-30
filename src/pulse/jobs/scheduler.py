@@ -179,7 +179,7 @@ def _make_daily_digest_job(config):
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=summ_llm,
-                summarization_model=summarization_model_for_digest(config),
+                summarization_model=summarization_model_for_digest(config) or "",
             )
         except Exception as e:
             _log_llm_related_job_failure("daily_digest", e)
@@ -207,7 +207,7 @@ def _make_morning_briefing_job(config):
                 vault_path=config.vault_path,
                 channel=channel,
                 llm=summ_llm,
-                summarization_model=summarization_model_for_digest(config),
+                summarization_model=summarization_model_for_digest(config) or "",
             )
         except Exception as e:
             _log_llm_related_job_failure("morning_briefing", e)
@@ -246,8 +246,8 @@ def _make_discovery_job(cadence, config):
                 vault_path=config.vault_path,
                 llm=disc_llm,
                 notification_channel=channel,
-                summarization_model=summarization_model_for_digest(config),
-                discovery_model=discovery_model_for_discovery(config),
+                summarization_model=summarization_model_for_digest(config) or "",
+                discovery_model=discovery_model_for_discovery(config) or "",
             )
         except Exception as e:
             _log_llm_related_job_failure(f"discovery_{cadence}", e)

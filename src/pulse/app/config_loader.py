@@ -7,6 +7,42 @@ from dotenv import dotenv_values
 from pulse.app.config import PulseConfig
 from pulse.app.paths import resolve_pulse_paths
 
+# Vendor env names (no PULSE_ prefix) used by many tools; fill config when unset in file / PULSE_*.
+_VENDOR_API_KEY_ENV = (
+    ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    ("OPENAI_API_KEY", "openai_api_key"),
+    ("GEMINI_API_KEY", "gemini_api_key"),
+)
+
+
+def default_pulse_config_path(*, cwd: Path | None = None) -> Path:
+    """Path to the main Pulse config file (TOML).
+
+    Resolution (first match wins):
+
+    1. ``PULSE_CONFIG_FILE`` — absolute or relative path to the TOML file.
+    2. ``PULSE_CONFIG_DIR`` / ``pulse.toml`` — config directory (e.g. XDG-style layout).
+    3. ``<cwd>/.config/pulse.toml`` if that file exists.
+    4. ``<cwd>/pulse.toml`` if that file exists (repository-root fallback).
+    5. Otherwise ``<cwd>/.config/pulse.toml`` (default for new installs; parent dir created on write).
+
+    ``cwd`` defaults to :func:`pathlib.Path.cwd`.
+    """
+    base = cwd or Path.cwd()
+    env_file = (os.environ.get("PULSE_CONFIG_FILE") or "").strip()
+    if env_file:
+        return Path(env_file).expanduser()
+    env_dir = (os.environ.get("PULSE_CONFIG_DIR") or "").strip()
+    if env_dir:
+        return Path(env_dir).expanduser() / "pulse.toml"
+    dot_config = base / ".config" / "pulse.toml"
+    root_toml = base / "pulse.toml"
+    if dot_config.is_file():
+        return dot_config
+    if root_toml.is_file():
+        return root_toml
+    return dot_config
+
 
 class PulseConfigNotFoundError(FileNotFoundError):
     pass
@@ -41,6 +77,12 @@ def load_config(
 
         env_values = _env_vars_for_config(os.environ)
         merged = {**file_values, **env_values}
+        for env_name, field_name in _VENDOR_API_KEY_ENV:
+            current = merged.get(field_name)
+            if current is not None and str(current).strip():
+                continue
+            if (v := os.environ.get(env_name)) is not None and str(v).strip():
+                merged[field_name] = v
         return PulseConfig(**merged)
 
     # Install-safe path resolution path.
@@ -69,4 +111,11 @@ def load_config(
         "timezone": "UTC",
     }
     merged = {**defaults, **dot_env_values, **file_values, **env_values}
+    for env_name, field_name in _VENDOR_API_KEY_ENV:
+        current = merged.get(field_name)
+        if current is not None and str(current).strip():
+            continue
+        if (v := os.environ.get(env_name)) is not None and str(v).strip():
+            merged[field_name] = v
+
     return PulseConfig(**merged)

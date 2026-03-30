@@ -37,8 +37,8 @@ def _looks_like_billing_or_credits(text: str) -> bool:
 def _for_one(exc: BaseException) -> str | None:
     if isinstance(exc, anthropic.AuthenticationError):
         return (
-            "Anthropic rejected your API key (401). Check PULSE_ANTHROPIC_API_KEY "
-            "and that the key is active at console.anthropic.com."
+            "Anthropic rejected your API key (401). Check ANTHROPIC_API_KEY / "
+            "anthropic_api_key in pulse.toml and that the key is active at console.anthropic.com."
         )
     if isinstance(exc, anthropic.PermissionDeniedError):
         return (
@@ -49,7 +49,7 @@ def _for_one(exc: BaseException) -> str | None:
         detail = _api_error_text(exc)
         base = (
             "Anthropic returned 404 — often an invalid model id. "
-            "Check `[llm.*]` model values in pulse.toml (legacy PULSE_ANTHROPIC_API_KEY uses fixed defaults)."
+            "Check `[llm.*]` model values in pulse.toml."
         )
         return f"{base} API said: {detail}" if detail else base
     if isinstance(exc, anthropic.RateLimitError):

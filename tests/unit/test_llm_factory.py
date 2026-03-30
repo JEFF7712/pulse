@@ -84,6 +84,19 @@ def test_create_llm_provider_missing_key_raises(monkeypatch):
         create_llm_provider(role)
 
 
+def test_create_llm_provider_uses_pulse_config_when_env_unset(monkeypatch):
+    from pulse.llm.factory import create_llm_provider
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    role = LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6")
+    cfg = PulseConfig(anthropic_api_key="sk-from-toml")
+    provider = create_llm_provider(role, pulse_config=cfg)
+
+    from pulse.llm.anthropic import AnthropicProvider
+
+    assert isinstance(provider, AnthropicProvider)
+
+
 def test_create_providers_from_config_new_style(monkeypatch, stub_openai_module):
     from pulse.llm.factory import create_providers_from_config
 
@@ -128,16 +141,13 @@ def test_create_providers_from_config_single_block_fallback(
     assert isinstance(disc_llm, OpenAICompatibleProvider)
 
 
-def test_create_providers_from_config_legacy_anthropic(monkeypatch):
+def test_create_providers_from_config_anthropic_key_only_without_llm_roles():
     from pulse.llm.factory import create_providers_from_config
 
     config = PulseConfig(anthropic_api_key="test-key")
     summ_llm, disc_llm = create_providers_from_config(config)
-
-    from pulse.llm.anthropic import AnthropicProvider
-
-    assert isinstance(summ_llm, AnthropicProvider)
-    assert isinstance(disc_llm, AnthropicProvider)
+    assert summ_llm is None
+    assert disc_llm is None
 
 
 def test_create_providers_from_config_no_config():
@@ -193,24 +203,11 @@ def test_create_corrections_provider_falls_back_to_discovery(monkeypatch):
     assert isinstance(provider, AnthropicProvider)
 
 
-def test_create_corrections_provider_legacy_fallback(monkeypatch):
+def test_create_corrections_provider_anthropic_key_only_returns_none():
     from pulse.llm.factory import create_corrections_provider_from_config
 
-    captured = {}
-
-    class FakeAnthropicProvider:
-        def __init__(self, api_key: str, model: str) -> None:
-            captured["api_key"] = api_key
-            captured["model"] = model
-
-    monkeypatch.setattr("pulse.llm.anthropic.AnthropicProvider", FakeAnthropicProvider)
-
     config = PulseConfig(anthropic_api_key="test-key")
-
-    provider = create_corrections_provider_from_config(config)
-
-    assert isinstance(provider, FakeAnthropicProvider)
-    assert captured == {"api_key": "test-key", "model": "claude-sonnet-4-6"}
+    assert create_corrections_provider_from_config(config) is None
 
 
 def test_create_corrections_provider_no_config_returns_none():
@@ -244,24 +241,16 @@ def test_summarization_model_for_digest_reuses_discovery_when_summarization_omit
     assert summarization_model_for_digest(config) == "claude-sonnet-4-6"
 
 
-def test_summarization_model_for_digest_legacy_uses_fixed_default() -> None:
-    from pulse.llm.factory import (
-        LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
-        summarization_model_for_digest,
-    )
+def test_summarization_model_for_digest_empty_config_returns_none() -> None:
+    from pulse.llm.factory import summarization_model_for_digest
 
-    config = PulseConfig()
-    assert summarization_model_for_digest(config) == LEGACY_ANTHROPIC_SUMMARIZATION_MODEL
+    assert summarization_model_for_digest(PulseConfig()) is None
 
 
-def test_discovery_model_for_discovery_legacy_uses_fixed_default() -> None:
-    from pulse.llm.factory import (
-        LEGACY_ANTHROPIC_DISCOVERY_MODEL,
-        discovery_model_for_discovery,
-    )
+def test_discovery_model_for_discovery_empty_config_returns_none() -> None:
+    from pulse.llm.factory import discovery_model_for_discovery
 
-    config = PulseConfig()
-    assert discovery_model_for_discovery(config) == LEGACY_ANTHROPIC_DISCOVERY_MODEL
+    assert discovery_model_for_discovery(PulseConfig()) is None
 
 
 def test_discovery_model_for_discovery_uses_role() -> None:

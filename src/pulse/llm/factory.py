@@ -16,9 +16,25 @@ _API_KEY_ENV = {
 
 _SUPPORTED_PROVIDERS = set(_API_KEY_ENV.keys())
 
-# Used only when `PULSE_ANTHROPIC_API_KEY` / `anthropic_api_key` is set without `[llm.*]`.
-LEGACY_ANTHROPIC_SUMMARIZATION_MODEL = "claude-haiku-4-5-20251001"
-LEGACY_ANTHROPIC_DISCOVERY_MODEL = "claude-sonnet-4-6"
+_CONFIG_API_KEY_FIELD = {
+    "anthropic": "anthropic_api_key",
+    "openai": "openai_api_key",
+    "gemini": "gemini_api_key",
+    "ollama": "openai_api_key",
+}
+
+
+def _api_key_from_pulse_config(provider: str, pulse_config: PulseConfig | None) -> str | None:
+    if pulse_config is None:
+        return None
+    field = _CONFIG_API_KEY_FIELD.get(provider)
+    if not field:
+        return None
+    raw = getattr(pulse_config, field, None)
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
 
 
 def _resolve_role(llm: LLMConfig, role: LLMRoleConfig | None) -> LLMRoleConfig | None:
@@ -40,7 +56,11 @@ def _resolve_role(llm: LLMConfig, role: LLMRoleConfig | None) -> LLMRoleConfig |
     return LLMRoleConfig(provider=provider, model=role.model, base_url=base_url)
 
 
-def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
+def create_llm_provider(
+    role_config: LLMRoleConfig,
+    *,
+    pulse_config: PulseConfig | None = None,
+) -> LLM:
     """Create an LLM provider instance from a role config."""
     provider = role_config.provider
     if not provider:
@@ -55,7 +75,9 @@ def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
         )
 
     env_var = _API_KEY_ENV[provider]
-    api_key = os.environ.get(env_var)
+    api_key = _api_key_from_pulse_config(provider, pulse_config)
+    if not api_key:
+        api_key = os.environ.get(env_var)
 
     # Ollama doesn't need a real API key
     if provider == "ollama" and not api_key:
@@ -63,7 +85,7 @@ def create_llm_provider(role_config: LLMRoleConfig) -> LLM:
 
     if not api_key:
         raise ValueError(
-            f"{provider.title()} provider requires {env_var} environment variable"
+            f"{provider.title()} provider requires {env_var} or the matching key in pulse.toml"
         )
 
     if provider == "anthropic":
@@ -93,19 +115,11 @@ def create_corrections_provider_from_config(config: PulseConfig) -> LLM | None:
         if llm.corrections is not None:
             resolved = _resolve_role(llm, llm.corrections)
             if resolved is not None:
-                return create_llm_provider(resolved)
+                return create_llm_provider(resolved, pulse_config=config)
 
         _, disc_resolved = effective_llm_role_configs(config)
         if disc_resolved is not None:
-            return create_llm_provider(disc_resolved)
-
-    if config.anthropic_api_key:
-        from pulse.llm.anthropic import AnthropicProvider
-
-        return AnthropicProvider(
-            api_key=config.anthropic_api_key,
-            model=LEGACY_ANTHROPIC_DISCOVERY_MODEL,
-        )
+            return create_llm_provider(disc_resolved, pulse_config=config)
 
     return None
 
@@ -134,52 +148,35 @@ def effective_llm_role_configs(
     )
 
 
-def summarization_model_for_digest(config: PulseConfig) -> str:
-    """Model id passed to SourceSummarizer; matches the active summarization role."""
+def summarization_model_for_digest(config: PulseConfig) -> str | None:
+    """Model id for SourceSummarizer when a summarization role resolves; else ``None``."""
     summ_config, _ = effective_llm_role_configs(config)
-    if summ_config is not None:
-        return summ_config.model
-    return LEGACY_ANTHROPIC_SUMMARIZATION_MODEL
+    if summ_config is None:
+        return None
+    return summ_config.model
 
 
-def discovery_model_for_discovery(config: PulseConfig) -> str:
-    """Discovery LLM model id; matches `[llm.discovery]` or legacy Anthropic default."""
+def discovery_model_for_discovery(config: PulseConfig) -> str | None:
+    """Model id for discovery when a discovery role resolves; else ``None``."""
     _, disc_config = effective_llm_role_configs(config)
-    if disc_config is not None:
-        return disc_config.model
-    return LEGACY_ANTHROPIC_DISCOVERY_MODEL
+    if disc_config is None:
+        return None
+    return disc_config.model
 
 
 def create_providers_from_config(config: PulseConfig) -> tuple[LLM | None, LLM | None]:
-    """Returns (summarization_llm, discovery_llm) from config.
+    """Return ``(summarization_llm, discovery_llm)`` from ``[llm.*]`` roles, or ``(None, None)``."""
+    if config.llm is None:
+        return (None, None)
 
-    Resolution order:
-    1. config.llm (new-style per-role config)
-    2. config.anthropic_api_key (legacy single-provider)
-    3. (None, None) if nothing configured
-    """
-    if config.llm is not None:
-        summ_config, disc_config = effective_llm_role_configs(config)
+    summ_config, disc_config = effective_llm_role_configs(config)
+    if not summ_config and not disc_config:
+        return (None, None)
 
-        if not summ_config and not disc_config:
-            return (None, None)
-
-        summ_llm = create_llm_provider(summ_config) if summ_config else None
-        disc_llm = create_llm_provider(disc_config) if disc_config else None
-        return (summ_llm, disc_llm)
-
-    # Legacy: anthropic_api_key
-    if config.anthropic_api_key:
-        from pulse.llm.anthropic import AnthropicProvider
-
-        summ_llm = AnthropicProvider(
-            api_key=config.anthropic_api_key,
-            model=LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
-        )
-        disc_llm = AnthropicProvider(
-            api_key=config.anthropic_api_key,
-            model=LEGACY_ANTHROPIC_DISCOVERY_MODEL,
-        )
-        return (summ_llm, disc_llm)
-
-    return (None, None)
+    summ_llm = (
+        create_llm_provider(summ_config, pulse_config=config) if summ_config else None
+    )
+    disc_llm = (
+        create_llm_provider(disc_config, pulse_config=config) if disc_config else None
+    )
+    return (summ_llm, disc_llm)

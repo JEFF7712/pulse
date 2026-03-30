@@ -1,7 +1,27 @@
-# Pulse connector configuration.
-# Copy to pulse.toml and adjust to your setup.
-# Secrets (API keys, tokens) go in .env, not here.
+# Pulse configuration (TOML).
+# Install as ``.config/pulse.toml`` in your project (preferred) or as ``pulse.toml``
+# in the repo root (fallback layout). Put secrets here (gitignored) or use environment
+# variables: PULSE_* overrides this file; ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
+# are also read when the matching pulse.toml field is empty.
+#
+# Core paths and timezone (defaults — uncomment to override at file root):
+#   database_path = "data/pulse.db"
+#   vault_path = "Pulse-Vault"
+#   timezone = "UTC"
+#
+# OAuth and API credentials are still root keys in this file (not nested under
+# [connectors.*]) so one place matches PulseConfig and PULSE_* env overrides.
+# Comments below sit next to the connectors that use each key.
+#
+# Notifications — Telegram (root keys; not a connector table):
+#   telegram_bot_token = "..."
+#   telegram_chat_id = "..."
+#
 # All connectors default to enabled = false — set true only for sources you want.
+
+# Google OAuth (root keys; shared by Gmail, Calendar, and YouTube connectors):
+#   google_client_id = "..."
+#   google_client_secret = "..."
 
 [connectors.gmail]
 enabled = false
@@ -15,10 +35,19 @@ poll_interval = "30m"
 enabled = false
 poll_interval = "1h"
 
+# Spotify OAuth (root keys):
+#   spotify_client_id = "..."
+#   spotify_client_secret = "..."
+
 [connectors.spotify]
 enabled = false
 poll_interval = "30m"
 supplementary_interval = "6h"
+
+# Microsoft 365 OAuth (root keys):
+#   microsoft_client_id = "..."
+#   microsoft_client_secret = "..."
+#   microsoft_tenant_id = "common"
 
 [connectors.microsoft_mail]
 enabled = false
@@ -29,18 +58,35 @@ enabled = false
 poll_interval = "30m"
 calendar_id = "primary"
 
+# GitHub OAuth (root keys; or use a PAT via CLI where supported):
+#   github_client_id = "..."
+#   github_client_secret = "..."
+
 [connectors.github]
 enabled = false
 poll_interval = "30m"
+
+# Linear API (root key):
+#   linear_api_key = "..."
 
 [connectors.linear]
 enabled = false
 poll_interval = "30m"
 
+# GitLab OAuth or PAT (root keys):
+#   gitlab_client_id = "..."
+#   gitlab_client_secret = "..."
+#   gitlab_token = "..."
+
 [connectors.gitlab]
 enabled = false
 poll_interval = "30m"
 gitlab_base_url = "https://gitlab.com"
+
+# Plaid (root keys):
+#   plaid_client_id = "..."
+#   plaid_secret = "..."
+#   plaid_env = "sandbox"
 
 [connectors.plaid]
 enabled = false
@@ -59,11 +105,19 @@ poll_interval = "1h"
 # urls = ["https://hnrss.org/newest"]
 urls = []
 
+# Notion (root key):
+#   notion_token = "..."
+
 [connectors.notion]
 enabled = false
 poll_interval = "45m"
 # Optional: query specific databases (UUIDs) in addition to workspace search.
 # database_ids = ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]
+
+# Oura Cloud (root keys; PAT skips OAuth):
+#   oura_client_id = "..."
+#   oura_client_secret = "..."
+#   oura_personal_access_token = "..."
 
 [connectors.oura]
 enabled = false
@@ -72,7 +126,7 @@ poll_interval = "6h"
 [connectors.companion]
 enabled = false
 # The companion app pushes location and health events to /webhooks/companion.
-# Set PULSE_COMPANION_TOKEN in .env to enable API auth.
+# Set companion_token here (or PULSE_COMPANION_TOKEN in the environment) to enable API auth.
 
 # --- LLM Configuration ---
 # Configure providers for summarization (digest narratives),
@@ -81,13 +135,15 @@ enabled = false
 # independently.
 #
 # Supported providers: anthropic, openai, gemini, ollama
-# API keys are read from environment variables:
-#   ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+# API keys (root keys in this file, or vendor env vars when empty):
+#   anthropic_api_key = "..."   # or ANTHROPIC_API_KEY
+#   openai_api_key = "..."      # or OPENAI_API_KEY
+#   gemini_api_key = "..."      # or GEMINI_API_KEY
 #
 # Summarization and discovery can reuse each other when only one of those
 # two roles is configured. Corrections follow the separate fallback below.
 #
-# Option A — one provider, pick models per role (API key in .env for that vendor).
+# Option A — one provider, pick models per role (API key in this file or env for that vendor).
 # Model ids: see Anthropic / OpenAI / Gemini docs (linked from docs/reference/configuration.md).
 # [llm]
 # provider = "anthropic"
@@ -111,9 +167,4 @@ enabled = false
 # [llm.corrections]
 # provider = "openai"
 # model = "gpt-5.4-mini"
-# If omitted, corrections reuse [llm.discovery]. If neither block is set,
-# corrections fall back to legacy PULSE_ANTHROPIC_API_KEY (fixed Sonnet id).
-
-# --- Legacy (still works) ---
-# If you just want Anthropic for everything, set PULSE_ANTHROPIC_API_KEY
-# in .env and skip the [llm] section entirely (built-in Haiku/Sonnet defaults).
+# If omitted, corrections reuse [llm.discovery].

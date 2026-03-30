@@ -59,11 +59,9 @@ Include dev tools (pytest): `uv sync --group dev`.
 
 **Classic venv** — `python3 -m venv .venv`, activate, then `pip install -e .` (and `pip install pytest` if you run tests).
 
-Copy `.env.example` and set any values you need:
+**Configuration file** — keep paths, secrets, connector blocks, and `[llm]` in **`pulse.toml`**, usually at **`.config/pulse.toml`** in your project (new default). A repo-root **`pulse.toml`** is still read if present and `.config/pulse.toml` does not exist. Override with **`PULSE_CONFIG_FILE`** (path to the TOML file) or **`PULSE_CONFIG_DIR`** (directory containing `pulse.toml`). See `pulse.toml.example`. Run `pulse configure` to edit the resolved file. Environment variables override the file: any `PULSE_*` name maps to the same snake_case root key (for example `PULSE_DATABASE_PATH` → `database_path`). `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` are also applied when the corresponding field is empty. Pulse does **not** load a `.env` file; export vars in your shell or container instead.
 
-```bash
-cp .env.example .env
-```
+For Docker and shell exports, the same settings are often passed as env vars:
 
 | Variable | Runtime use | Default |
 |----------|-------------|---------|
@@ -103,20 +101,17 @@ cp .env.example .env
 | `PULSE_OURA_PERSONAL_ACCESS_TOKEN` | Oura personal access token (skips OAuth when set) | _(optional)_ |
 | `PULSE_NOTION_TOKEN` | Notion internal integration secret for the Notion connector | _(optional)_ |
 | `PULSE_LINEAR_API_KEY` | Linear personal API key for assigned-issue sync | _(optional)_ |
-| `PULSE_ANTHROPIC_API_KEY` | Legacy single-provider fallback for profile structuring, digest summarization, and discovery | _(optional)_ |
+| `PULSE_ANTHROPIC_API_KEY` | Anthropic API key for `[llm.*]` with `provider = "anthropic"` (or use `anthropic_api_key` in `pulse.toml`) | _(optional)_ |
 
-Connector toggles and nested connector settings live in `pulse.toml`, not in `.env`.
+Connector toggles and nested connector settings live under `[connectors.*]` in `pulse.toml` (not separate per-connector files).
 
-LLM configuration has two supported paths:
-
-- Recommended: configure `[llm.summarization]`, `[llm.discovery]`, and/or `[llm.corrections]` in `pulse.toml` (see `pulse.toml.example`). Set `[llm] provider` once and use different `model` values per role (e.g. fast summarization + stronger discovery), or set `provider` on each block when mixing vendors. Credentials come from standard env vars such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`. For **up-to-date model id examples** (Claude 4.6 family, GPT-5.4 variants, Gemini 2.5, etc.) and links to each vendor’s model list, see [**LLM provider configuration** in the configuration reference](docs/reference/configuration.md#llm-provider-configuration).
-- Legacy fallback: set `PULSE_ANTHROPIC_API_KEY` only; model ids are fixed defaults unless you configure `[llm.summarization]` / `[llm.discovery]` in `pulse.toml`.
+LLM features require **`[llm.summarization]`**, **`[llm.discovery]`**, and/or **`[llm.corrections]`** in `pulse.toml` (see `pulse.toml.example`). Set `[llm] provider` once and use different `model` values per role (e.g. fast summarization + stronger discovery), or set `provider` on each block when mixing vendors. Put API keys in `pulse.toml` (`anthropic_api_key`, `openai_api_key`, `gemini_api_key`) or use `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` in the environment. For **up-to-date model id examples** (Claude 4.6 family, GPT-5.4 variants, Gemini 2.5, etc.) and links to each vendor’s model list, see [**LLM provider configuration** in the configuration reference](docs/reference/configuration.md#llm-provider-configuration).
 
 The scheduled `daily_digest` job, `pulse digest`, the homepage **Digest** action, and MCP `pulse_digest` all use the same path: they aggregate stats, then run the digest job with the configured summarization provider when one resolves, otherwise they fall back to the non-LLM summarizer.
 
 The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
 
-Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. They also share the same `PULSE_VAULT_PATH` and `pulse.toml` + `.env` config path.
+Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. They resolve the rest of config via `load_config()` (default `.config/pulse.toml`, else repo-root `pulse.toml`, plus process environment overrides).
 
 ## Docs
 

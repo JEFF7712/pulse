@@ -13,7 +13,7 @@ from rich_argparse import RichHelpFormatter
 from pulse.app import cli_ui as ui
 from pulse.app.cli_ui import SITE_ACCENT, SITE_CREAM, SITE_MUTED_FG
 from pulse.app.config import PulseConfig
-from pulse.app.config_loader import PulseConfigNotFoundError, load_config
+from pulse.app.config_loader import PulseConfigNotFoundError, default_pulse_config_path, load_config
 from pulse.app.paths import PulsePaths, resolve_pulse_paths
 from pulse.connectors.github_auth import (
     GITHUB_AUTH_PORT,
@@ -116,7 +116,7 @@ def _gitlab_base_url(config: PulseConfig) -> str:
 def _onboard_print_prerequisites() -> None:
     ui.rule("Before you start")
     ui.muted_line(
-        "Run from the directory where .env and pulse.toml should live (usually the repo root)."
+        "Run from the directory where your Pulse config lives (usually ``.config/pulse.toml`` or repo-root ``pulse.toml``)."
     )
     ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
     ui.muted_line(
@@ -283,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "test-telegram",
         parents=[config_parent],
-        help="Send one Telegram test message (requires Telegram vars in .env)",
+        help="Send one Telegram test message (requires Telegram settings in pulse.toml or env)",
     )
 
     reset_parser = subparsers.add_parser(
@@ -377,7 +377,7 @@ def _onboard(args) -> None:
         _auth_google(show_rule=False)
     else:
         ui.muted_line(
-            "Skipping — no Google OAuth client in .env or no enabled Gmail / Calendar / YouTube connector."
+            "Skipping — no Google OAuth client configured or no enabled Gmail / Calendar / YouTube connector."
         )
 
     ui.onboard_phase("auth spotify")
@@ -625,29 +625,7 @@ def _prompt_env_field(
         return value
 
 
-def _load_dotenv_file(env_path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not env_path.exists():
-        return out
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, val = line.partition("=")
-            out[key.strip()] = val.strip()
-    return out
-
-
-def _write_dotenv_ordered(
-    env_path: Path, env: dict[str, str], key_order: list[str]
-) -> None:
-    seen = set(key_order)
-    lines = [f"{k}={env[k]}" for k in key_order if k in env]
-    for k in sorted(k for k in env if k not in seen):
-        lines.append(f"{k}={env[k]}")
-    env_path.write_text("\n".join(lines) + "\n")
-
-
-# Core, integration, model-provider, and notification keys — .env emit order in configure.
+# Core, integration, model-provider, and notification keys — pulse.toml root emit order in configure.
 _CONFIGURE_CORE_FIELDS: list[tuple[str, str, str, bool]] = [
     ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
     ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
@@ -683,7 +661,7 @@ _CONFIGURE_INTEGRATION_FIELDS: list[tuple[str, str, bool]] = [
     ("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True),
 ]
 
-# LLM vendor API keys (see pulse.llm.factory — standard env names, plus legacy PULSE_ANTHROPIC_API_KEY).
+# LLM vendor API keys (see pulse.llm.factory — also ``anthropic_api_key`` / ``PULSE_ANTHROPIC_API_KEY`` in TOML or env).
 _MODEL_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
     (
         "anthropic",
@@ -692,12 +670,12 @@ _MODEL_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = 
         [
             (
                 "ANTHROPIC_API_KEY",
-                "Anthropic API key (used when [llm.*] provider = anthropic)",
+                "Anthropic API key ([llm.*] provider = anthropic; or pulse.toml anthropic_api_key)",
                 True,
             ),
             (
                 "PULSE_ANTHROPIC_API_KEY",
-                "Anthropic API key (legacy fallback if [llm] blocks are unset)",
+                "Same key as ANTHROPIC_API_KEY (TOML / env alias)",
                 True,
             ),
         ],
@@ -734,7 +712,7 @@ _CONFIGURE_MODEL_PROVIDER_FIELDS: list[tuple[str, str, bool]] = [
     fld for *_, flds in _MODEL_PROVIDER_DEFS for fld in flds
 ]
 
-# Per-provider notification / webhook env (order preserved for full wizard + .env key order).
+# Per-provider notification / webhook keys (order preserved for full wizard + pulse.toml key order).
 _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
     (
         "telegram",
@@ -873,6 +851,18 @@ _CONFIGURE_ENV_KEY_ORDER: list[str] = (
     + [t[0] for t in _CONFIGURE_NOTIFICATION_FIELDS]
 )
 
+# Map configure / model-provider env keys to ``PulseConfig`` root field names (pulse.toml).
+_ENV_KEY_TO_CONFIG_FIELD: dict[str, str] = {
+    "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "PULSE_ANTHROPIC_API_KEY": "anthropic_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
+    "GEMINI_API_KEY": "gemini_api_key",
+}
+
+_PULSE_ROOT_FIELD_NAMES: frozenset[str] = frozenset(
+    k for k in PulseConfig.model_fields if k not in ("connectors", "llm")
+)
+
 _CONNECTOR_DEFS: list[tuple[str, str, str]] = [
     ("gmail", "15m", "Gmail (email)"),
     ("calendar", "30m", "Google Calendar"),
@@ -977,7 +967,7 @@ _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
     ("core", "Core settings (paths, timezone)"),
     (
         "connectors",
-        "Connectors (.env, pulse.toml, OAuth / Plaid / Oura when needed)",
+        "Connectors (pulse.toml credentials + blocks, OAuth / Plaid / Oura when needed)",
     ),
     (
         "notifications",
@@ -1070,10 +1060,50 @@ def _prompt_env_field_list(
         working_env[key] = _prompt_env_field(key, label, current, is_secret)
 
 
-def _save_configure_env(env_path: Path, working_env: dict[str, str]) -> None:
-    if not (working_env.get("PULSE_SMTP_PORT") or "").strip():
-        working_env["PULSE_SMTP_PORT"] = "587"
-    _write_dotenv_ordered(env_path, working_env, _CONFIGURE_ENV_KEY_ORDER)
+def _env_key_to_pulse_field(ek: str) -> str | None:
+    if ek in _ENV_KEY_TO_CONFIG_FIELD:
+        return _ENV_KEY_TO_CONFIG_FIELD[ek]
+    if ek.startswith("PULSE_"):
+        cand = ek[6:].lower()
+        if cand in _PULSE_ROOT_FIELD_NAMES:
+            return cand
+    return None
+
+
+def _ordered_pulse_root_field_names() -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for ek in _CONFIGURE_ENV_KEY_ORDER:
+        fname = _env_key_to_pulse_field(ek)
+        if fname and fname not in seen:
+            seen.add(fname)
+            out.append(fname)
+    for fname in sorted(_PULSE_ROOT_FIELD_NAMES):
+        if fname not in seen:
+            out.append(fname)
+    return out
+
+
+def _pulse_config_to_working_env(cfg: PulseConfig) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for fname in _PULSE_ROOT_FIELD_NAMES:
+        val = getattr(cfg, fname)
+        env_k = f"PULSE_{fname.upper()}"
+        if val is None:
+            out[env_k] = ""
+        elif isinstance(val, bool):
+            out[env_k] = "true" if val else "false"
+        else:
+            out[env_k] = str(val)
+    if cfg.anthropic_api_key:
+        ak = cfg.anthropic_api_key
+        out["ANTHROPIC_API_KEY"] = ak
+        out["PULSE_ANTHROPIC_API_KEY"] = ak
+    if cfg.openai_api_key:
+        out["OPENAI_API_KEY"] = cfg.openai_api_key
+    if cfg.gemini_api_key:
+        out["GEMINI_API_KEY"] = cfg.gemini_api_key
+    return out
 
 
 def _connector_prereqs_met(name: str, env: dict[str, str]) -> bool:
@@ -1134,9 +1164,9 @@ def _prompt_enable_connector(
 ) -> bool:
     if was_enabled and not creds_ok:
         ui.muted_line(
-            "  (Note: connector was enabled but matching .env credentials look missing.)"
+            "  (Note: connector was enabled but matching credentials look missing.)"
         )
-    # First-time / currently off: opt in (default off) even if .env already has creds.
+    # First-time / currently off: opt in (default off) even if pulse.toml already has creds.
     if not was_enabled:
         yn = input(f"  Enable {label}? [y/N] ").strip().lower()
         return yn in ("y", "yes")
@@ -1181,6 +1211,64 @@ def _toml_inline_value(v: object) -> str:
         esc = v.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{esc}"'
     raise TypeError(f"Unsupported TOML value type: {type(v)!r}")
+
+
+def _coerce_pulse_root_string(fname: str, raw: str) -> str | int | bool:
+    raw = raw.strip()
+    if fname == "smtp_port":
+        return int(raw)
+    if fname in ("smtp_use_tls", "smtp_use_ssl"):
+        return raw.lower() in ("1", "true", "yes", "on")
+    return raw
+
+
+def _merge_working_env_into_full_root(full: dict, working_env: dict[str, str]) -> None:
+    for ek, fname in _ENV_KEY_TO_CONFIG_FIELD.items():
+        if ek not in working_env:
+            continue
+        v = working_env[ek].strip()
+        if v:
+            full[fname] = v
+        else:
+            full.pop(fname, None)
+    for key, val in working_env.items():
+        if not key.startswith("PULSE_"):
+            continue
+        fname = key[6:].lower()
+        if fname not in _PULSE_ROOT_FIELD_NAMES:
+            continue
+        v = val.strip()
+        if not v:
+            full.pop(fname, None)
+        else:
+            full[fname] = _coerce_pulse_root_string(fname, v)
+
+
+def _pulse_scalar_empty_for_emit(v: object) -> bool:
+    if v is None:
+        return True
+    if isinstance(v, str) and not v.strip():
+        return True
+    return False
+
+
+def _emit_pulse_root_scalar_lines(full: dict) -> list[str]:
+    lines: list[str] = []
+    seen: set[str] = set()
+    for fname in _ordered_pulse_root_field_names():
+        if fname not in full:
+            continue
+        v = full[fname]
+        if _pulse_scalar_empty_for_emit(v):
+            continue
+        lines.append(f"{fname} = {_toml_inline_value(v)}")
+        seen.add(fname)
+    for fname in sorted(k for k in full if k in _PULSE_ROOT_FIELD_NAMES and k not in seen):
+        v = full[fname]
+        if _pulse_scalar_empty_for_emit(v):
+            continue
+        lines.append(f"{fname} = {_toml_inline_value(v)}")
+    return lines
 
 
 def _connector_emit_lines(
@@ -1305,12 +1393,17 @@ def _emit_llm_sections(llm: dict) -> list[str]:
 
 
 def _serialize_pulse_toml_document(full: dict) -> str:
-    """Emit pulse.toml text: connectors (known + extra), [llm], then other top-level tables."""
+    """Emit pulse.toml: app scalars, connectors, ``[llm]``, then other top-level tables."""
     lines = [
-        "# Pulse connector configuration.",
-        "# Secrets (API keys, tokens) go in .env, not here.",
+        "# Pulse configuration (single file: paths, secrets, connectors, LLM roles).",
+        "# ``PULSE_*`` and vendor API env vars override values from this file when set.",
         "",
     ]
+    root_lines = _emit_pulse_root_scalar_lines(full)
+    if root_lines:
+        lines.append("# --- App (paths, integrations, notifications, API keys) ---")
+        lines.extend(root_lines)
+        lines.append("")
     connectors = full.get("connectors")
     if not isinstance(connectors, dict):
         connectors = {}
@@ -1329,7 +1422,8 @@ def _serialize_pulse_toml_document(full: dict) -> str:
         lines.append("# --- LLM (digest summarization, discovery, corrections) ---")
         lines.append("")
         lines.extend(_emit_llm_sections(llm))
-    for top_key in sorted(k for k in full if k not in ("connectors", "llm")):
+    skip_top = frozenset(("connectors", "llm")) | _PULSE_ROOT_FIELD_NAMES
+    for top_key in sorted(k for k in full if k not in skip_top):
         # Forward-compat: extra top-level sections as [key] with flat scalars only.
         block = full[top_key]
         if not isinstance(block, dict):
@@ -1343,6 +1437,15 @@ def _serialize_pulse_toml_document(full: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _save_pulse_settings(toml_path: Path, working_env: dict[str, str]) -> None:
+    if not (working_env.get("PULSE_SMTP_PORT") or "").strip():
+        working_env["PULSE_SMTP_PORT"] = "587"
+    full = _load_full_pulse_toml(toml_path)
+    _merge_working_env_into_full_root(full, working_env)
+    toml_path.parent.mkdir(parents=True, exist_ok=True)
+    toml_path.write_text(_serialize_pulse_toml_document(full))
+
+
 def _write_connectors_state(state: dict[str, dict], toml_path: Path) -> None:
     full = _load_full_pulse_toml(toml_path)
     old_c = full.get("connectors")
@@ -1352,6 +1455,7 @@ def _write_connectors_state(state: dict[str, dict], toml_path: Path) -> None:
     for name, _, _ in _CONNECTOR_DEFS:
         merged[name] = state.get(name) or {}
     full["connectors"] = merged
+    toml_path.parent.mkdir(parents=True, exist_ok=True)
     toml_path.write_text(_serialize_pulse_toml_document(full))
 
 
@@ -1406,7 +1510,7 @@ def _prompt_one_connector_toml_section(
             enabled = was_enabled
             if enabled and not creds_ok:
                 ui.muted_line(
-                    "  (Note: still enabled, but matching .env credentials look missing.)"
+                    "  (Note: still enabled, but matching credentials look missing.)"
                 )
     else:
         enabled = _prompt_enable_connector(
@@ -1660,7 +1764,6 @@ def _pick_connector_submenu(
 
 def _configure_connectors_hub(
     working_env: dict[str, str],
-    env_path: Path,
     toml_path: Path,
     *,
     offer_oauth: bool,
@@ -1670,7 +1773,7 @@ def _configure_connectors_hub(
         state = _load_connectors_state(toml_path)
         if not showed_connector_legend:
             ui.muted_line(
-                "● = enabled in pulse.toml · ○ = disabled · ✓/✗ = .env prereqs (only when ●). "
+                "● = enabled in pulse.toml · ○ = disabled · ✓/✗ = credential prereqs (only when ●). "
                 "Pick a source to edit its credentials and block; when you save with ●, "
                 "OAuth / Plaid Link / Oura run here if that source needs tokens."
             )
@@ -1687,15 +1790,15 @@ def _configure_connectors_hub(
         ui.step(label)
         fields = _CONNECTOR_ENV_FIELDS.get(name, [])
         if fields:
-            ui.muted_line(".env variables for this connector (leave blank to skip).")
+            ui.muted_line("Credentials for this connector (saved in pulse.toml; leave blank to skip).")
             _prompt_env_field_list(
                 fields,
                 working_env,
-                offer_bulk_keep=env_path.exists(),
+                offer_bulk_keep=toml_path.exists(),
                 section_label=f"{label} credentials",
             )
-            _save_configure_env(env_path, working_env)
-            ui.success(f"Saved {env_path}")
+            _save_pulse_settings(toml_path, working_env)
+            ui.success(f"Saved {toml_path}")
         state = _load_connectors_state(toml_path)
         existing = state.get(name, {})
         state[name] = _prompt_one_connector_toml_section(
@@ -1855,13 +1958,13 @@ def _configure_core_only(working_env: dict[str, str]) -> None:
         working_env[key] = _prompt_env_field(key, label, current, is_secret)
 
 
-def _configure_integrations_only(working_env: dict[str, str], env_path: Path) -> None:
+def _configure_integrations_only(working_env: dict[str, str], toml_path: Path) -> None:
     ui.step("Credentials (integrations)")
     ui.muted_line("OAuth clients and API keys for data sources. Leave blank to skip.")
     _prompt_env_field_list(
         _CONFIGURE_INTEGRATION_FIELDS,
         working_env,
-        offer_bulk_keep=env_path.exists(),
+        offer_bulk_keep=toml_path.exists(),
         section_label="integration credentials",
     )
 
@@ -1875,9 +1978,9 @@ def _model_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
     if provider_id == "anthropic":
         return bool(g("ANTHROPIC_API_KEY") or g("PULSE_ANTHROPIC_API_KEY"))
     if provider_id == "openai":
-        return bool(g("OPENAI_API_KEY"))
+        return bool(g("OPENAI_API_KEY") or g("PULSE_OPENAI_API_KEY"))
     if provider_id == "gemini":
-        return bool(g("GEMINI_API_KEY"))
+        return bool(g("GEMINI_API_KEY") or g("PULSE_GEMINI_API_KEY"))
     if provider_id == "ollama":
         return False
     return False
@@ -1938,12 +2041,12 @@ def _pick_model_provider_submenu(working_env: dict[str, str]) -> str | None:
     return val_by_label[chosen]
 
 
-def _configure_model_providers_hub(working_env: dict[str, str], env_path: Path) -> None:
+def _configure_model_providers_hub(working_env: dict[str, str], toml_path: Path) -> None:
     showed_legend = False
     while True:
         if not showed_legend:
             ui.muted_line(
-                "● = API key set in .env for that vendor · ○ = missing · "
+                "● = API key set in pulse.toml for that vendor · ○ = missing · "
                 "Match [llm] / [llm.summarization] / … provider values in pulse.toml."
             )
             showed_legend = True
@@ -1963,27 +2066,27 @@ def _configure_model_providers_hub(working_env: dict[str, str], env_path: Path) 
                 "OPENAI_API_KEY can stay blank; Pulse uses a placeholder when unset."
             )
             continue
-        ui.muted_line(".env API keys for this vendor (leave blank to skip).")
+        ui.muted_line("API keys for this vendor (saved in pulse.toml; leave blank to skip).")
         _prompt_env_field_list(
             fields,
             working_env,
-            offer_bulk_keep=env_path.exists(),
+            offer_bulk_keep=toml_path.exists(),
             section_label=f"{label} API keys",
         )
-        _save_configure_env(env_path, working_env)
-        ui.success(f"Saved {env_path}")
+        _save_pulse_settings(toml_path, working_env)
+        ui.success(f"Saved {toml_path}")
 
 
-def _configure_model_providers_only(working_env: dict[str, str], env_path: Path) -> None:
+def _configure_model_providers_only(working_env: dict[str, str], toml_path: Path) -> None:
     ui.step("Model providers")
     ui.muted_line(
         "Provider choice and model ids live in pulse.toml under [llm] / [llm.summarization] / …; "
-        "this pass only writes vendor API keys to .env. Leave blank to skip."
+        "this pass writes vendor API keys into pulse.toml. Leave blank to skip."
     )
     _prompt_env_field_list(
         _CONFIGURE_MODEL_PROVIDER_FIELDS,
         working_env,
-        offer_bulk_keep=env_path.exists(),
+        offer_bulk_keep=toml_path.exists(),
         section_label="model provider API keys",
     )
 
@@ -2075,12 +2178,12 @@ def _pick_notification_provider_submenu(working_env: dict[str, str]) -> str | No
     return val_by_label[chosen]
 
 
-def _configure_notifications_hub(working_env: dict[str, str], env_path: Path) -> None:
+def _configure_notifications_hub(working_env: dict[str, str], toml_path: Path) -> None:
     showed_legend = False
     while True:
         if not showed_legend:
             ui.muted_line(
-                "● = required .env values set for that channel · ○ = incomplete · "
+                "● = required values set in pulse.toml for that channel · ○ = incomplete · "
                 "Several channels can be active; digests broadcast to all that are ready."
             )
             showed_legend = True
@@ -2093,43 +2196,41 @@ def _configure_notifications_hub(working_env: dict[str, str], env_path: Path) ->
         row = next(r for r in _NOTIFICATION_PROVIDER_DEFS if r[0] == pick)
         _pid, label, _emoji, fields = row
         ui.step(label)
-        ui.muted_line(".env variables for this channel (leave blank to skip).")
+        ui.muted_line("Values for this channel (saved in pulse.toml; leave blank to skip).")
         _prompt_env_field_list(
             fields,
             working_env,
-            offer_bulk_keep=env_path.exists(),
+            offer_bulk_keep=toml_path.exists(),
             section_label=f"{label} notifications",
         )
-        _save_configure_env(env_path, working_env)
-        ui.success(f"Saved {env_path}")
+        _save_pulse_settings(toml_path, working_env)
+        ui.success(f"Saved {toml_path}")
 
 
-def _configure_notifications_only(working_env: dict[str, str], env_path: Path) -> None:
+def _configure_notifications_only(working_env: dict[str, str], toml_path: Path) -> None:
     ui.step("Notifications")
     ui.muted_line("Telegram, webhooks, and SMTP. Leave blank to skip.")
     _prompt_env_field_list(
         _CONFIGURE_NOTIFICATION_FIELDS,
         working_env,
-        offer_bulk_keep=env_path.exists(),
+        offer_bulk_keep=toml_path.exists(),
         section_label="notification settings",
     )
 
 
 _LLM_ROLES_PROVIDERS: tuple[str, ...] = ("anthropic", "openai", "gemini", "ollama")
 _OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
+_WIZARD_DEFAULT_ANTHROPIC_SUMM = "claude-haiku-4-5-20251001"
+_WIZARD_DEFAULT_ANTHROPIC_DISC = "claude-sonnet-4-6"
 
 
 def _configure_llm_roles_wizard(toml_path: Path) -> None:
     """Prompt for [llm] provider, summarization model, discovery model; merge into pulse.toml."""
-    from pulse.llm.factory import (
-        LEGACY_ANTHROPIC_DISCOVERY_MODEL,
-        LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
-    )
 
     defaults_map: dict[str, tuple[str, str]] = {
         "anthropic": (
-            LEGACY_ANTHROPIC_SUMMARIZATION_MODEL,
-            LEGACY_ANTHROPIC_DISCOVERY_MODEL,
+            _WIZARD_DEFAULT_ANTHROPIC_SUMM,
+            _WIZARD_DEFAULT_ANTHROPIC_DISC,
         ),
         "openai": ("gpt-4.1-mini", "gpt-4.1"),
         "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
@@ -2151,7 +2252,7 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
     ui.step("LLM roles in pulse.toml")
     ui.muted_line(
         "Sets [llm] provider plus [llm.summarization] and [llm.discovery] model ids. "
-        "API keys stay in .env (Model providers menu). Existing [llm.corrections] is kept."
+        "API keys live in pulse.toml (Model providers menu). Existing [llm.corrections] is kept."
     )
 
     if not sys.stdin.isatty():
@@ -2296,29 +2397,29 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
             new_llm["base_url"] = old_bu.strip()
 
     full["llm"] = new_llm
+    toml_path.parent.mkdir(parents=True, exist_ok=True)
     toml_path.write_text(_serialize_pulse_toml_document(full))
     ui.success(f"Saved {toml_path}")
 
 
 def _run_configure_full_wizard(
     working_env: dict[str, str],
-    env_path: Path,
     toml_path: Path,
     *,
     offer_oauth: bool,
 ) -> None:
     _configure_core_only(working_env)
-    _configure_integrations_only(working_env, env_path)
-    _configure_model_providers_only(working_env, env_path)
+    _configure_integrations_only(working_env, toml_path)
+    _configure_model_providers_only(working_env, toml_path)
     if sys.stdin.isatty():
         llm_ans = input(
             "  Configure [llm] provider and model roles in pulse.toml now? [y/N] "
         ).strip().lower()
         if llm_ans in ("y", "yes"):
             _configure_llm_roles_wizard(toml_path)
-    _configure_notifications_only(working_env, env_path)
-    _save_configure_env(env_path, working_env)
-    ui.success(f"Saved {env_path}")
+    _configure_notifications_only(working_env, toml_path)
+    _save_pulse_settings(toml_path, working_env)
+    ui.success(f"Saved {toml_path}")
 
     ui.step("Connector configuration")
     enabled = _configure_connectors_toml(working_env, toml_path)
@@ -2347,17 +2448,16 @@ def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True, confi
     paths = resolve_pulse_paths(config_dir=config_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
     paths.data_dir.mkdir(parents=True, exist_ok=True)
-    env_path = paths.env_path
     toml_path = paths.toml_path
 
     ui.banner_tagline()
     ui.rule("Pulse configuration")
 
-    working_env = _load_dotenv_file(env_path)
+    working_env = _pulse_config_to_working_env(load_config(toml_path))
 
     if not interactive_menu:
         _run_configure_full_wizard(
-            working_env, env_path, toml_path, offer_oauth=offer_oauth
+            working_env, toml_path, offer_oauth=offer_oauth
         )
         return
 
@@ -2371,28 +2471,27 @@ def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True, confi
             break
         if choice == "core":
             _configure_core_only(working_env)
-            _save_configure_env(env_path, working_env)
-            ui.success(f"Saved {env_path}")
+            _save_pulse_settings(toml_path, working_env)
+            ui.success(f"Saved {toml_path}")
         elif choice == "connectors":
             ui.step("Connectors")
             _configure_connectors_hub(
                 working_env,
-                env_path,
                 toml_path,
                 offer_oauth=offer_oauth,
             )
         elif choice == "notifications":
             ui.step("Notifications")
-            _configure_notifications_hub(working_env, env_path)
+            _configure_notifications_hub(working_env, toml_path)
         elif choice == "model_providers":
             ui.step("Model providers")
-            _configure_model_providers_hub(working_env, env_path)
+            _configure_model_providers_hub(working_env, toml_path)
         elif choice == "llm_roles":
             ui.step("LLM roles in pulse.toml")
             _configure_llm_roles_wizard(toml_path)
         elif choice == "full":
             _run_configure_full_wizard(
-                working_env, env_path, toml_path, offer_oauth=offer_oauth
+                working_env, toml_path, offer_oauth=offer_oauth
             )
             break
 
@@ -2466,10 +2565,7 @@ def _strip_markdown_fences(text: str) -> str:
     return t
 
 
-async def _structure_profile_markdown(raw: str, api_key: str) -> str:
-    from pulse.llm.anthropic import AnthropicProvider
-
-    llm = AnthropicProvider(api_key=api_key, model=_PROFILE_STRUCTURE_MODEL)
+async def _structure_profile_markdown(raw, llm) -> str:
     structured = await llm.complete(
         f"The user wrote the following about themselves. Turn it into the vault profile markdown.\n\n---\n{raw}\n---",
         system_prompt=_PROFILE_STRUCTURE_SYSTEM,
@@ -2607,8 +2703,8 @@ def _init(
                     vault_path=config.vault_path,
                     llm=disc_llm,
                     notification_channel=channel,
-                    summarization_model=summarization_model_for_digest(config),
-                    discovery_model=discovery_model_for_discovery(config),
+                    summarization_model=summarization_model_for_digest(config) or "",
+                    discovery_model=discovery_model_for_discovery(config) or "",
                 )
             )
         except Exception as e:
@@ -2620,7 +2716,9 @@ def _init(
             raise SystemExit(1) from e
         ui.muted_line(result.detail)
     else:
-        ui.muted_line("Skipping discovery (no LLM provider configured).")
+        ui.muted_line(
+            "Skipping discovery (configure [llm.summarization] and/or [llm.discovery])."
+        )
 
     ui.success(
         "Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler."
@@ -2634,6 +2732,8 @@ def _collect_profile(
     profile_file: Path | None = None,
     profile_text: str | None = None,
 ) -> None:
+    from pulse.llm.factory import create_providers_from_config
+
     ui.step("User profile")
     ui.muted_line(
         "Describe yourself in free form; Pulse will structure it for your vault."
@@ -2644,11 +2744,17 @@ def _collect_profile(
         ui.warning("No profile text provided; skipping profile write.")
         return
 
-    if config.anthropic_api_key:
-        ui.say("[accent]Structuring profile[/] with the LLM…")
+    from pulse.llm.anthropic import AnthropicProvider
+
+    summ_llm, disc_llm = create_providers_from_config(config)
+    anthropic_llm = next(
+        (x for x in (summ_llm, disc_llm) if isinstance(x, AnthropicProvider)), None
+    )
+    if anthropic_llm is not None:
+        ui.say("[accent]Structuring profile[/] with Anthropic…")
         try:
             profile_content = asyncio.run(
-                _structure_profile_markdown(raw, config.anthropic_api_key)
+                _structure_profile_markdown(raw, anthropic_llm)
             )
         except Exception as e:
             um = user_message_for_anthropic_exception(e)
@@ -2661,7 +2767,8 @@ def _collect_profile(
             profile_content = _profile_markdown_without_llm(raw)
     else:
         ui.muted_line(
-            "No PULSE_ANTHROPIC_API_KEY; saving your text under “Self description” (no LLM pass)."
+            "No Anthropic LLM in [llm.summarization] / [llm.discovery]; "
+            "saving your text under “Self description” (no LLM pass)."
         )
         profile_content = _profile_markdown_without_llm(raw)
 
@@ -2697,7 +2804,7 @@ def _digest(args) -> None:
             database_path=config.database_path,
             vault_path=config.vault_path,
             llm=summ_llm,
-            summarization_model=summarization_model_for_digest(config),
+            summarization_model=summarization_model_for_digest(config) or "",
         )
     )
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
@@ -2719,7 +2826,7 @@ def _discover(args) -> None:
     _, disc_llm = create_providers_from_config(config)
     if disc_llm is None:
         ui.error(
-            "No LLM provider configured. Set [llm.discovery] in pulse.toml or PULSE_ANTHROPIC_API_KEY."
+            "No discovery LLM configured. Set [llm.discovery] (or [llm.summarization]) in pulse.toml."
         )
         sys.exit(1)
 
@@ -2738,8 +2845,8 @@ def _discover(args) -> None:
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=disc_llm,
-                summarization_model=summarization_model_for_digest(config),
-                discovery_model=discovery_model_for_discovery(config),
+                summarization_model=summarization_model_for_digest(config) or "",
+                discovery_model=discovery_model_for_discovery(config) or "",
             )
         )
     except Exception as e:
@@ -3028,7 +3135,7 @@ def _test_telegram() -> None:
 
     if not config.telegram_bot_token or not config.telegram_chat_id:
         ui.error(
-            "PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in .env"
+            "PULSE_TELEGRAM_BOT_TOKEN and PULSE_TELEGRAM_CHAT_ID must be set in pulse.toml or the environment"
         )
         sys.exit(1)
 

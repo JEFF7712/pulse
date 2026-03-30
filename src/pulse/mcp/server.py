@@ -159,7 +159,7 @@ async def pulse_digest(day: str | None = None, ctx: Context = None) -> str:
     pulse_ctx = _get_pulse_ctx(ctx)
     config = pulse_ctx.config if pulse_ctx.config is not None else load_config()
     summ_llm, _ = create_providers_from_config(config)
-    model = summarization_model_for_digest(config)
+    model = summarization_model_for_digest(config) or ""
 
     await run_aggregation_job(
         day=target_date, database_path=pulse_ctx.database_path

@@ -1,8 +1,8 @@
 # Connectors Index
 
-Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Microsoft 365 (Outlook mail and calendar), Spotify, GitHub, Linear, GitLab, Plaid (bank transactions), Notion, Oura Ring (sleep, readiness, activity, and workouts), local browser history, and RSS/Atom feeds (no API keys for feeds). There is no committed `pulse.toml`—use `pulse.toml.example` or the file written by `pulse configure`. This page gives the setup path for each connector.
+Pulse ships pull connectors for Google (Gmail, Calendar, YouTube), Microsoft 365 (Outlook mail and calendar), Spotify, GitHub, Linear, GitLab, Plaid (bank transactions), Notion, Oura Ring (sleep, readiness, activity, and workouts), local browser history, and RSS/Atom feeds (no API keys for feeds). There is no committed config file—use `pulse.toml.example` as a template; `pulse configure` writes **`.config/pulse.toml`** by default (or repo-root `pulse.toml` if you use the repository-root fallback layout). This page gives the setup path for each connector.
 
-OAuth, Plaid Link, and Oura Cloud OAuth run from **`pulse configure` → Connectors**: pick a source, save its `.env` and `pulse.toml` with that connector **enabled** (●); token prompts appear at the end of that flow when needed.
+OAuth, Plaid Link, and Oura Cloud OAuth run from **`pulse configure` → Connectors**: pick a source, save its credentials in `pulse.toml` with that connector **enabled** (●); token prompts appear at the end of that flow when needed.
 
 ## Google
 
@@ -10,7 +10,7 @@ Google authentication covers the Google-backed connectors Pulse can enable: Gmai
 
 ### Prerequisites
 
-- set `PULSE_GOOGLE_CLIENT_ID` and `PULSE_GOOGLE_CLIENT_SECRET` in `.env`, usually through `pulse configure`
+- set `PULSE_GOOGLE_CLIENT_ID` and `PULSE_GOOGLE_CLIENT_SECRET` in `pulse.toml` (or env), usually through `pulse configure`
 - keep at least one Google connector enabled in `pulse.toml` (`gmail`, `calendar`, or `youtube`)
 - complete OAuth from `pulse configure` → **Connectors** → a Google-backed source (Gmail, Calendar, or YouTube); saving with the connector enabled starts the Google OAuth flow
 
@@ -30,7 +30,7 @@ Spotify is configured separately from Google and uses its own OAuth flow.
 
 ### Prerequisites
 
-- set `PULSE_SPOTIFY_CLIENT_ID` and `PULSE_SPOTIFY_CLIENT_SECRET` in `.env`, usually through `pulse configure`
+- set `PULSE_SPOTIFY_CLIENT_ID` and `PULSE_SPOTIFY_CLIENT_SECRET` in `pulse.toml` (or env), usually through `pulse configure`
 - keep `[connectors.spotify] enabled = true` in `pulse.toml`
 - complete OAuth from `pulse configure` → **Connectors** → Spotify; save with the connector enabled
 
@@ -51,7 +51,7 @@ Microsoft Graph covers Outlook mail and calendar using one token file. Register 
 
 ### Prerequisites
 
-- set `PULSE_MICROSOFT_CLIENT_ID` and `PULSE_MICROSOFT_CLIENT_SECRET` in `.env`
+- set `PULSE_MICROSOFT_CLIENT_ID` and `PULSE_MICROSOFT_CLIENT_SECRET` in `pulse.toml` (or env)
 - optional: `PULSE_MICROSOFT_TENANT_ID` (defaults to `common` for multi-tenant sign-in)
 - enable `microsoft_mail` and/or `microsoft_calendar` in `pulse.toml`
 - authorize from `pulse configure` → **Connectors** → Outlook mail or 365 calendar; save with the connector enabled
@@ -70,7 +70,7 @@ Use `calendar_id = "primary"` under `[connectors.microsoft_calendar]` for your d
 ### Prerequisites
 
 - GitHub OAuth App with callback `http://localhost:8891/callback`
-- `PULSE_GITHUB_CLIENT_ID` and `PULSE_GITHUB_CLIENT_SECRET` in `.env`
+- `PULSE_GITHUB_CLIENT_ID` and `PULSE_GITHUB_CLIENT_SECRET` in `pulse.toml` (or env)
 - `[connectors.github] enabled = true`
 - authorize from `pulse configure` → **Connectors** → GitHub; save with the connector enabled
 
@@ -85,7 +85,7 @@ Linear uses a [personal API key](https://developers.linear.app/docs/graphql/work
 ### Prerequisites
 
 - Create an API key in Linear (Settings → API → Personal API keys).
-- Set `PULSE_LINEAR_API_KEY` in `.env` (same value the Linear UI shows; Pulse sends it as the `Authorization` header).
+- Set `PULSE_LINEAR_API_KEY` in `pulse.toml` (or env) (same value the Linear UI shows; Pulse sends it as the `Authorization` header).
 - Enable `[connectors.linear]` in `pulse.toml`.
 
 There is no OAuth step for Linear.
@@ -105,13 +105,13 @@ Use either OAuth or a [personal access token](https://docs.gitlab.com/ee/user/pr
 ### OAuth
 
 - GitLab OAuth application with redirect `http://localhost:8892/callback` (must match your `gitlab_base_url` host)
-- `PULSE_GITLAB_CLIENT_ID` and `PULSE_GITLAB_CLIENT_SECRET` in `.env`
+- `PULSE_GITLAB_CLIENT_ID` and `PULSE_GITLAB_CLIENT_SECRET` in `pulse.toml` (or env)
 - `[connectors.gitlab]` with `gitlab_base_url` (default `https://gitlab.com`)
 - authorize from `pulse configure` → **Connectors** → GitLab; save with the connector enabled
 
 ### Personal access token
 
-- set `PULSE_GITLAB_TOKEN` in `.env` and omit OAuth; Pulse uses the `PRIVATE-TOKEN` header against the GitLab API.
+- set `PULSE_GITLAB_TOKEN` in `pulse.toml` (or env) and omit OAuth; Pulse uses the `PRIVATE-TOKEN` header against the GitLab API.
 
 ### What Pulse pulls
 
@@ -139,7 +139,7 @@ Notion uses an [internal integration](https://developers.notion.com/docs/create-
 
 ### Prerequisites
 
-- Create an integration in Notion and copy the **Internal Integration Secret** into `PULSE_NOTION_TOKEN` in `.env`
+- Create an integration in Notion and copy the **Internal Integration Secret** into `PULSE_NOTION_TOKEN` in `pulse.toml` (or env)
 - Enable `[connectors.notion]` in `pulse.toml`
 - Share target pages/databases with the integration (Share → invite your integration)
 
@@ -162,7 +162,7 @@ Oura exposes daily sleep and readiness through the [Oura Cloud API v2](https://c
 ### Personal access token
 
 - Create a token in the Oura developer / Cloud dashboard (Personal Access Token).
-- Set `PULSE_OURA_PERSONAL_ACCESS_TOKEN` in `.env` and omit OAuth client fields.
+- Set `PULSE_OURA_PERSONAL_ACCESS_TOKEN` in `pulse.toml` (or env) and omit OAuth client fields.
 - Enable `[connectors.oura]` in `pulse.toml`
 
 No OAuth step is required when using a PAT.
@@ -170,7 +170,7 @@ No OAuth step is required when using a PAT.
 ### OAuth
 
 - Register an API application with redirect URI `http://localhost:8894/callback`.
-- Set `PULSE_OURA_CLIENT_ID` and `PULSE_OURA_CLIENT_SECRET` in `.env`.
+- Set `PULSE_OURA_CLIENT_ID` and `PULSE_OURA_CLIENT_SECRET` in `pulse.toml` (or env).
 - Enable `[connectors.oura]` in `pulse.toml`.
 - authorize from `pulse configure` → **Connectors** → Oura; save with the connector enabled
 

@@ -13,7 +13,7 @@ class DailySummary:
 
 
 class DailySummarizer:
-    def __init__(self, llm=None, summarization_model: str = "claude-haiku-4-5-20251001") -> None:
+    def __init__(self, llm=None, summarization_model: str = "") -> None:
         self._llm = llm
         self._summarization_model = summarization_model
 
