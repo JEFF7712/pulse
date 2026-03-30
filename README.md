@@ -1,4 +1,4 @@
-# Pulse
+# Pulse - Personal Intelligence Agent 
 
 A self-hosted, push-first personal intelligence agent. Pulse continuously ingests data from your digital life — email, calendar, purchases, health, media — and proactively surfaces insights through notifications. No app to open. No daily check-ins.
 
