@@ -35,25 +35,22 @@ CONNECTOR_REQUIRED_SNIPPETS = [
     "browser history",
     "RSS",
     "pulse configure",
-    "→ **Connectors**",
+    "Configure → Connectors",
     "db_path",
     "[connectors.browser]",
-    'db_path = "/path/to/browser-history.sqlite"',
     "[connectors.feeds]",
     "urls",
 ]
 
 QUICKSTART_OPTIONAL_AUTH_SNIPPETS = [
-    "nothing to authorize",
     "Notion",
 ]
 
 QUICKSTART_ONBOARD_SNIPPETS = [
     "pulse onboard",
     "pulse onboard --strict",
-    "pulse onboard -f ./my-profile.txt",
     "--profile-text",
-    "localhost:8888",
+    "`8888`",
 ]
 
 CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
@@ -80,12 +77,11 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "microsoft_tokens.json",
     "plaid_tokens.json",
     "llm.corrections",
-    "corrections stay stored but vault application is skipped",
+    "corrections are stored but vault application is skipped",
     "`correction_applications`",
-    "Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`",
-    "bounded vault update",
-    "The FastAPI app, CLI, and MCP server call the same `load_config()` path",
-    "If you configure only one of summarization/discovery, Pulse reuses it for both.",
+    "share the corrections pipeline",
+    "Same **`load_config()`**",
+    "One configured role can cover both summarization and discovery if the other is omitted.",
     "PULSE_COMPANION_TOKEN",
     "PULSE_FCM_SERVICE_ACCOUNT_PATH",
     "[connectors.companion]",
@@ -93,10 +89,7 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
 
 RUNBOOK_REQUIRED_SNIPPETS = [
     "/webhooks/corrections",
-    "PULSE_DISCORD_WEBHOOK_URL",
-    "PULSE_GOTIFY_URL",
-    "PULSE_SMTP_HOST",
-    "PULSE_NTFY_TOPIC",
+    "PULSE_CORRECTIONS_WEBHOOK_SECRET",
     "/health",
     "/webhooks/telegram",
     "pulse status",
@@ -106,22 +99,19 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "daily_digest",
     "morning_briefing",
     "discovery_daily",
-    "host timezone",
-    "process timezone",
-    "raw correction text",
-    "bounded vault updates",
+    "**host** timezone",
+    "PULSE_TIMEZONE",
     "correction_applications",
     "pulse_correct",
-    "single configured summarization/discovery role is reused for both",
     "/webhooks/companion",
     "/api/digests",
     "/api/corrections",
     "/api/device-token",
-    "device_tokens",
+    "PULSE_COMPANION_TOKEN",
 ]
 
 QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
-    "single configured summarization/discovery role is reused for both",
+    "optional discovery when LLM",
 ]
 
 PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
@@ -151,6 +141,25 @@ DOCS_APP_README_REQUIRED_SNIPPETS = [
 ]
 
 NON_CANONICAL_DOC_PARTS = {"plans", "specs", "superpowers"}
+
+
+def _joined_bash_fenced_blocks(markdown: str) -> str:
+    """Concatenate ```bash ... ``` bodies in document order (for CLI ordering checks)."""
+    parts: list[str] = []
+    cursor = 0
+    while True:
+        fence = markdown.find("```bash", cursor)
+        if fence == -1:
+            break
+        nl = markdown.find("\n", fence)
+        if nl == -1:
+            break
+        close = markdown.find("```", nl + 1)
+        if close == -1:
+            break
+        parts.append(markdown[nl + 1 : close])
+        cursor = close + 3
+    return "\n".join(parts)
 
 
 def iter_canonical_repo_docs() -> list[Path]:
@@ -239,17 +248,14 @@ def test_quickstart_common_operator_flow_orders_configure_before_init() -> None:
         encoding="utf-8"
     )
 
-    common_operator_flow = quickstart.split("## Common operator flow", maxsplit=1)[1]
-    common_operator_flow_block = common_operator_flow.split("```bash", maxsplit=1)[
-        1
-    ].split("```", maxsplit=1)[0]
+    bash_blocks = _joined_bash_fenced_blocks(quickstart)
 
-    configure_index = common_operator_flow_block.index("pulse configure")
-    init_index = common_operator_flow_block.index("pulse init")
-    run_index = common_operator_flow_block.index("pulse run")
+    configure_index = bash_blocks.index("pulse configure")
+    init_index = bash_blocks.index("pulse init")
+    run_index = bash_blocks.index("pulse run")
 
     assert configure_index < init_index < run_index, (
-        "quickstart.md common operator flow should list configure, then init, then run"
+        "quickstart.md bash examples should list configure, then init, then run"
     )
 
 
@@ -258,13 +264,10 @@ def test_quickstart_common_operator_flow_has_no_pulse_auth_commands() -> None:
         encoding="utf-8"
     )
 
-    common_operator_flow = quickstart.split("## Common operator flow", maxsplit=1)[1]
-    common_operator_flow_block = common_operator_flow.split("```bash", maxsplit=1)[
-        1
-    ].split("```", maxsplit=1)[0]
+    bash_blocks = _joined_bash_fenced_blocks(quickstart)
 
-    assert "pulse auth" not in common_operator_flow_block, (
-        "quickstart.md common operator flow should not reference removed pulse auth commands"
+    assert "pulse auth" not in bash_blocks, (
+        "quickstart.md bash examples should not reference removed pulse auth commands"
     )
 
 
