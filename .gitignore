@@ -6,13 +6,11 @@ __pycache__/
 .worktrees/
 .claude/
 .ruff_cache/
-.env
 pulse.toml
 .config/
 data/
 .envrc
 .direnv
 Pulse-Vault/
-DESIGN.md
 docs/superpowers/
 docs/plans/

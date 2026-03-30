@@ -22,6 +22,13 @@ export default defineConfig({
   themeConfig: {
     logo: "/pulse-mark.svg",
     siteTitle: "Pulse Docs",
+    socialLinks: [
+      {
+        icon: "github",
+        link: "https://github.com/JEFF7712/pulse",
+        ariaLabel: "Pulse on GitHub"
+      }
+    ],
     nav: [
       // `"/"` is rewritten to `/docs/` under base. `"/../"` yields `/docs/../` → `/`. `target` is required
       // so VitePress does not intercept the click and try to SPA-load `/` (no such page).

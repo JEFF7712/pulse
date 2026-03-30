@@ -35,8 +35,16 @@ Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
 
 Install `pulse-agent` from PyPI. The package provides `pulse` and `pulse-mcp` commands.
 
+**Quick install** (bootstraps [pipx](https://pipx.pypa.io/) if needed; runs `pulse onboard` when the session is interactive):
+
 ```bash
-pipx install pulse-agent   # recommended — isolated environment
+curl -fsSL https://pulseagent.dev/install.sh | bash
+```
+
+Manual install (recommended if you already use pipx):
+
+```bash
+pipx install pulse-agent   # isolated environment
 # or
 uv tool install pulse-agent
 # or
@@ -121,6 +129,7 @@ Documentation lives under [docs/index.md](docs/index.md). The deployed site serv
 - [Configuration reference](docs/reference/configuration.md)
 - [Operations runbook](docs/operations/runbook.md)
 - [Connectors index](docs/connectors/index.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Run tests
 

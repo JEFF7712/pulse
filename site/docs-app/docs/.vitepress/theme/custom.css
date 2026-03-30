@@ -346,3 +346,38 @@ a.pulse-home-card:hover {
     padding-right: 0;
   }
 }
+
+.pulse-docs-github-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.25rem 1rem 1.75rem;
+  border-top: 1px solid var(--vp-c-gutter);
+  background: var(--vp-c-bg);
+}
+
+.pulse-docs-github-footer__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--vp-c-text-2);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.pulse-docs-github-footer__link:hover {
+  color: var(--vp-c-text-1);
+}
+
+.pulse-docs-github-footer__link:focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 3px;
+}
+
+.pulse-docs-github-footer__icon {
+  display: block;
+}

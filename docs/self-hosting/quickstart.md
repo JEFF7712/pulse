@@ -6,11 +6,40 @@
 
 Ships `pulse` and `pulse-mcp`.
 
+**One-liner** (installs [pipx](https://pipx.pypa.io/) if needed, then `pulse-agent`; starts `pulse onboard` when your terminal is interactive):
+
+```bash
+curl -fsSL https://pulseagent.dev/install.sh | bash
+```
+
+Skip the onboarding wizard at the end:
+
+```bash
+curl -fsSL https://pulseagent.dev/install.sh | bash -s -- --no-onboard
+```
+
+Manual install (if you already use pipx):
+
 ```bash
 pipx install pulse-agent
 ```
 
-Alternatives: `uv tool install pulse-agent` or `pip install pulse-agent`. Check with `pulse --help`.
+**Other methods**
+
+- **uv** — `uv tool install pulse-agent`
+- **pip** — use a virtualenv; `pip install pulse-agent`
+
+**Docker**
+
+- **Image from this repo** — after `uv build`:  
+  `docker build -t pulse -f Dockerfile --build-arg PULSE_WHEEL=dist/pulse_agent-*.whl .`  
+  `docker run -p 8000:8000 -v pulse-config:/config -v pulse-data:/data pulse`  
+  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.
+- **Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host dirs to match), then `pulse run --host 0.0.0.0 --port 8000`.
+
+Check with `pulse --help` after any install path.
+
+The install script lives at [`scripts/install.sh` in the repository](https://github.com/JEFF7712/pulse/blob/main/scripts/install.sh) if you prefer to download and audit it before running.
 
 ## Developer install
 

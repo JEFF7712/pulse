@@ -4,11 +4,15 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'docs/**'
+      - 'scripts/install.sh'
       - '.dockerignore'
       - '.github/workflows/site-docker-publish.yml'
   pull_request:
     paths:
       - 'site/**'
+      - 'docs/**'
+      - 'scripts/install.sh'
       - '.dockerignore'
       - '.github/workflows/site-docker-publish.yml'
 permissions:

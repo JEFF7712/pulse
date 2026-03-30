@@ -19,6 +19,7 @@ cleanup() {
 trap cleanup EXIT
 
 [[ -f index.html ]]
+[[ -f ../scripts/install.sh ]]
 [[ -f ../docs/index.md ]]
 [[ ! -f docs/index.html ]]
 [[ -f docs-app/package.json ]]
@@ -48,6 +49,7 @@ grep -q '^RUN npm run docs:build$' Dockerfile
 grep -q '^FROM nginx:alpine$' Dockerfile
 grep -q '^COPY site/nginx.conf /etc/nginx/nginx.conf$' Dockerfile
 grep -q '^COPY site/index.html /usr/share/nginx/html/index.html$' Dockerfile
+grep -q '^COPY scripts/install.sh /usr/share/nginx/html/install.sh$' Dockerfile
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/pulse-mark\.svg /usr/share/nginx/html/pulse-mark\.svg$' Dockerfile
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/favicon\.ico /usr/share/nginx/html/favicon\.ico$' Dockerfile
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/ /usr/share/nginx/html/docs/$' Dockerfile
@@ -80,6 +82,7 @@ done
 
 docs_html="$docs_bridge_html"
 quickstart_html="$(curl -fsS "http://127.0.0.1:$port/docs/self-hosting/quickstart.html")"
+install_sh_body="$(curl -fsS "http://127.0.0.1:$port/install.sh")"
 configuration_html="$(curl -fsS "http://127.0.0.1:$port/docs/reference/configuration.html")"
 runbook_html="$(curl -fsS "http://127.0.0.1:$port/docs/operations/runbook.html")"
 connectors_html="$(curl -fsS "http://127.0.0.1:$port/docs/connectors/")"
@@ -121,7 +124,7 @@ grep -q 'Every insight, every memory' <<<"$html"
 ! grep -q '<form' <<<"$html"
 ! grep -q 'formspree.io' <<<"$html"
 grep -q 'Try now' <<<"$html"
-grep -q 'pip install pulse-agent' <<<"$html"
+grep -q 'curl -fsSL https://pulseagent.dev/install.sh | bash' <<<"$html"
 grep -q 'class="install-code"' <<<"$html"
 grep -q 'class="install-docs"' <<<"$html"
 grep -q 'View documentation' <<<"$html"
@@ -149,7 +152,12 @@ assert_contains "$docs_html" 'Open quickstart'
 assert_contains "$docs_html" 'What is Pulse?'
 assert_contains "$quickstart_html" 'Self-Hosting Quickstart'
 assert_contains "$quickstart_html" 'pulse configure'
-assert_contains "$quickstart_html" 'pipx install pulse-agent'
+assert_contains "$quickstart_html" 'Manual install (if you already use pipx):'
+assert_contains "$quickstart_html" 'pulseagent.dev/install.sh'
+assert_contains "$quickstart_html" 'docker build'
+assert_contains "$install_sh_body" '#!/usr/bin/env bash'
+assert_contains "$install_sh_body" 'pulse-agent'
+assert_contains "$install_sh_body" 'pipx'
 assert_contains "$configuration_html" 'Configuration Reference'
 assert_contains "$configuration_html" 'PULSE_DATABASE_PATH'
 assert_contains "$configuration_html" 'Top-level fields'
