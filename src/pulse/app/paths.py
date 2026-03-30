@@ -7,7 +7,6 @@ import os
 class PulsePaths:
     config_dir: Path
     data_dir: Path
-    env_path: Path
     toml_path: Path
 
 
@@ -16,7 +15,7 @@ def resolve_pulse_paths(config_dir: Path | None = None, cwd: Path | None = None)
     explicit = config_dir or os.environ.get("PULSE_CONFIG_DIR")
     if explicit is not None:
         resolved_config = Path(explicit).expanduser().resolve()
-    elif (cwd / "pulse.toml").exists() or (cwd / ".env").exists():
+    elif (cwd / "pulse.toml").exists():
         resolved_config = cwd
     else:
         xdg_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
@@ -27,6 +26,5 @@ def resolve_pulse_paths(config_dir: Path | None = None, cwd: Path | None = None)
     return PulsePaths(
         config_dir=resolved_config,
         data_dir=data_dir,
-        env_path=resolved_config / ".env",
         toml_path=resolved_config / "pulse.toml",
     )

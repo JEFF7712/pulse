@@ -2,7 +2,7 @@
 
 Pulse builds its runtime configuration primarily from a **TOML file named `pulse.toml`**, by default at **`.config/pulse.toml`** in the current working directory. A **repo-root `pulse.toml`** is still used when that path does not exist but `./pulse.toml` does (fallback layout). Set **`PULSE_CONFIG_FILE`** to point at a specific TOML file, or **`PULSE_CONFIG_DIR`** if the file lives at ``<dir>/pulse.toml``. The file holds root keys (paths, secrets, notifications, OAuth clients, LLM API keys), `[connectors.*]` blocks, and `[llm]` / `[llm.*]`.
 
-Merge order: XDG defaults, then `.env` file from the config directory, then the resolved `pulse.toml` file, then **`PULSE_*`** environment variables (which override everything), then **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, and **`GEMINI_API_KEY`** only for the matching field when that field is still empty after the previous steps.
+Merge order: XDG defaults, then the resolved `pulse.toml` file, then **`PULSE_*`** environment variables (which override the file), then **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, and **`GEMINI_API_KEY`** only for the matching field when that field is still empty after the previous steps.
 
 ## Installed vs repo-checkout layout
 
@@ -10,7 +10,7 @@ When you install `pulse-agent` from PyPI, config and data live under standard XD
 
 | Purpose | Default path |
 | --- | --- |
-| Config files (`pulse.toml`, `.env`) | `~/.config/pulse` |
+| Config file (`pulse.toml`) | `~/.config/pulse` |
 | Data files (database, vault, OAuth token files) | `~/.local/share/pulse` |
 
 `PULSE_CONFIG_DIR` overrides the config directory. Set it when you want Pulse to read config from a non-default location (for example a Docker bind-mount or a shared NFS path):
@@ -19,7 +19,7 @@ When you install `pulse-agent` from PyPI, config and data live under standard XD
 PULSE_CONFIG_DIR=/etc/pulse pulse run
 ```
 
-Repo-root `.env` and `pulse.toml` lookup still works as a compatibility fallback when `PULSE_CONFIG_DIR` is not set and the current working directory looks like a checkout (i.e. a `pulse.toml` or `.env` exists there). This means existing developer workflows and Docker setups using `--env-file` continue to work without change.
+Repo-root `pulse.toml` lookup still works as a compatibility fallback when `PULSE_CONFIG_DIR` is not set and the current working directory contains a `pulse.toml`. For Docker, pass settings as environment variables or bind-mount a `pulse.toml` into the config directory.
 
 ## Runtime model
 

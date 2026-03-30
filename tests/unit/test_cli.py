@@ -10,7 +10,6 @@ def test_default_env_values_use_resolved_data_dir(tmp_path):
     paths = PulsePaths(
         config_dir=(tmp_path / "config").resolve(),
         data_dir=(tmp_path / "data").resolve(),
-        env_path=(tmp_path / "config" / ".env").resolve(),
         toml_path=(tmp_path / "config" / "pulse.toml").resolve(),
     )
 

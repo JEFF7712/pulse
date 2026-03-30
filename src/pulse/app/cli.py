@@ -156,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--config-dir",
         type=Path,
         default=None,
-        help="Directory containing .env and pulse.toml",
+        help="Directory containing pulse.toml",
     )
 
     run_parser = subparsers.add_parser(
@@ -309,17 +309,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--all", action="store_true", help="Include future events (excluded by default)"
     )
 
-    cleanup_parser = subparsers.add_parser(
-        "cleanup",
-        parents=[config_parent],
-        help="Delete events with timestamps after now (bad imports or clock skew)",
-    )
-    cleanup_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be deleted without deleting",
-    )
-
     return parser
 
 
@@ -353,8 +342,6 @@ def main() -> None:
         _logs(args)
     elif args.command == "reset":
         _reset(args)
-    elif args.command == "cleanup":
-        _cleanup(args)
     elif args.command == "test-telegram":
         _test_telegram()
     else:
