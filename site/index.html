@@ -76,7 +76,8 @@
         .title,
         .tagline,
         .divider,
-        .status,
+        .install-cta,
+        .install-docs,
         .corner,
         .meta,
         .version {
@@ -90,9 +91,6 @@
           transform: scaleX(1) !important;
         }
 
-        .status span {
-          animation: none !important;
-        }
       }
 
       html {
@@ -346,24 +344,155 @@
         animation: fadeUp 0.85s var(--ease-out-expo) 0.85s forwards;
       }
 
-      .status {
+      .install-cta {
+        opacity: 0;
+        animation: fadeUp 0.85s var(--ease-out-expo) 1s forwards;
+        max-width: 22rem;
+        margin: 0 auto;
+      }
+
+      .install-label {
         font-size: 0.75rem;
         letter-spacing: 0.28em;
         text-transform: uppercase;
         color: var(--dim);
-        opacity: 0;
-        animation: fadeUp 0.85s var(--ease-out-expo) 1s forwards;
+        margin: 0 0 0.85rem;
       }
 
-      .status span {
+      .install-code-wrap {
+        position: relative;
+        margin: 0;
+      }
+
+      .install-code {
+        margin: 0;
+        padding: 0.85rem 5rem 0.85rem 1.1rem;
+        text-align: left;
+        font-family: "Geist Mono", monospace;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        color: var(--cream);
+        background: rgba(3, 3, 3, 0.45);
+        border: 1px solid var(--line-subtle);
+        border-radius: 8px;
+        line-height: 1.5;
+        overflow-x: auto;
+      }
+
+      .install-code code {
+        font-family: inherit;
+        color: inherit;
+        background: none;
+        padding: 0;
+      }
+
+      .install-copy {
+        position: absolute;
+        top: 50%;
+        right: 0.45rem;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2rem;
+        height: 2rem;
+        padding: 0 0.15rem;
+        margin: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--dim);
+        cursor: pointer;
+        transition:
+          color var(--t-hover) var(--ease-out-expo),
+          background var(--t-hover) var(--ease-out-expo);
+      }
+
+      .install-copy:hover {
         color: var(--accent);
-        animation: blink 2s step-end infinite;
+        background: rgba(74, 222, 128, 0.08);
       }
 
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
+      .install-copy:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .install-copy.is-copied {
+        color: var(--accent);
+        background: rgba(74, 222, 128, 0.1);
+      }
+
+      .install-copy.is-copied:hover {
+        background: rgba(74, 222, 128, 0.14);
+      }
+
+      .install-copy-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .install-copy.is-copied .install-copy-icon {
+        display: none;
+      }
+
+      .install-copy svg {
+        display: block;
+        flex-shrink: 0;
+      }
+
+      .install-copy-done {
+        display: none;
+        font-family: "Geist Mono", monospace;
+        font-size: 0.62rem;
+        font-weight: 400;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        line-height: 1;
+        padding: 0 0.2rem;
+      }
+
+      .install-copy.is-copied .install-copy-done {
+        display: block;
+      }
+
+      .install-docs {
+        display: inline-block;
+        width: auto;
+        max-width: 100%;
+        margin-top: 0.85rem;
+        padding: 0.45rem 0.75rem;
+        box-sizing: border-box;
+        text-align: center;
+        font-family: "Geist Mono", monospace;
+        font-size: 0.62rem;
+        font-weight: 400;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: var(--cream);
+        border: 1px solid var(--line-medium);
+        border-radius: 6px;
+        background: rgba(3, 3, 3, 0.25);
+        opacity: 0;
+        animation: fadeUp 0.85s var(--ease-out-expo) 1.12s forwards;
+        transition:
+          border-color var(--t-hover) var(--ease-out-expo),
+          color var(--t-hover) var(--ease-out-expo),
+          background var(--t-hover) var(--ease-out-expo);
+      }
+
+      .install-docs:hover {
+        color: var(--accent);
+        border-color: rgba(74, 222, 128, 0.35);
+        background: rgba(74, 222, 128, 0.06);
+      }
+
+      .install-docs:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
 
       @keyframes fadeUp {
@@ -1114,189 +1243,6 @@
         max-width: 36rem;
       }
 
-      /* Signup section */
-      .signup {
-        position: relative;
-        padding: clamp(6rem, 14vw, 10rem) 1.5rem clamp(5rem, 12vw, 8rem);
-        max-width: 520px;
-        margin: 0 auto;
-        text-align: center;
-      }
-
-      .signup::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 1px;
-        height: 72px;
-        background: linear-gradient(to bottom, var(--line-medium), transparent);
-      }
-
-      .signup-panel {
-        position: relative;
-        padding: 2.35rem 1.85rem 2.1rem;
-        border-radius: 12px;
-        border: 1px solid var(--line-medium);
-        background: linear-gradient(
-          165deg,
-          rgba(22, 21, 19, 0.78) 0%,
-          rgba(10, 10, 9, 0.92) 100%
-        );
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        box-shadow:
-          0 28px 64px rgba(0, 0, 0, 0.5),
-          0 0 0 1px rgba(0, 0, 0, 0.35),
-          inset 0 1px 0 rgba(255, 255, 255, 0.045);
-        transition:
-          border-color var(--t-panel) var(--ease-out-expo),
-          box-shadow var(--t-panel) var(--ease-out-expo);
-      }
-
-      .signup-panel::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 1.25rem;
-        right: 1.25rem;
-        height: 1px;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          var(--accent-soft),
-          transparent
-        );
-        opacity: 0.9;
-        pointer-events: none;
-        border-radius: 12px 12px 0 0;
-      }
-
-      .signup-panel:hover {
-        border-color: rgba(74, 222, 128, 0.22);
-        box-shadow:
-          0 32px 72px rgba(0, 0, 0, 0.55),
-          0 0 0 1px rgba(74, 222, 128, 0.07),
-          inset 0 1px 0 rgba(255, 255, 255, 0.055);
-      }
-
-      .signup-panel:focus-within {
-        border-color: rgba(74, 222, 128, 0.3);
-        box-shadow:
-          0 32px 72px rgba(0, 0, 0, 0.55),
-          0 0 0 1px rgba(74, 222, 128, 0.12),
-          inset 0 1px 0 rgba(255, 255, 255, 0.055);
-      }
-
-      .signup-heading {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(2rem, 4.25vw, 2.9rem);
-        color: var(--white);
-        font-weight: 400;
-        margin-bottom: 1.5rem;
-        line-height: 1.3;
-      }
-
-      .signup-sub {
-        font-family: "Instrument Serif", serif;
-        font-size: 1.2rem;
-        color: var(--cream);
-        margin-bottom: 2rem;
-        line-height: 1.6;
-        font-style: italic;
-      }
-
-      .signup-form {
-        display: flex;
-        gap: 0;
-        max-width: 100%;
-        margin: 0 auto 1.25rem;
-      }
-
-      .signup-form input {
-        flex: 1;
-        background: rgba(3, 3, 3, 0.35);
-        border: 1px solid var(--line-subtle);
-        border-right: none;
-        padding: 0.9rem 1.2rem;
-        font-family: "Geist Mono", monospace;
-        font-size: var(--font-ui);
-        color: var(--white);
-        letter-spacing: 0.05em;
-        outline: none;
-        transition:
-          border-color var(--t-hover) var(--ease-out-expo),
-          background var(--t-hover) var(--ease-out-expo);
-      }
-
-      .signup-form input::placeholder {
-        color: var(--dim);
-        letter-spacing: 0.1em;
-      }
-
-      .signup-form input:focus {
-        border-color: var(--accent);
-      }
-
-      .signup-form input:focus-visible,
-      .signup-form button:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-      }
-
-      .signup-form button {
-        background: var(--accent);
-        color: var(--black);
-        border: 1px solid var(--accent);
-        padding: 0.9rem 1.8rem;
-        font-family: "Geist Mono", monospace;
-        font-size: 0.75rem;
-        font-weight: 400;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        cursor: pointer;
-        transition:
-          background var(--t-hover) var(--ease-out-expo),
-          color var(--t-hover) var(--ease-out-expo),
-          border-color var(--t-hover) var(--ease-out-expo);
-      }
-
-      .signup-form button:hover {
-        background: transparent;
-        color: var(--accent);
-      }
-
-      .signup-form button:disabled {
-        opacity: 0.6;
-        cursor: wait;
-      }
-
-      .signup-note {
-        font-size: 0.65rem;
-        letter-spacing: 0.15em;
-        color: var(--dim);
-        text-transform: uppercase;
-      }
-
-      .signup-success {
-        display: none;
-        font-family: "Instrument Serif", serif;
-        font-size: 1.25rem;
-        color: var(--accent);
-        font-style: italic;
-      }
-
-      .signup-error {
-        display: none;
-        margin: -0.5rem auto 1rem;
-        max-width: 100%;
-        font-size: 0.75rem;
-        letter-spacing: 0.12em;
-        color: #d6a698;
-        text-transform: uppercase;
-      }
-
       /* Scroll-in sections (progressive: no JS = fully visible) */
       html.reveal-ready .reveal-section:not(.is-revealed) {
         opacity: 0;
@@ -1435,19 +1381,6 @@
           gap: 2rem;
         }
 
-        .signup-form {
-          flex-direction: column;
-        }
-
-        .signup-form input {
-          border-right: 1px solid var(--dim);
-          border-bottom: none;
-        }
-
-        .signup-form input:focus {
-          border-color: var(--accent);
-        }
-
         .corner {
           display: none;
         }
@@ -1477,7 +1410,38 @@
         <h1 class="title"><span>Pulse</span></h1>
         <p class="tagline">Turn your life data into useful observations.</p>
         <div class="divider"></div>
-        <p class="status">Agent status: <span>■</span> In development</p>
+        <div class="install-cta">
+          <p class="install-label">Try now</p>
+          <div class="install-code-wrap">
+            <pre class="install-code" id="installCodeBlock"><code>pip install pulse-agent</code></pre>
+            <button
+              type="button"
+              class="install-copy"
+              id="installCopyBtn"
+              aria-label="Copy install command"
+            >
+              <span class="install-copy-icon" aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+              </span>
+              <span class="install-copy-done" aria-hidden="true">Copied!</span>
+            </button>
+          </div>
+          <a class="install-docs" href="/docs/">View documentation</a>
+        </div>
       </div>
 
       <p class="meta">Self-hosted &middot; Open source &middot; Always on</p>
@@ -1710,17 +1674,11 @@
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
-              d="M12 3a4.5 4.5 0 0 0-4.5 4.5V10l-1.2 2.4a1.5 1.5 0 0 0 1.34 2.1h8.72a1.5 1.5 0 0 0 1.34-2.1L16.5 10V7.5A4.5 4.5 0 0 0 12 3Z"
+              d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
               stroke="currentColor"
               stroke-width="1.5"
               stroke-linecap="round"
               stroke-linejoin="round"
-            />
-            <path
-              d="M9 17a3 3 0 0 0 6 0"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
             />
           </svg>
         </div>
@@ -1778,39 +1736,6 @@
             control. If you unplug it, it's gone. That's the point.
           </p>
         </div>
-      </div>
-    </section>
-
-    <section class="signup reveal-section">
-      <div class="signup-panel">
-        <h2 class="signup-heading">Join the early access list.</h2>
-        <p class="signup-sub">
-          Leave your email to get notified when Pulse launches.
-        </p>
-        <form
-          class="signup-form"
-          id="signupForm"
-          method="POST"
-          action="https://formspree.io/f/mreywkbd"
-        >
-          <input
-            type="email"
-            id="emailInput"
-            name="email"
-            placeholder="you@email.com"
-            required
-          />
-          <button type="submit">Request Early Access</button>
-        </form>
-        <p class="signup-error" id="signupError">
-          Something went wrong. Please try again.
-        </p>
-        <p class="signup-success" id="signupSuccess">
-          You're on the list. We'll be in touch.
-        </p>
-        <p class="signup-note">
-          No spam. Just early access updates when there is something worth trying.
-        </p>
       </div>
     </section>
 
@@ -2222,53 +2147,53 @@
           })();
         });
       })();
+    </script>
+    <script>
+      (function () {
+        var btn = document.getElementById("installCopyBtn");
+        var pre = document.getElementById("installCodeBlock");
+        if (!btn || !pre) return;
 
-      const signupForm = document.getElementById("signupForm");
-      const signupSuccess = document.getElementById("signupSuccess");
-      const signupError = document.getElementById("signupError");
-      const signupNote = document.querySelector(".signup-note");
-      const signupButton = signupForm.querySelector("button");
-      const canEnhanceSignup =
-        typeof window.fetch === "function" &&
-        typeof window.FormData === "function";
+        var code = pre.querySelector("code");
+        var command = (code ? code.textContent : pre.textContent || "").trim();
+        if (!command) return;
 
-      signupForm.addEventListener("submit", async function (event) {
-        if (!canEnhanceSignup) {
-          return;
+        var defaultLabel = btn.getAttribute("aria-label") || "Copy install command";
+
+        function showCopied() {
+          btn.classList.add("is-copied");
+          btn.setAttribute("aria-label", "Copied!");
+          window.setTimeout(function () {
+            btn.classList.remove("is-copied");
+            btn.setAttribute("aria-label", defaultLabel);
+          }, 2000);
         }
 
-        event.preventDefault();
-
-        if (signupButton.disabled) {
-          return;
-        }
-
-        signupError.style.display = "none";
-        signupButton.disabled = true;
-
-        try {
-          const response = await fetch(signupForm.action, {
-            method: "POST",
-            body: new FormData(signupForm),
-            headers: {
-              Accept: "application/json",
-            },
-          });
-
-          if (!response.ok) {
-            signupError.style.display = "block";
-            signupButton.disabled = false;
-            return;
+        function copyWithExec() {
+          var ta = document.createElement("textarea");
+          ta.value = command;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            if (document.execCommand("copy")) {
+              showCopied();
+            }
+          } finally {
+            document.body.removeChild(ta);
           }
-
-          signupForm.style.display = "none";
-          signupSuccess.style.display = "block";
-          signupNote.style.display = "none";
-        } catch (error) {
-          signupButton.disabled = false;
-          signupForm.submit();
         }
-      });
+
+        btn.addEventListener("click", function () {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(command).then(showCopied).catch(copyWithExec);
+          } else {
+            copyWithExec();
+          }
+        });
+      })();
     </script>
   </body>
 </html>

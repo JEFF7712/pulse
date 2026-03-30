@@ -7,8 +7,10 @@
   --pulse-accent: #4ade80;
   --pulse-dim: #3a3632;
   --pulse-line: rgba(196, 191, 184, 0.18);
-  --vp-font-family-base: "Source Sans 3", system-ui, sans-serif;
-  --vp-font-family-mono: "Geist Mono", monospace;
+  --vp-font-family-base: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --vp-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
   --vp-c-brand-1: #4ade80;
   --vp-c-brand-2: #73e89a;
   --vp-c-brand-3: #2fbf62;
@@ -24,6 +26,9 @@
   --vp-home-hero-name-color: #e8e4df;
   --vp-home-hero-text-color: #c4bfb8;
   --vp-home-hero-tagline-color: #c4bfb8;
+  --vp-code-font-size: 0.8125em;
+  --vp-code-line-height: 1.55;
+  --vp-custom-block-font-size: 13px;
 }
 
 .dark {
@@ -39,6 +44,10 @@
   --vp-c-bg-soft: #151311;
 }
 
+html {
+  font-size: 14px;
+}
+
 html,
 body {
   background:
@@ -48,6 +57,10 @@ body {
 
 body {
   color: var(--pulse-white);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body::before {
@@ -84,30 +97,108 @@ body::before {
 .vp-doc h2,
 .vp-doc h3,
 .VPNavBarTitle .title span {
-  font-family: "Instrument Serif", serif;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-family: var(--vp-font-family-base);
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
 .vp-doc h1 {
-  font-size: clamp(3rem, 7vw, 5rem);
-  line-height: 0.95;
+  font-weight: 700;
+  font-size: clamp(1.55rem, 3.2vw, 2rem);
+  line-height: 1.2;
+  margin: 0 0 0.35rem;
 }
 
 .vp-doc h2 {
-  font-size: clamp(2rem, 4vw, 2.8rem);
+  margin: 1.75rem 0 0.5rem;
+  padding-top: 1rem;
+  font-size: clamp(1.2rem, 2.2vw, 1.4rem);
+  line-height: 1.3;
   border-top-color: var(--pulse-line);
 }
 
+.vp-doc h2 .header-anchor {
+  top: 1rem;
+}
+
 .vp-doc h3 {
-  font-size: 1.8rem;
+  margin: 1.15rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.vp-doc h4 {
+  margin: 0.9rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .vp-doc p,
 .vp-doc li {
   color: var(--pulse-cream);
-  line-height: 1.75;
+  line-height: 1.55;
   font-family: var(--vp-font-family-base);
+}
+
+.vp-doc p,
+.vp-doc summary {
+  margin: 0.5rem 0;
+}
+
+.vp-doc ul,
+.vp-doc ol {
+  margin: 0.5rem 0;
+  padding-left: 1.1rem;
+}
+
+.vp-doc li + li {
+  margin-top: 0.3rem;
+}
+
+.vp-doc blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+}
+
+.vp-doc blockquote > p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.vp-doc table {
+  margin: 0.65rem 0;
+}
+
+.vp-doc th,
+.vp-doc td {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.vp-doc hr {
+  margin: 0.65rem 0;
+}
+
+.vp-doc .custom-block {
+  margin: 0.65rem 0;
+}
+
+.vp-doc .custom-block p {
+  margin: 0.35rem 0;
+  line-height: 1.5;
+}
+
+.VPNavBarMenuLink,
+.VPSidebarItem .text,
+.VPLocalNav .menu-text {
+  font-size: 13px;
+}
+
+.VPNavBarTitle .title span {
+  font-size: 0.95rem;
 }
 
 .vp-doc a,
@@ -126,17 +217,17 @@ body::before {
 
 .pulse-docs-home .pulse-home-kicker,
 .pulse-docs-home .vp-doc > div > ol {
-  font-family: "Geist Mono", monospace;
+  font-family: var(--vp-font-family-mono);
 }
 
 .pulse-docs-home .pulse-home-card p {
   font-family: var(--vp-font-family-base);
-  font-size: 0.9375rem;
-  line-height: 1.65;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 .pulse-docs-home .pulse-home-card .pulse-home-cta {
-  font-family: "Geist Mono", monospace;
+  font-family: var(--vp-font-family-mono);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -148,7 +239,7 @@ body::before {
 
 .pulse-docs-home .vp-doc > div {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.1rem;
 }
 
 .pulse-docs-home .vp-doc h1,
@@ -163,12 +254,12 @@ body::before {
 
 .pulse-docs-home .vp-doc h1 {
   margin: 0;
-  padding-top: 1.5rem;
+  padding-top: 1.1rem;
 }
 
 .pulse-docs-home .vp-doc h2 {
-  margin-top: 1rem;
-  padding-top: 1.5rem;
+  margin-top: 0.65rem;
+  padding-top: 1.1rem;
   border-top: 1px solid var(--pulse-line);
 }
 
@@ -179,8 +270,8 @@ body::before {
 .pulse-home-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  margin: 0.5rem 0 1rem;
+  gap: 0.75rem;
+  margin: 0.35rem 0 0.75rem;
 }
 
 a.pulse-home-card {
@@ -188,7 +279,7 @@ a.pulse-home-card {
   flex-direction: column;
   align-items: flex-start;
   min-height: 100%;
-  padding: 1.25rem;
+  padding: 1rem;
   border: 1px solid var(--pulse-line);
   border-radius: 2px;
   background: linear-gradient(180deg, rgba(17, 16, 15, 0.92), rgba(11, 11, 10, 0.92));
@@ -212,24 +303,24 @@ a.pulse-home-card:hover {
 }
 
 .pulse-home-kicker {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   color: var(--pulse-cream);
-  font-size: 0.68rem;
-  letter-spacing: 0.24em;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 .pulse-home-card h3 {
-  margin: 0 0 0.75rem;
-  font-family: "Instrument Serif", serif;
-  font-size: 1.35rem;
-  font-weight: 400;
+  margin: 0 0 0.5rem;
+  font-family: var(--vp-font-family-base);
+  font-size: 1.05rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--pulse-white);
 }
 
 .pulse-home-card p {
-  margin: 0 0 1rem;
+  margin: 0 0 0.65rem;
 }
 
 .pulse-home-cta {

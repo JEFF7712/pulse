@@ -34,8 +34,8 @@ grep -qx 'docs/.vitepress/dist' docs-app/.gitignore
 ! grep -q '^\.vitepress/' docs-app/.gitignore
 grep -q 'base: "/docs/"' docs-app/docs/.vitepress/config.mts
 grep -q 'import "./custom.css";' docs-app/docs/.vitepress/theme/index.ts
-grep -q '^  --vp-font-family-base: "Source Sans 3", system-ui, sans-serif;$' docs-app/docs/.vitepress/theme/custom.css
-grep -q '^  --vp-font-family-mono: "Geist Mono", monospace;$' docs-app/docs/.vitepress/theme/custom.css
+grep -q '^  --vp-font-family-base: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",$' docs-app/docs/.vitepress/theme/custom.css
+grep -q '^  --vp-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,$' docs-app/docs/.vitepress/theme/custom.css
 grep -q '^\.pulse-docs-home \.vp-doc > div {$' docs-app/docs/.vitepress/theme/custom.css
 npm ci --ignore-scripts --no-audit --no-fund --prefix docs-app >/dev/null
 grep -q '^FROM node:20-alpine AS docs-builder$' Dockerfile
@@ -118,21 +118,18 @@ grep -q 'Same data\. Different agenda\.' <<<"$html"
 grep -q '<h3>Sovereignty</h3>' <<<"$html"
 grep -q 'Every insight, every memory' <<<"$html"
 ! grep -q '<h3>On Your Terms</h3>' <<<"$html"
-grep -q '<form' <<<"$html"
-grep -q 'class="signup-form"' <<<"$html"
-grep -q 'id="signupForm"' <<<"$html"
-grep -q 'method="POST"' <<<"$html"
-grep -q 'action="https://formspree.io/f/mreywkbd"' <<<"$html"
-grep -q 'type="email"' <<<"$html"
-grep -q 'name="email"' <<<"$html"
-grep -q 'required' <<<"$html"
-node tests/signup-runtime-behavior.js
-grep -q 'Join the early access list\.' <<<"$html"
-grep -q 'No spam\. Just early access updates when there is something worth trying\.' <<<"$html"
-grep -q 'Request Early Access' <<<"$html"
+! grep -q '<form' <<<"$html"
+! grep -q 'formspree.io' <<<"$html"
+grep -q 'Try now' <<<"$html"
+grep -q 'pip install pulse-agent' <<<"$html"
+grep -q 'class="install-code"' <<<"$html"
+grep -q 'class="install-docs"' <<<"$html"
+grep -q 'View documentation' <<<"$html"
+! grep -q 'Join the early access list' <<<"$html"
+! grep -q 'Request Early Access' <<<"$html"
 ! grep -q 'Notify Me' <<<"$html"
 ! grep -q 'This is being built in the open\.' <<<"$html"
-grep -q 'Leave your email to get notified when Pulse launches\.' <<<"$html"
+! grep -q 'In development' <<<"$html"
 
 grep -q '<title>Pulse Docs</title>' <<<"$docs_bridge_html"
 assert_contains "$docs_html" 'Pulse Docs'
@@ -142,7 +139,6 @@ assert_contains "$docs_html" 'Run Pulse'
 assert_contains "$docs_html" 'Configure Pulse'
 assert_contains "$docs_html" 'Operate Pulse'
 assert_contains "$docs_html" 'Connect Data Sources'
-assert_contains "$docs_html" 'Self-Hosting Docs'
 assert_contains "$docs_html" 'Self-Hosting'
 assert_contains "$docs_html" 'Configuration'
 assert_contains "$docs_html" 'Operations'
@@ -153,13 +149,13 @@ assert_contains "$docs_html" 'Open quickstart'
 assert_contains "$docs_html" 'What is Pulse?'
 assert_contains "$quickstart_html" 'Self-Hosting Quickstart'
 assert_contains "$quickstart_html" 'pulse configure'
-assert_contains "$quickstart_html" 'Before you start'
+assert_contains "$quickstart_html" 'pipx install pulse-agent'
 assert_contains "$configuration_html" 'Configuration Reference'
 assert_contains "$configuration_html" 'PULSE_DATABASE_PATH'
-assert_contains "$configuration_html" 'Runtime model'
+assert_contains "$configuration_html" 'Top-level fields'
 assert_contains "$runbook_html" 'Operations Runbook'
 assert_contains "$runbook_html" 'GET /health'
-assert_contains "$runbook_html" 'Fast health checks'
+assert_contains "$runbook_html" 'Triage'
 assert_contains "$connectors_html" 'Connectors Index'
-assert_contains "$connectors_html" 'Plaid Link'
+assert_contains "$connectors_html" 'plaid_tokens.json'
 assert_contains "$connectors_html" 'Google'

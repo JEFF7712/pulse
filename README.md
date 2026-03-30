@@ -139,9 +139,34 @@ uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 
 ## Use as an MCP server
 
-Add to your agent's MCP config (e.g. `.claude/settings.json`):
+Pulse ships an [MCP](https://modelcontextprotocol.io/) server so you can use your **existing AI agents**—**Claude Code**, **OpenClaw**, Cursor, and any other MCP-capable client—to read events, run digests, check connectors, and record corrections through the same SQLite store and vault as the standalone app. The agent brings scheduling and models; Pulse brings your personal data and digest pipeline.
 
-This example uses the same config model as the standalone app: `pulse.mcp.server` calls the shared config loader, so use `PULSE_DATABASE_PATH` and `PULSE_VAULT_PATH` here too.
+**Before you wire MCP**
+
+1. Complete a normal Pulse setup at least once: a real **`pulse.toml`** must exist where `load_config()` looks (default `~/.config/pulse/pulse.toml`, or repo-root `pulse.toml`, or the path from **`PULSE_CONFIG_FILE`** / **`PULSE_CONFIG_DIR`**). The MCP entrypoint uses `load_config(require_files=True)` and **exits on startup** if that file is missing—setting only `PULSE_DATABASE_PATH` / `PULSE_VAULT_PATH` in JSON is not enough without a TOML on disk. Run `pulse configure` if you have not created config yet.
+2. Put **`database_path`** and **`vault_path`** in `pulse.toml` (or override with **`PULSE_DATABASE_PATH`** and **`PULSE_VAULT_PATH`** in the MCP `env` block) so the agent process hits the same DB and vault as `pulse serve` / your scheduler.
+3. If the agent starts the server with a working directory where Pulse would not find your config, set **`PULSE_CONFIG_FILE`** (absolute path to `pulse.toml`) or **`PULSE_CONFIG_DIR`** in the MCP `env` block.
+
+Add a server entry to your agent’s MCP settings (location and shape differ by product—Claude Code, OpenClaw, Cursor, etc.; check their docs for `"mcpServers"` or equivalent).
+
+**Example: `pulse-mcp` on `PATH`** (after `pipx install pulse-agent` or `uv tool install pulse-agent`):
+
+```json
+{
+  "mcpServers": {
+    "pulse": {
+      "command": "pulse-mcp",
+      "env": {
+        "PULSE_CONFIG_FILE": "/absolute/path/to/pulse.toml"
+      }
+    }
+  }
+}
+```
+
+Omit `PULSE_CONFIG_FILE` when default resolution already finds your `pulse.toml` (typical layout: `~/.config/pulse/pulse.toml`).
+
+**Example: run from a git clone with uv**
 
 ```json
 {
@@ -149,6 +174,7 @@ This example uses the same config model as the standalone app: `pulse.mcp.server
     "pulse": {
       "command": "uv",
       "args": ["run", "python", "-m", "pulse.mcp.server"],
+      "cwd": "/absolute/path/to/pulse/repo",
       "env": {
         "PULSE_DATABASE_PATH": "/absolute/path/to/pulse.db",
         "PULSE_VAULT_PATH": "/absolute/path/to/Pulse-Vault"
@@ -158,7 +184,7 @@ This example uses the same config model as the standalone app: `pulse.mcp.server
 }
 ```
 
-If `pulse-mcp` is on your `PATH` (after `uv sync`), you can use `"command": "pulse-mcp"` with empty `args` instead.
+When you rely on repo-root **`pulse.toml`**, set a server **`cwd`** to that repo *if your agent’s MCP config supports it*; otherwise use **`PULSE_CONFIG_FILE`** pointing at that file.
 
 ### Available tools
 

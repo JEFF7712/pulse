@@ -57,6 +57,8 @@ def test_run_daily_digest_job_writes_digest_for_requested_day(tmp_path):
         content = output_path.read_text(encoding="utf-8")
         # New DigestBuilder format: timeline with time-block subheadings, Email section (not "Email Highlights")
         assert "# 2026-03-22" in content
+        assert "[[01-Daily/2026-03-21]]" in content
+        assert "[[01-Daily/2026-03-23]]" in content
         assert "## Timeline" in content
         assert "Team sync" in content
         assert "## Email" in content

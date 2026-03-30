@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from pulse.analysis.preprocessor import PreprocessedDay
+from pulse.vault.wikilinks import format_daily_digest_nav_line
 
 
 def _fmt_hours(seconds: int | None) -> str | None:
@@ -37,7 +38,12 @@ class DigestBuilder:
         preprocessed: PreprocessedDay,
         narratives: dict[str, str] | None = None,
     ) -> str:
-        sections: list[str] = [f"# {day.isoformat()}", ""]
+        sections: list[str] = [
+            f"# {day.isoformat()}",
+            "",
+            format_daily_digest_nav_line(day),
+            "",
+        ]
 
         # Day at a Glance (only with LLM narratives)
         if narratives:

@@ -8,6 +8,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from rich import box
+from rich.panel import Panel
+from rich.text import Text
 from rich_argparse import RichHelpFormatter
 
 from pulse.app import cli_ui as ui
@@ -457,6 +460,10 @@ def _run(args) -> None:
 
     # Ensure data directory exists
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
+
+    from pulse.vault.onboarding import ensure_vault_onboarding
+
+    ensure_vault_onboarding(config.vault_path)
 
     # Bootstrap schema
     async def _bootstrap():
@@ -2510,6 +2517,59 @@ Rules:
 - If the input is sparse, keep the file short rather than padding with guesses."""
 
 
+# Shown during interactive `pulse init` so users can copy it into another chat product.
+_LLM_ASSISTANT_EXPORT_PROMPT = """I'm setting up Pulse, a self-hosted tool that pulls together my email, calendar, music, browsing, and similar sources into one place. I need a factual baseline about me so Pulse can make sense of that data (who people are, what I work on, what matters in my life).
+
+From your stored memories and what you've learned about me, export only real-world facts: who I am, what I do, and what I'm involved in. Preserve my wording when you're quoting something I said about myself.
+
+Do not include rules about how you (the assistant) should write, format, reply, or behave — no "always/never" chat instructions, tone preferences for AI, or similar. Skip generic LLM meta-preferences entirely.
+
+## Categories (output in this order):
+
+1. **Identity**: Name (or how I refer to myself), age or life stage if known, where I live or work from, timezone if known, languages, education, family and important relationships, hobbies and interests.
+
+2. **Work**: Current job or role, employer or freelance focus, past roles worth knowing, industries and skill areas that describe what I actually do.
+
+3. **Projects**: Things I've built, lead, or seriously committed to — one entry per project: what it is, status, and any decisions or context that matter. Start each entry with the project name or a short label.
+
+4. **Life context**: Anything else factual that helps interpret my calendar, mail, or activity (e.g. recurring commitments, key people or orgs, travel patterns, side responsibilities). Keep it concrete, not wishlists.
+
+## Format:
+
+Use section headers for each category. Within each category, one fact per line, oldest first when you have a sense of time. Use:
+
+[YYYY-MM-DD] - Fact here.
+
+If no date is known, use [unknown].
+
+## Output:
+
+- Wrap the entire export in a single code block for easy copying.
+- After the code block, say whether this is everything you have or if more factual detail might exist."""
+
+
+def _print_llm_assistant_import_hint() -> None:
+    ui.say("")
+    ui.say(
+        "[accent]Import from another AI[/] [muted](optional)[/]\n"
+        "[muted]Copy the boxed prompt into ChatGPT, Claude, Gemini, or similar. "
+        "Paste the reply below as your baseline profile, "
+        "or skip and describe yourself in your own words.[/]"
+    )
+    ui.say(
+        Panel(
+            Text(_LLM_ASSISTANT_EXPORT_PROMPT),
+            title="[accent]Prompt to copy[/]",
+            border_style=SITE_ACCENT,
+            box=box.ROUNDED,
+        )
+    )
+    ui.muted_line(
+        "Then paste here (outer ``` fences are stripped automatically). "
+        "End input with Ctrl-D (macOS/Linux) or Ctrl-Z then Enter (Windows)."
+    )
+
+
 def _read_profile_raw_text(
     *, profile_file: Path | None, profile_text: str | None
 ) -> str:
@@ -2524,9 +2584,9 @@ def _read_profile_raw_text(
         return path.read_text(encoding="utf-8").strip()
     if not sys.stdin.isatty():
         return sys.stdin.read().strip()
+    _print_llm_assistant_import_hint()
     ui.say(
-        "\n[accent]Paste[/] a free-form description of yourself [muted](role, interests, what you want Pulse to notice).[/]\n"
-        "[muted]End input with Ctrl-D on a new line (macOS/Linux), or Ctrl-Z then Enter (Windows).[/]\n"
+        "\n[accent]Paste[/] your profile [muted](exported facts or free-form: who you are, work, projects, context for your data).[/]\n"
     )
     try:
         return sys.stdin.read().strip()
@@ -2585,6 +2645,11 @@ def _init(
     )
 
     config = load_config(config_dir=config_dir)
+
+    from pulse.vault.onboarding import ensure_vault_onboarding
+
+    ensure_vault_onboarding(config.vault_path)
+
     vault = VaultMemory(config.vault_path)
 
     ui.rule("pulse init")
@@ -2723,10 +2788,12 @@ def _collect_profile(
 
     ui.step("User profile")
     ui.muted_line(
-        "Describe yourself in free form; Pulse will structure it for your vault."
+        "Describe yourself in free form, or paste a factual export from another chat; "
+        "Pulse will structure it for your vault when an Anthropic model is configured."
     )
 
     raw = _read_profile_raw_text(profile_file=profile_file, profile_text=profile_text)
+    raw = _strip_markdown_fences(raw)
     if not raw:
         ui.warning("No profile text provided; skipping profile write.")
         return
@@ -3060,58 +3127,6 @@ def _reset(args) -> None:
                 )
 
     asyncio.run(_do_reset())
-
-
-def _cleanup(args) -> None:
-    from datetime import UTC, datetime
-
-    from pulse.store.db import connect_db
-    from pulse.store.schema import bootstrap_schema
-
-    config = load_config()
-
-    if not Path(config.database_path).exists():
-        ui.error("No database found.")
-        sys.exit(1)
-
-    async def _do_cleanup():
-        async with connect_db(config.database_path) as db:
-            await bootstrap_schema(db)
-
-            now_iso = datetime.now(UTC).isoformat()
-
-            cur = await db.execute(
-                "SELECT source, event_type, COUNT(*) FROM events "
-                "WHERE timestamp > ? "
-                "GROUP BY source, event_type ORDER BY COUNT(*) DESC",
-                (now_iso,),
-            )
-            rows = await cur.fetchall()
-
-            ui.rule("pulse cleanup")
-            if not rows:
-                ui.muted_line("No future-dated events found.")
-                return
-
-            total = sum(r[2] for r in rows)
-            ui.warning(f"Found [bold]{total}[/] events with timestamps in the future:")
-            for source, etype, count in rows:
-                ui.kv_line(f"{source} / {etype}", str(count))
-
-            if args.dry_run:
-                ui.muted_line("Dry run — no changes made.")
-                return
-
-            confirm = input(f"\nDelete {total} future events? [y/N] ").strip().lower()
-            if confirm not in ("y", "yes"):
-                ui.warning("Cancelled.")
-                return
-
-            await db.execute("DELETE FROM events WHERE timestamp > ?", (now_iso,))
-            await db.commit()
-            ui.success(f"Deleted {total} future-dated events.")
-
-    asyncio.run(_do_cleanup())
 
 
 def _test_telegram() -> None:

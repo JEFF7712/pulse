@@ -11,6 +11,7 @@ from pulse.store.db import enable_foreign_keys
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
 from pulse.store.sync_state import SyncStateRepository
+from pulse.vault.onboarding import ensure_vault_onboarding
 
 
 @dataclass
@@ -35,6 +36,7 @@ async def open_pulse_context(
     db = await aiosqlite.connect(db_path)
     await enable_foreign_keys(db)
     await bootstrap_schema(db)
+    ensure_vault_onboarding(vault_path)
     try:
         yield PulseContext(
             events=EventRepository(db),

@@ -1,29 +1,29 @@
 # Configuration Reference
 
-Pulse builds its runtime configuration primarily from a **TOML file named `pulse.toml`**, by default at **`.config/pulse.toml`** in the current working directory. A **repo-root `pulse.toml`** is still used when that path does not exist but `./pulse.toml` does (fallback layout). Set **`PULSE_CONFIG_FILE`** to point at a specific TOML file, or **`PULSE_CONFIG_DIR`** if the file lives at ``<dir>/pulse.toml``. The file holds root keys (paths, secrets, notifications, OAuth clients, LLM API keys), `[connectors.*]` blocks, and `[llm]` / `[llm.*]`.
+**`pulse.toml`** — root keys, `[connectors.*]`, `[llm]` / `[llm.*]`. Resolution: **`.config/pulse.toml`** first, else **`./pulse.toml`**, else create under `.config/`. Override path with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`** (file = `<dir>/pulse.toml`).
 
-Merge order: XDG defaults, then the resolved `pulse.toml` file, then **`PULSE_*`** environment variables (which override the file), then **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, and **`GEMINI_API_KEY`** only for the matching field when that field is still empty after the previous steps.
+**Precedence:** XDG defaults → `pulse.toml` → **`PULSE_*`** (overrides file) → **`ANTHROPIC_API_KEY`** / **`OPENAI_API_KEY`** / **`GEMINI_API_KEY`** only to fill still-empty matching fields.
 
-## Installed vs repo-checkout layout
+**Secrets:** Keep OAuth/API values in gitignored `pulse.toml` or env. Connector tables are not overridden by env—edit TOML.
 
-When you install `pulse-agent` from PyPI, config and data live under standard XDG directories rather than inside the repository:
+## Installed vs repo layout
+
+PyPI install uses XDG paths:
 
 | Purpose | Default path |
 | --- | --- |
 | Config file (`pulse.toml`) | `~/.config/pulse` |
 | Data files (database, vault, OAuth token files) | `~/.local/share/pulse` |
 
-`PULSE_CONFIG_DIR` overrides the config directory. Set it when you want Pulse to read config from a non-default location (for example a Docker bind-mount or a shared NFS path):
-
 ```bash
 PULSE_CONFIG_DIR=/etc/pulse pulse run
 ```
 
-Repo-root `pulse.toml` lookup still works as a compatibility fallback when `PULSE_CONFIG_DIR` is not set and the current working directory contains a `pulse.toml`. For Docker, pass settings as environment variables or bind-mount a `pulse.toml` into the config directory.
+If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: env vars or bind-mount `pulse.toml` into the config dir.
 
-## Runtime model
+## Top-level fields
 
-The live config model in `src/pulse/app/config.py` currently exposes these top-level fields:
+`src/pulse/app/config.py` — reference:
 
 | Field | Env var | Default | Notes |
 | --- | --- | --- | --- |
@@ -51,22 +51,22 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `smtp_use_tls` | `PULSE_SMTP_USE_TLS` | `true` | Use STARTTLS after connect (typical for submission on port 587). |
 | `smtp_use_ssl` | `PULSE_SMTP_USE_SSL` | `false` | Use implicit TLS (`SMTP_SSL`, typical for port 465). |
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
-| `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | Treat as a secret; keep `pulse.toml` gitignored or inject via env in CI. |
+| `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | OAuth secret (env or gitignored TOML). |
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
-| `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | Secret; prefer gitignored `pulse.toml` or env injection. |
+| `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | OAuth secret. |
 | `microsoft_client_id` | `PULSE_MICROSOFT_CLIENT_ID` | unset | Microsoft Graph OAuth (mail/calendar). |
-| `microsoft_client_secret` | `PULSE_MICROSOFT_CLIENT_SECRET` | unset | Secret; prefer gitignored `pulse.toml` or env injection. |
+| `microsoft_client_secret` | `PULSE_MICROSOFT_CLIENT_SECRET` | unset | OAuth secret. |
 | `microsoft_tenant_id` | `PULSE_MICROSOFT_TENANT_ID` | unset | Tenant id or `common` when unset. |
 | `github_client_id` | `PULSE_GITHUB_CLIENT_ID` | unset | GitHub OAuth. |
-| `github_client_secret` | `PULSE_GITHUB_CLIENT_SECRET` | unset | Secret; prefer gitignored `pulse.toml` or env injection. |
+| `github_client_secret` | `PULSE_GITHUB_CLIENT_SECRET` | unset | OAuth secret. |
 | `gitlab_client_id` | `PULSE_GITLAB_CLIENT_ID` | unset | GitLab OAuth (optional if using PAT). |
-| `gitlab_client_secret` | `PULSE_GITLAB_CLIENT_SECRET` | unset | Secret; prefer gitignored `pulse.toml` or env injection. |
+| `gitlab_client_secret` | `PULSE_GITLAB_CLIENT_SECRET` | unset | OAuth secret. |
 | `gitlab_token` | `PULSE_GITLAB_TOKEN` | unset | PAT; when set, OAuth is not used. |
 | `plaid_client_id` | `PULSE_PLAID_CLIENT_ID` | unset | Plaid Link + transactions. |
-| `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Secret; prefer gitignored `pulse.toml` or env injection. |
+| `plaid_secret` | `PULSE_PLAID_SECRET` | unset | Plaid secret. |
 | `plaid_env` | `PULSE_PLAID_ENV` | unset | `sandbox`, `development`, or `production`. |
-| `oura_client_id` | `PULSE_OURA_CLIENT_ID` | unset | Oura Cloud API OAuth client id (optional if using PAT). |
-| `oura_client_secret` | `PULSE_OURA_CLIENT_SECRET` | unset | Oura OAuth secret; prefer gitignored `pulse.toml` or env injection. |
+| `oura_client_id` | `PULSE_OURA_CLIENT_ID` | unset | Oura OAuth (optional if using PAT). |
+| `oura_client_secret` | `PULSE_OURA_CLIENT_SECRET` | unset | OAuth secret. |
 | `oura_personal_access_token` | `PULSE_OURA_PERSONAL_ACCESS_TOKEN` | unset | Oura personal access token; when set, OAuth is not used. |
 | `notion_token` | `PULSE_NOTION_TOKEN` | unset | Notion internal integration secret for workspace search / database query. |
 | `linear_api_key` | `PULSE_LINEAR_API_KEY` | unset | Linear personal API key; syncs issues assigned to the key’s user. |
@@ -75,15 +75,17 @@ The live config model in `src/pulse/app/config.py` currently exposes these top-l
 | `gemini_api_key` | `PULSE_GEMINI_API_KEY` | unset | API key for `[llm.*]` with `provider = "gemini"`; environment fallback `GEMINI_API_KEY` when empty. |
 | `llm` | _(set in `pulse.toml`)_ | unset | Nested per-role provider config for `summarization`, `discovery`, and `corrections`; supports `anthropic`, `openai`, `gemini`, and `ollama`. |
 
-### LLM provider configuration
+### LLM blocks
 
-Configure LLMs in `pulse.toml` via **`[llm.summarization]`**, **`[llm.discovery]`**, and **`[llm.corrections]`**. Each block sets `model` and optional `provider` and `base_url`. You can set **`[llm] provider`** (and optional **`[llm] base_url`**) once, then list only **`model`** under each role — for example Haiku for digest summarization and Opus for discovery on Anthropic, or a smaller vs larger OpenAI model id. If you configure only one of summarization/discovery, Pulse reuses it for both. **`[llm] base_url`** is inherited only for `openai` and `ollama` roles so a local Ollama URL is not applied to Anthropic or Gemini.
+**`[llm.summarization]`**, **`[llm.discovery]`**, **`[llm.corrections]`** — each has `model`, optional `provider`, `base_url`. Set **`[llm] provider`** / **`base_url`** once; per-role `base_url` inherits only for **`openai`** and **`ollama`**. One configured role can cover both summarization and discovery if the other is omitted.
 
-Digest, discovery, MCP digest, and the scheduler require these roles (or a single shared role) to resolve an LLM; there is no separate “API key only” mode. **`pulse init`** profile structuring uses an Anthropic client only when an Anthropic model is already configured for summarization or discovery.
+Providers: **`anthropic`**, **`openai`**, **`gemini`**, **`ollama`**. Keys in TOML or **`ANTHROPIC_API_KEY`** / **`OPENAI_API_KEY`** / **`GEMINI_API_KEY`** / **`PULSE_*`**. `ollama` uses OpenAI-compatible transport; placeholder API key ok if unset.
 
-Supported providers are `anthropic`, `openai`, `gemini`, and `ollama`.
+Digest, discovery, scheduled jobs, and MCP digest need a resolved LLM role. **`pulse init`** profile structuring uses Anthropic only when summarization or discovery is already Anthropic.
 
-**Same provider, different models** (set `anthropic_api_key` in `pulse.toml` or `ANTHROPIC_API_KEY` in the environment). These ids match the current Claude API family ([Anthropic model overview](https://docs.anthropic.com/en/docs/about-claude/models/overview)): Haiku 4.5 for fast summarization, Opus 4.6 for heavier discovery.
+**Corrections:** `[llm.corrections]` first, else inherits discovery; if neither resolves, corrections are stored but vault application is skipped.
+
+**Anthropic example** ([model ids](https://docs.anthropic.com/en/docs/about-claude/models/overview)):
 
 ```toml
 [llm]
@@ -96,7 +98,7 @@ model = "claude-haiku-4-5-20251001"
 model = "claude-opus-4-6"
 ```
 
-**OpenAI example** — flagship `gpt-5.4` plus smaller `gpt-5.4-nano` / `gpt-5.4-mini` as documented on [OpenAI Models](https://platform.openai.com/docs/models) (verify ids in your project before deploying):
+**OpenAI** ([models](https://platform.openai.com/docs/models) — confirm ids in your account):
 
 ```toml
 [llm]
@@ -109,7 +111,7 @@ model = "gpt-5.4-nano"
 model = "gpt-5.4"
 ```
 
-**Gemini example** (set `GEMINI_API_KEY`; stable ids from [Gemini models](https://ai.google.dev/gemini-api/docs/models)):
+**Gemini** ([models](https://ai.google.dev/gemini-api/docs/models)):
 
 ```toml
 [llm]
@@ -122,7 +124,7 @@ model = "gemini-2.5-flash"
 model = "gemini-2.5-pro"
 ```
 
-**Mixed providers** (each role supplies its own `provider`):
+**Mixed providers:**
 
 ```toml
 [llm.summarization]
@@ -139,17 +141,9 @@ provider = "openai"
 model = "gpt-5.4-mini"
 ```
 
-Put API keys in `pulse.toml` (`anthropic_api_key`, `openai_api_key`, `gemini_api_key`) or set **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, **`GEMINI_API_KEY`**, or matching **`PULSE_*`** names in the environment (see the field table above).
-
-`ollama` uses the OpenAI-compatible transport and defaults to a placeholder key when no `OPENAI_API_KEY` is set.
-
-Corrections: **`[llm.corrections]`** is used first, then **`[llm.discovery]`** if corrections is omitted. If neither resolves a provider, corrections stay stored but vault application is skipped.
-
 ## `pulse.toml`
 
-`config_loader.default_pulse_config_path()` picks the config file: ``.config/pulse.toml`` first if it exists, otherwise ``./pulse.toml``, otherwise it targets ``.config/pulse.toml`` for new installs (the directory is created when the CLI saves). The file is optional; when present it supplies root scalars, the nested `connectors` map, and `llm`. `PULSE_*` environment variables override root fields; connector tables are not overridden by env (only by editing the TOML file).
-
-The checked-in template matches `pulse.toml.example`: every connector starts with `enabled = false` so you opt in explicitly.
+Loader: `.config/pulse.toml` → `./pulse.toml` → default `.config/` for new saves. Optional file; **`PULSE_*`** overrides root scalars only. Template = repo **`pulse.toml.example`** (all connectors `enabled = false`).
 
 ```toml
 [connectors.gmail]
@@ -207,28 +201,18 @@ poll_interval = "1h"
 urls = []
 ```
 
-The full checked-in template is `pulse.toml.example` at the repository root. Set `enabled = true` on each connector you want (for example Spotify after OAuth setup, or feeds after adding `urls`). `pulse configure` writes a fresh `pulse.toml` from your answers.
+Optional commented **`[llm.corrections]`** in the example — omit to inherit discovery’s model.
 
-The example file also includes a commented `llm.corrections` block. Leave it out if you want corrections to inherit discovery behavior; add it when correction interpretation should use a different provider or model than discovery.
-
-Each connector entry is parsed into a `ConnectorConfig` model with:
-
-- `enabled` defaulting to `false` when the key is omitted (opt-in)
-- `poll_interval` defaulting to `15m`
-- extra connector-specific keys preserved as-is
-
-That extra-field behavior is what allows settings such as `browser = "chrome"`, `db_path`, `urls` for feeds, `calendar_id` / `gitlab_base_url` / `omit_amounts_in_digest`, or Spotify supplementary cadence to live in `pulse.toml` without changing the top-level config loader.
+**`ConnectorConfig`:** `enabled` defaults false, `poll_interval` default `15m`; extra keys (`browser`, `urls`, `calendar_id`, …) pass through.
 
 ## Companion app
 
-The companion mobile app pushes location and health events to the Pulse backend via a shared-secret webhook. Two environment variables control this integration:
-
 | Env var | Default | Notes |
 | --- | --- | --- |
-| `PULSE_COMPANION_TOKEN` | unset | Shared secret for app ↔ server authentication. Set `companion_token` in `pulse.toml` or this env var; requests without a matching `Authorization: Bearer <token>` header are rejected with HTTP 401. Leave unset to disable token enforcement (not recommended in production). |
-| `PULSE_FCM_SERVICE_ACCOUNT_PATH` | unset | Path to the Firebase service account JSON file used to send FCM push notifications to companion app users. Required for push delivery; notifications are silently skipped when unset. |
+| `PULSE_COMPANION_TOKEN` | unset | Bearer for companion API; or `companion_token` in TOML. Unset = no auth check (avoid in prod). |
+| `PULSE_FCM_SERVICE_ACCOUNT_PATH` | unset | Firebase JSON for FCM; unset skips push. |
 
-Enable the companion connector in `pulse.toml` to mount the webhook route and allow the app to send events:
+Enable companion:
 
 ```toml
 [connectors.companion]
@@ -237,43 +221,29 @@ enabled = true
 # Set companion_token here or PULSE_COMPANION_TOKEN in the environment for API auth.
 ```
 
-When `[connectors.companion]` is disabled (the default), the `/webhooks/companion` route is not mounted and companion events are not accepted.
+Disabled → `/webhooks/companion` not mounted.
 
-## Secret and token files
+## Token files
 
-The runtime keeps secrets and refresh tokens in different places:
+OAuth refresh tokens live next to the DB: `google_tokens.json`, `spotify_tokens.json`, `microsoft_tokens.json`, `github_tokens.json`, `gitlab_tokens.json`, `plaid_tokens.json`. Directory = parent of **`database_path`** — changing **`PULSE_DATABASE_PATH`** moves them.
 
-- client credentials live in gitignored `pulse.toml` and/or the process environment (same sources as `pulse configure` writes); never commit real secrets
-- OAuth-style token files beside the database: `google_tokens.json`, `spotify_tokens.json`, `microsoft_tokens.json`, `github_tokens.json`, `gitlab_tokens.json`, `plaid_tokens.json` (Plaid stores `access_token` and transaction sync cursor; treat like other secrets)
+## App, CLI, MCP
 
-Because the token paths are derived from `Path(config.database_path).parent`, changing `PULSE_DATABASE_PATH` also changes where those `*.json` token files are written.
+Same **`load_config()`**: `pulse.toml` + env. Telegram, MCP **`pulse_correct`**, and **`POST /webhooks/corrections`** share the corrections pipeline (store text, `correction_applications` row, optional vault edit when LLM + target resolve). **`pulse_digest`** matches CLI/scheduler digest path.
 
-## MCP server vs standalone app
+**MCP-only:** the `pulse-mcp` process calls **`load_config(require_files=True)`**, so a **`pulse.toml` file must exist** at the resolved location before the server starts. If your agent spawns MCP with an unexpected working directory, set **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`** in the MCP server `env` so Pulse finds the same config as `pulse` / `uvicorn`.
 
-The FastAPI app, CLI, and MCP server call the same `load_config()` path: the resolved `pulse.toml` file (default `.config/pulse.toml` with repository-root fallback), plus process environment overrides as described above.
+## Runtime notes
 
-That matters for the corrections workflow:
+- **`/health`** — process up; not connector/LLM proof.
+- Scheduler registers digest, briefing, discovery, aggregation; jobs **skip** when notify channel or LLM is missing (see [Runbook](../operations/runbook.md)).
+- Digest: CLI, web, MCP, and cron share one summarization path (LLM or fallback).
+- Briefing: needs summarization LLM + ≥1 notify channel; multi-channel = duplicate sends.
+- Discovery: one shared summarization/discovery role; no role → skip.
 
-- Telegram replies and MCP `pulse_correct` calls always store the raw correction text in `corrections.message_text`; authenticated `POST /webhooks/corrections` requests do the same
-- both surfaces also initialize the `correction_applications` table and record the correction status there (`applied`, `needs_review`, `skipped`, or `failed`)
-- when a corrections provider is configured, the interpreter may apply one bounded vault update to the resolved target (daily digest note append, pattern notes/status update, `profile.md` learned corrections section replace, or `routines.md` correction updates section replace)
-- when no corrections provider is configured, the raw correction is still stored and the audit/status row explains that application was skipped
+## Env-only deploy
 
-The MCP `pulse_digest` tool uses the same aggregation + digest job path as the CLI and scheduler, including the configured summarization provider when one resolves.
-
-## Runtime consequences
-
-- `/health` only checks that the app booted with a valid config object; it does not prove that external connectors are authenticated
-- the scheduler always wires `daily_digest`, `morning_briefing`, and discovery jobs, but some of them return a skipped result when no notification channel or discovery-provider settings are configured
-- the **scheduled** `daily_digest` job still fires every 24 hours; when a summarization provider is configured it passes an LLM into the digest runner, otherwise it uses the non-LLM summarizer
-- `pulse digest`, the web **Digest** action, and MCP `pulse_digest` use that same summarization-provider path (aggregate first, then digest); when no provider resolves, all of them fall back to the non-LLM summarizer
-- `morning_briefing` uses the same summarization LLM path as the daily digest (then sends the briefing text); it needs at least one outbound channel among Telegram, ntfy, Gotify, SMTP email, generic webhook, Discord webhook, Slack webhook, or Pushover (user key + API token together); when several are set, Pulse broadcasts the same notification to all of them
-- discovery jobs resolve the same way as digest/discovery provider creation: a single configured summarization/discovery role is reused for both; if no role resolves, discovery skips with a no-provider message
-- corrections application needs `correction_applications`, a vault path, and a corrections provider resolved from `llm.corrections` or `llm.discovery`; otherwise the system keeps the raw correction and records a skipped or needs-review status instead of editing vault files
-
-## Environment-only deployment
-
-For Docker, systemd, or CI, you can skip putting secrets in TOML and export the same **`PULSE_*`** names (and optional **`ANTHROPIC_API_KEY`** / **`OPENAI_API_KEY`** / **`GEMINI_API_KEY`**) in the process environment. See the README variable table for the full list. Example:
+Docker/systemd/CI: export **`PULSE_*`** (+ optional vendor API keys). Example:
 
 ```bash
 export PULSE_DATABASE_PATH=data/pulse.db

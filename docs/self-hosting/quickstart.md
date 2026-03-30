@@ -1,173 +1,85 @@
 # Self-Hosting Quickstart
 
-Use this guide when you want the shortest real path from a fresh install to a running self-hosted Pulse instance.
+**Happy path:** `pulse configure` → `pulse init` → `pulse run`.
 
 ## Install
 
-Install `pulse-agent` from PyPI. The package provides two commands: `pulse` and `pulse-mcp`.
-
-**Recommended — pipx** (installs in an isolated environment and puts both commands on your PATH):
+Ships `pulse` and `pulse-mcp`.
 
 ```bash
 pipx install pulse-agent
 ```
 
-**Alternative — uv tool** (similar isolation, uv-managed):
+Alternatives: `uv tool install pulse-agent` or `pip install pulse-agent`. Check with `pulse --help`.
 
-```bash
-uv tool install pulse-agent
-```
+## Developer install
 
-**Alternative — pip** (installs into the active Python environment):
+- **uv:** `uv sync` (optional `--group dev`)
+- **Nix:** `nix develop`, then `uv sync --group dev`
+- **venv:** `python3 -m venv .venv` → activate → `pip install -e .`
 
-```bash
-pip install pulse-agent
-```
+## 1. Configure
 
-After installing, `pulse --help` should print the command list.
-
-## Developer setup (alternative)
-
-If you are working on Pulse itself or prefer a checkout-based workflow, use one of these instead of a PyPI install:
-
-- **uv** (recommended): `uv sync` from the repo root. Include dev tools with `uv sync --group dev`.
-- **Nix**: `nix develop` from the repo root drops you into a shell with Python, uv, and a `.venv` kept in sync via `uv sync --group dev`.
-- **Classic venv**: `python3 -m venv .venv`, activate, then `pip install -e .`.
-
-## Before you configure
-
-- If you plan to use Google, Spotify, Microsoft 365, GitHub, or GitLab, create those OAuth apps first so you have client credentials ready for `pulse.toml` (or your environment). For Plaid, create a Plaid developer application.
-
-## One-command onboard (optional)
-
-You can run the same path as steps 1–4 in one command:
-
-```bash
-pulse onboard
-```
-
-Before `pulse configure`, the CLI prints a short checklist (working directory, install, OAuth prep, Spotify callback on `localhost:8888`, and other localhost ports for Microsoft, GitHub, GitLab, and Plaid). After `pulse init`, it reminds you to open the app and use `pulse status` / `pulse insights` in another terminal.
-
-By default, `pulse onboard` runs each OAuth / Plaid / Oura step only when that service’s credentials are configured (via `pulse.toml` or env) and the matching connector is enabled in `pulse.toml` (GitLab skips OAuth when `PULSE_GITLAB_TOKEN` is set; Plaid Link runs only when `plaid_tokens.json` does not exist yet).
-
-To always run **all** configured auth and link steps (and exit with an error if a required step fails), use:
-
-```bash
-pulse onboard --strict
-```
-
-The same profile options as `pulse init` are accepted, for example:
-
-```bash
-pulse onboard -f ./my-profile.txt
-pulse onboard --profile-text "Engineer in Austin; focus on health metrics."
-```
-
-Server flags match `pulse run` (`--host`, `--port`, `--log-level`).
-
-## 1. Configure Pulse
-
-Start with the interactive setup flow:
+If you use Google, Spotify, Microsoft 365, GitHub, GitLab, or Plaid, create OAuth (and Plaid) apps first so client IDs and secrets are ready. Oura: personal access token or OAuth app.
 
 ```bash
 pulse configure
 ```
 
-`pulse configure` is the self-hosting entry point. The menu:
+**Menu:** Core (database, vault, timezone), **Connectors** (per-source creds + OAuth/Plaid/Oura when ●), Notifications, Model providers, LLM block in TOML, Full wizard. TTY: arrows + Enter; else digits `0`–`6` (`0` = Done). **`PULSE_*`** overrides top-level TOML when set in the environment.
 
-- **Core** — database path, vault path, timezone.
-- **Connectors** — pick a source: its credentials (saved as root keys in `pulse.toml`), connector block, then OAuth / Plaid / Oura when you save with that source enabled (details in §2). Rows show **●**/**○** (enabled in `pulse.toml`), emoji, short name, **✓**/**✗** for credential prereqs when ●, poll interval.
-- **Notifications** — **●**/**○** rows per outbound path (Telegram through SMTP, corrections webhook, companion / FCM, …); pick one to edit only those keys in `pulse.toml`.
-- **Model providers** — vendor API keys stored in `pulse.toml` (or override with `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `PULSE_*` in the environment).
-- **LLM in pulse.toml** — wizard for `[llm]` provider plus summarization and discovery `model` ids (merges into `pulse.toml`; keeps `[llm.corrections]` if present). For Ollama, also prompts for the OpenAI-compatible base URL.
-- **Full wizard** — core, all integrations, model keys, optional LLM roles step (TTY), all notification keys, every connector’s `pulse.toml`, then OAuth for each enabled connector (same coverage as `pulse onboard`’s configure phase).
+**Config file:** Prefer **`.config/pulse.toml`** or repo-root **`pulse.toml`**. Override with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`**. Start from `pulse.toml.example`; connectors default to disabled until you enable them.
 
-Arrow keys + Enter in a TTY; otherwise type `0`–`6` (`0` = Done). When `pulse.toml` already has values, wide prompts can **keep all existing values** for that section in one answer. `PULSE_*` environment variables override the TOML file when set in the process environment.
+There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (localhost callbacks on `8888`, `8890`–`8894` as applicable). Complete this **before** `pulse init` if the first pull should hit those APIs. Notion, Linear (API key), browser, and feeds skip browser OAuth here.
 
-There is no committed config file in the repo (gitignored). Copy `pulse.toml.example` to **`.config/pulse.toml`** (preferred) or repo-root **`pulse.toml`**, or run `pulse configure`, which writes the resolved path (usually `.config/pulse.toml` for new setups). Override with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`**. The example file keeps **every** connector `enabled = false` so you opt in explicitly; `pulse configure` does the same for new connector blocks (press `y` to turn sources on). Typical intervals when you enable everything:
+**Shortcut:** `pulse onboard` runs the same configure-style path plus auth when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
 
-- Gmail every `15m`
-- Google Calendar every `30m`
-- YouTube every `1h`
-- Spotify every `30m` with a supplementary pull every `6h`
-- browser history every `15m`
-
-## 2. OAuth, Plaid, and Oura (inside Connectors)
-
-There is no separate `pulse auth …` command. From **`pulse configure` → Connectors**, pick each source you enabled (Gmail, Spotify, Microsoft 365, GitHub, GitLab, Plaid, Oura, …). After you save that connector’s credentials and `pulse.toml` block with **●** (enabled), Pulse offers the same OAuth, Plaid Link, or Oura browser flows as before (localhost callbacks on `8888`, `8890`, `8891`, `8892`, `8893`, `8894` where applicable).
-
-Finish those steps **before** `pulse init` if the first pull should hit those APIs. For **Notion**, **Linear** (API key), **browser**, **feeds**, etc., there is nothing to authorize in that menu.
-
-## 3. Initialize your profile and first data pull
-
-Run the bootstrap command:
+## 2. `pulse init`
 
 ```bash
 pulse init
 ```
 
-`pulse init` does the operator happy path in one command:
+Ensures vault **`README.md`** and **`Meta/AGENTS.md`** exist (created once if missing), writes **`04-Config/profile.md`**, runs initial pulls, optional discovery when LLM + notification config allows.
 
-- creates or updates your vault profile in `04-Config/profile.md` (structured with Anthropic when `[llm.summarization]` or `[llm.discovery]` uses `provider = "anthropic"` and the key is available; otherwise saved as a simple “Self description” section)
-- performs the initial pull for active connectors
-- aggregates stats
-- optionally runs an initial **weekly** discovery pass when a discovery provider resolves; a single configured summarization/discovery role is reused for both (discovery notifications are sent when any outbound channel is configured: Telegram, ntfy, or webhook URL)
-
-## 4. Start the API server and scheduler
-
-Once initialization succeeds, start Pulse:
+## 3. `pulse run`
 
 ```bash
 pulse run
 ```
 
-This boots the database schema, loads active connectors from `pulse.toml`, starts the scheduler, and serves the app on `0.0.0.0:8000` unless you override `--host`, `--port`, or `--log-level`.
+Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull, Digest, Discover, Test Telegram (same pipelines as CLI where noted).
 
-The root URL (`/`) is a small operator page: it shows database and vault paths, connector counts, and how many scheduler jobs are registered. You can trigger **Pull**, **Digest**, **Discover**, and **Test Telegram** from the browser (roughly like `pulse pull`, `pulse digest`, `pulse discover`, and `pulse test-telegram`). The web **Digest** action uses the same digest pipeline as `pulse digest` and the **scheduled** `daily_digest` job (summarization LLM when configured, otherwise non-LLM fallback). The web **Discover** button runs daily cadence only—use the CLI for weekly or monthly passes.
-
-## 5. Check that data is flowing
-
-Use the status command to inspect the local store:
-
-```bash
-pulse status
-```
-
-`pulse status` prints the database path, total events, the observed time range, per-source counts, and connector sync cursors.
-
-## 6. Review discovered patterns
-
-When discovery has run, inspect the saved insights:
-
-```bash
-pulse insights
-```
-
-If no patterns exist yet, Pulse tells you to run discovery first. Otherwise it lists the discovered patterns, confidence values, and vault paths.
-
-## Other CLI commands
-
-- `pulse pull [sources…]` — run connector pulls immediately (default: all active pull connectors).
-- `pulse digest [--date YYYY-MM-DD]` — aggregate stats and write the daily digest vault file for that day (today if omitted); uses the configured summarization provider when available, otherwise falls back to the non-LLM summarizer.
-- `pulse discover [--cadence daily|weekly|monthly] [--date YYYY-MM-DD]` — run a discovery pass manually when a discovery provider resolves (a single configured summarization/discovery role is reused for both).
-- `pulse test-telegram` — send a one-off test message using your Telegram settings.
-- `pulse cleanup [--dry-run]` — list or delete events whose timestamps are in the future (useful if bad data or clock skew landed in the database).
-
-## Common operator flow
-
-For a normal first-time setup, the happy path is:
-
-```bash
-pulse configure
-pulse init
-pulse run
-```
-
-Inside the first `pulse configure`, open **Connectors** and walk each OAuth-backed source **before** `pulse init`. Run `pulse configure` again any time you need to re-authorize (pick the same connector) or edit `pulse.toml`.
-
-After Pulse has been running for a while, the two fastest health checks are:
+## 4. Inspect
 
 ```bash
 pulse status
 pulse insights
 ```
+
+`status` — DB path, event counts, cursors. `insights` — discovery output; prompts you to run discovery first if empty.
+
+| Command | Purpose |
+| --- | --- |
+| `pulse pull [sources…]` | Immediate connector pulls |
+| `pulse digest [--date YYYY-MM-DD]` | Daily digest file for that day |
+| `pulse discover [--cadence …]` | Manual discovery pass |
+| `pulse test-telegram` | One-off Telegram test |
+
+Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
+
+## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
+
+Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_digest`, `pulse_correct`, …) against the same database and vault as this install.
+
+**Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
+
+```text
+Read https://raw.githubusercontent.com/JEFF7712/pulse/main/docs/self-hosting/mcp-agent-setup.md and follow every step to install Pulse (pulse-agent), ensure pulse.toml exists, and register pulse-mcp in my MCP settings for this machine.
+```
+
+## Vault (Obsidian)
+
+Output lives under **`vault_path`** / **`PULSE_VAULT_PATH`**. Common patterns: dedicated folder as its own vault; subfolder inside an existing vault; or symlink (mobile/sync may not handle symlinks well). First vault use may create **`README.md`** (structure + reserved headings) and **`Meta/AGENTS.md`**.
+
+Daily digests include **wikilinks** to the previous and next day as `[[01-Daily/YYYY-MM-DD]]` for navigation and graph edges in Obsidian.

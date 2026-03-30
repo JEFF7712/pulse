@@ -11,6 +11,7 @@ from pulse.store.analytics import AnalyticsRepository
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
+from pulse.vault.onboarding import ensure_vault_onboarding
 from pulse.vault.writer import write_daily_digest
 
 
@@ -99,6 +100,8 @@ async def run_discovery_job(
     discovery_model: str = "",
 ) -> JobResult:
     from pulse.analysis.discovery import DiscoveryEngine
+
+    ensure_vault_onboarding(vault_path)
 
     engine = DiscoveryEngine(
         database_path=database_path,

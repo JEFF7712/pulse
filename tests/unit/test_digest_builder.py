@@ -58,6 +58,8 @@ def test_digest_builder_produces_narrative_markdown():
     md = builder.build(date(2026, 3, 26), day, narratives)
 
     assert "# 2026-03-26" in md
+    assert "[[01-Daily/2026-03-25]]" in md
+    assert "[[01-Daily/2026-03-27]]" in md
     assert "## Day at a Glance" in md
     assert "## Timeline" in md
     assert "## Email" in md
@@ -86,6 +88,7 @@ def test_digest_builder_fallback_without_narratives():
 
     # Should still produce valid markdown without Day at a Glance
     assert "# 2026-03-26" in md
+    assert "[[01-Daily/2026-03-25]]" in md
     assert "Hello" in md
     assert "## Day at a Glance" not in md
 

@@ -13,22 +13,6 @@ export default defineConfig({
       { id: "pulse-docs-dark" },
       "document.documentElement.classList.add('dark')"
     ],
-    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
-    [
-      "link",
-      {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossorigin: ""
-      }
-    ],
-    [
-      "link",
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&display=swap"
-      }
-    ],
     ["link", { rel: "icon", href: "/docs/favicon.ico", sizes: "any" }],
     [
       "link",
@@ -39,7 +23,9 @@ export default defineConfig({
     logo: "/pulse-mark.svg",
     siteTitle: "Pulse Docs",
     nav: [
-      { text: "Website", link: "/" },
+      // `"/"` is rewritten to `/docs/` under base. `"/../"` yields `/docs/../` → `/`. `target` is required
+      // so VitePress does not intercept the click and try to SPA-load `/` (no such page).
+      { text: "Main site", link: "/../", target: "_self" },
       { text: "Self-Hosting", link: "/self-hosting/quickstart" },
       { text: "Configuration", link: "/reference/configuration" },
       { text: "Operations", link: "/operations/runbook" },
@@ -50,7 +36,11 @@ export default defineConfig({
         text: "Self-Hosting Docs",
         items: [
           { text: "Overview", link: "/" },
-          { text: "Self-Hosting Quickstart", link: "/self-hosting/quickstart" }
+          { text: "Self-Hosting Quickstart", link: "/self-hosting/quickstart" },
+          {
+            text: "MCP agent setup (for AI assistants)",
+            link: "/self-hosting/mcp-agent-setup"
+          }
         ]
       },
       {
