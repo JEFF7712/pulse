@@ -55,6 +55,11 @@ Python package source lives under `src/pulse/`. High-level areas:
 | `src/pulse/mcp/` | MCP server |
 | `src/pulse/store/` | SQLite persistence |
 | `tests/` | Pytest suite |
+| `companion_app/` | Flutter iOS companion (digests, corrections; see design in repo docs) |
+
+### Companion app (Flutter)
+
+From `companion_app/`: install the [Flutter SDK](https://docs.flutter.dev/get-started/install), then `flutter pub get`. The repo includes `ios/` and `android/` scaffolding; if you strip them locally, regenerate with `flutter create . --platforms=ios,android` (it preserves `lib/`). Run `flutter test` and `flutter run` on a device or simulator.
 
 ## License
 
