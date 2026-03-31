@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 
+import '../app_navigator.dart';
 import '../models/digest_preview.dart';
+import '../services/push_notifications.dart';
 import '../state/session_controller.dart';
 import 'digest_browser_screen.dart';
 
@@ -25,11 +27,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _refresh();
+      if (!mounted) {
+        return;
+      }
+      final api = context.read<SessionController>().apiClient;
+      if (api != null) {
+        await PushNotificationsCoordinator.instance.start(
+          navigatorKey: pulseNavigatorKey,
+          apiClient: api,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    PushNotificationsCoordinator.instance.stop();
     _correctionCtrl.dispose();
     super.dispose();
   }

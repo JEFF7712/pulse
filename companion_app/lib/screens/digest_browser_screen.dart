@@ -6,16 +6,20 @@ import 'package:provider/provider.dart';
 
 import '../models/digest_preview.dart';
 import '../state/session_controller.dart';
+import '../utils/digest_date_slug.dart';
 
 class DigestBrowserScreen extends StatefulWidget {
-  const DigestBrowserScreen({super.key});
+  const DigestBrowserScreen({super.key, this.initialDateSlug});
+
+  /// When set (e.g. `yyyy-MM-dd` from notification [context_id]), opens that digest first.
+  final String? initialDateSlug;
 
   @override
   State<DigestBrowserScreen> createState() => _DigestBrowserScreenState();
 }
 
 class _DigestBrowserScreenState extends State<DigestBrowserScreen> {
-  DateTime _selected = DateTime.now();
+  late DateTime _selected;
   DigestPreview? _digest;
   bool _loading = false;
   String? _error;
@@ -25,6 +29,7 @@ class _DigestBrowserScreenState extends State<DigestBrowserScreen> {
   @override
   void initState() {
     super.initState();
+    _selected = parseDigestDateSlug(widget.initialDateSlug) ?? DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 

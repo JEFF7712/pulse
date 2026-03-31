@@ -1,12 +1,16 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'app_navigator.dart';
 import 'screens/home_screen.dart';
 import 'screens/setup_screen.dart';
+import 'services/push_notifications.dart';
 import 'state/session_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   runApp(
     ChangeNotifierProvider(
       create: (_) {
@@ -25,6 +29,7 @@ class PulseCompanionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: pulseNavigatorKey,
       title: 'Pulse Companion',
       theme: ThemeData(
         colorSchemeSeed: Colors.teal,

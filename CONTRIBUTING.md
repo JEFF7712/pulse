@@ -61,6 +61,8 @@ Python package source lives under `src/pulse/`. High-level areas:
 
 From `companion_app/`: install the [Flutter SDK](https://docs.flutter.dev/get-started/install), then `flutter pub get`. The repo includes `ios/` and `android/` scaffolding; if you strip them locally, regenerate with `flutter create . --platforms=ios,android` (it preserves `lib/`). Run `flutter test` and `flutter run` on a device or simulator.
 
+**Push (FCM):** The app registers the device with Pulse (`POST /api/device-token`) when Firebase initializes. Add your Firebase project files: **`ios/Runner/GoogleService-Info.plist`** (Xcode → Runner). For Android, add **`android/app/google-services.json`** and apply the [Google services Gradle plugin](https://firebase.google.com/docs/flutter/setup?platform=android) to `android/settings.gradle.kts` and `android/app/build.gradle.kts`. Without those files the app still runs; push setup is skipped at runtime. Enable the Push Notifications capability and APNs in the Apple Developer portal for production iOS builds.
+
 ## License
 
 By contributing, you agree your contributions are licensed under the same terms as the project ([MIT License](LICENSE)).
