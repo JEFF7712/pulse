@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../app_navigator.dart';
 import '../models/digest_preview.dart';
+import '../services/companion_sensor_coordinator.dart';
 import '../services/push_notifications.dart';
 import '../state/session_controller.dart';
 import 'digest_browser_screen.dart';
@@ -16,7 +19,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DigestPreview? _digest;
   bool _loading = true;
   String? _loadError;
@@ -27,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refresh();
       if (!mounted) {
@@ -38,15 +42,25 @@ class _HomeScreenState extends State<HomeScreen> {
           navigatorKey: pulseNavigatorKey,
           apiClient: api,
         );
+        await CompanionSensorCoordinator.instance.start(api);
       }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    CompanionSensorCoordinator.instance.stop();
     PushNotificationsCoordinator.instance.stop();
     _correctionCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(CompanionSensorCoordinator.instance.onResume());
+    }
   }
 
   Future<void> _refresh() async {

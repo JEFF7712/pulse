@@ -63,6 +63,8 @@ From `companion_app/`: install the [Flutter SDK](https://docs.flutter.dev/get-st
 
 **Push (FCM):** The app registers the device with Pulse (`POST /api/device-token`) when Firebase initializes. Add your Firebase project files: **`ios/Runner/GoogleService-Info.plist`** (Xcode → Runner). For Android, add **`android/app/google-services.json`** and apply the [Google services Gradle plugin](https://firebase.google.com/docs/flutter/setup?platform=android) to `android/settings.gradle.kts` and `android/app/build.gradle.kts`. Without those files the app still runs; push setup is skipped at runtime. Enable the Push Notifications capability and APNs in the Apple Developer portal for production iOS builds.
 
+**Health & location:** The app reads steps and sleep (HealthKit on iOS, Health Connect on Android) and occasionally records a coarse `location.enter` snapshot (`place: snapshot`), queues events locally, and POSTs batches to `/webhooks/companion`. Enable the **`companion`** connector on the Pulse server. In Xcode, add the **HealthKit** capability (in addition to the `Info.plist` strings already in the template). On Android, `MainActivity` extends **`FlutterFragmentActivity`** (required for Health Connect permission flows on newer APIs); install the Health Connect app and grant **Steps** and **Sleep** read access when prompted.
+
 ## License
 
 By contributing, you agree your contributions are licensed under the same terms as the project ([MIT License](LICENSE)).

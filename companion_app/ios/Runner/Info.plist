@@ -53,6 +53,12 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Pulse reads steps and sleep to add them to your personal timeline.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Pulse does not write data to Health.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Pulse uses your location for optional place context sent to your server.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
