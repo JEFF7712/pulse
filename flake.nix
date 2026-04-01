@@ -13,6 +13,16 @@
         # pyproject requires >=3.12; match nixpkgs’ 3.12 or 3.13 as you prefer
         python = pkgs.python313;
         pythonPkgs = python.pkgs;
+        jdk = pkgs.jdk17;
+        # Linux desktop target + native engine bits (optional; mobile dev does not require GTK)
+        linuxFlutterNative = pkgs.lib.optionals pkgs.stdenv.isLinux [
+          pkgs.pkg-config
+          pkgs.clang
+          pkgs.cmake
+          pkgs.ninja
+          pkgs.gtk3
+          pkgs.glib
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
@@ -20,9 +30,15 @@
             python
             pkgs.uv
             pythonPkgs.venvShellHook
-          ];
+            # companion_app/ — dart, flutter, pub, flutter test / run
+            pkgs.flutter
+            jdk
+          ] ++ linuxFlutterNative;
 
           venvDir = ".venv";
+
+          # Gradle (Android) uses this; flutter doctor expects a modern JDK
+          JAVA_HOME = "${jdk}";
 
           # Install from uv.lock + pyproject (includes dependency-groups.dev → pytest)
           postVenvCreation = ''
@@ -40,10 +56,16 @@
             sqlite
           ];
 
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            pkgs.sqlite
-          ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
+            [
+              pkgs.stdenv.cc.cc.lib
+              pkgs.sqlite
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+              pkgs.gtk3
+              pkgs.glib
+            ]
+          );
         };
 
         packages.default = pythonPkgs.buildPythonApplication {

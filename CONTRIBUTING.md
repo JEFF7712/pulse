@@ -15,7 +15,7 @@ Thanks for helping improve Pulse. This document covers how to set up a developme
 uv sync --group dev
 ```
 
-**Nix** — From the repo root: `nix develop`, then use the provided environment (uv keeps `.venv` in sync).
+**Nix** — From the repo root: `nix develop`, then use the provided environment (uv keeps `.venv` in sync). The shell also includes **Flutter** (Dart, `flutter pub get`, `flutter test`, …), **JDK 17** (`JAVA_HOME` for Android Gradle), and on Linux, GTK-related build inputs for optional `flutter run -d linux`.
 
 **Classic venv** — Create a virtualenv, then `pip install -e .` and `pip install pytest` (or install the `dev` group equivalent).
 
