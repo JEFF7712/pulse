@@ -88,15 +88,21 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
     Path(settings.database_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        await run_aggregation_job(day=target_day, database_path=settings.database_path)
+        await run_aggregation_job(
+            day=target_day,
+            database_path=settings.database_path,
+            timezone=settings.timezone,
+        )
         await run_discovery_job(
             cadence="daily",
             target_date=target_day,
             database_path=settings.database_path,
             vault_path=settings.vault_path,
             llm=disc_llm,
+            timezone=settings.timezone,
             notification_channel=notification_channel,
-            summarization_model=summarization_model_for_source_summaries(settings) or "",
+            summarization_model=summarization_model_for_source_summaries(settings)
+            or "",
             discovery_model=discovery_model_for_discovery(settings) or "",
         )
     except Exception as e:

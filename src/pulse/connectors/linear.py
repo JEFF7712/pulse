@@ -1,4 +1,5 @@
 """Linear assigned issues → Pulse dev.linear.issue events (development activity stream)."""
+
 from __future__ import annotations
 
 import logging
@@ -62,7 +63,8 @@ class LinearConnector(Connector):
         return self._api_key is not None
 
     def _headers(self) -> dict[str, str]:
-        assert self._api_key is not None
+        if self._api_key is None:
+            raise RuntimeError("Configure Linear API key")
         return {
             "Authorization": self._api_key,
             "Content-Type": "application/json",
@@ -86,9 +88,13 @@ class LinearConnector(Connector):
                     "query": _ASSIGNED_ISSUES_QUERY,
                     "variables": {"after": cursor},
                 }
-                resp = await client.post(LINEAR_GQL, json=payload, headers=self._headers())
+                resp = await client.post(
+                    LINEAR_GQL, json=payload, headers=self._headers()
+                )
                 if resp.status_code == 401:
-                    logger.warning("Linear API unauthorized — check PULSE_LINEAR_API_KEY")
+                    logger.warning(
+                        "Linear API unauthorized — check PULSE_LINEAR_API_KEY"
+                    )
                     return []
                 resp.raise_for_status()
                 body = resp.json()
@@ -149,7 +155,9 @@ def _parse_issue_node(
     if not raw_updated:
         return None
     try:
-        ts = datetime.fromisoformat(str(raw_updated).replace("Z", "+00:00")).astimezone(UTC)
+        ts = datetime.fromisoformat(str(raw_updated).replace("Z", "+00:00")).astimezone(
+            UTC
+        )
     except ValueError:
         return None
 

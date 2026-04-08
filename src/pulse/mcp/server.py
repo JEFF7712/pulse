@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -49,6 +50,16 @@ def _get_pulse_ctx(ctx: Context) -> PulseContext:
     return ctx.request_context.lifespan_context
 
 
+def _context_timezone(pulse_ctx: PulseContext) -> str:
+    if pulse_ctx.config is None:
+        return "UTC"
+    return pulse_ctx.config.timezone
+
+
+def _today_for_timezone(timezone: str) -> str:
+    return datetime.now(ZoneInfo(timezone)).date().isoformat()
+
+
 @mcp.tool()
 async def pulse_events_for_day(
     day: str | None = None, source: str | None = None, ctx: Context = None
@@ -59,15 +70,17 @@ async def pulse_events_for_day(
         day: ISO date string (e.g. 2026-03-23). Defaults to today.
         source: Optional filter by source (e.g. gmail, calendar).
     """
+    pulse_ctx = _get_pulse_ctx(ctx)
     if day is None:
-        day = date.today().isoformat()
+        day = _today_for_timezone(_context_timezone(pulse_ctx))
 
     parsed = _parse_day(day)
     if isinstance(parsed, str):
         return parsed
 
-    pulse_ctx = _get_pulse_ctx(ctx)
-    events = await pulse_ctx.events.list_events_for_day(day)
+    events = await pulse_ctx.events.list_events_for_day(
+        day, timezone=_context_timezone(pulse_ctx)
+    )
 
     if source:
         events = [e for e in events if e.source == source]
@@ -162,21 +175,23 @@ async def pulse_discovery(
     if cadence not in ("daily", "weekly", "monthly"):
         return f"Invalid cadence '{cadence}'. Use daily, weekly, or monthly."
 
+    pulse_ctx = _get_pulse_ctx(ctx)
     if day is None:
-        day = date.today().isoformat()
+        day = _today_for_timezone(_context_timezone(pulse_ctx))
 
     target_date = _parse_day(day)
     if isinstance(target_date, str):
         return target_date
 
-    pulse_ctx = _get_pulse_ctx(ctx)
     config = pulse_ctx.config if pulse_ctx.config is not None else load_config()
     _, disc_llm = create_providers_from_config(config)
     if disc_llm is None:
         return "Discovery skipped: no LLM provider configured."
 
     await run_aggregation_job(
-        day=target_date, database_path=pulse_ctx.database_path
+        day=target_date,
+        database_path=pulse_ctx.database_path,
+        timezone=_context_timezone(pulse_ctx),
     )
     channel = build_notification_channel(config)
     job = await run_discovery_job(
@@ -185,6 +200,7 @@ async def pulse_discovery(
         database_path=pulse_ctx.database_path,
         vault_path=pulse_ctx.vault_path,
         llm=disc_llm,
+        timezone=_context_timezone(pulse_ctx),
         notification_channel=channel,
         summarization_model=summarization_model_for_source_summaries(config) or "",
         discovery_model=discovery_model_for_discovery(config) or "",
@@ -207,7 +223,11 @@ async def pulse_insights(
     analytics = AnalyticsRepository(pulse_ctx._db)
     rows = await analytics.list_insights(status=status)
     if not rows:
-        return "No insights found." if status is None else f"No insights with status={status!r}."
+        return (
+            "No insights found."
+            if status is None
+            else f"No insights with status={status!r}."
+        )
     return json.dumps(rows, indent=2)
 
 

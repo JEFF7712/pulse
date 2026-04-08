@@ -72,6 +72,154 @@ def test_aggregate_daily_stats_groups_by_source_and_type(tmp_path):
     assert by_key[("gmail", "email.sent")]["count"] == 1
 
 
+def test_aggregate_daily_stats_uses_local_day_window(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "local-day.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            event_repo = EventRepository(db)
+            analytics_repo = AnalyticsRepository(db)
+
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "before",
+                        datetime(2026, 1, 15, 7, 59, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "start",
+                        datetime(2026, 1, 15, 8, 0, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "end-minus-one",
+                        datetime(2026, 1, 16, 7, 59, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "after",
+                        datetime(2026, 1, 16, 8, 0, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                ]
+            )
+            await analytics_repo.aggregate_daily_stats(
+                "2026-01-15", timezone="America/Los_Angeles"
+            )
+            return await analytics_repo.get_daily_stats("2026-01-15")
+
+    stats = asyncio.run(exercise())
+
+    assert len(stats) == 1
+    assert stats[0]["count"] == 2
+    assert stats[0]["first_at"] == "2026-01-15T08:00:00+00:00"
+    assert stats[0]["last_at"] == "2026-01-16T07:59:00+00:00"
+
+
+def test_aggregate_daily_stats_include_preexisting_offset_rows(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "daily-stats-offset.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics_repo = AnalyticsRepository(db)
+
+            await db.execute(
+                """
+                INSERT INTO events (id, timestamp, source, event_type, data, metadata)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "legacy-offset",
+                    "2026-01-15T01:00:00-08:00",
+                    "gmail",
+                    "email.received",
+                    "{}",
+                    "{}",
+                ),
+            )
+            await db.commit()
+
+            await analytics_repo.aggregate_daily_stats(
+                "2026-01-15", timezone="America/Los_Angeles"
+            )
+            return await analytics_repo.get_daily_stats("2026-01-15")
+
+    stats = asyncio.run(exercise())
+
+    assert len(stats) == 1
+    assert stats[0]["count"] == 1
+    assert stats[0]["first_at"] == "2026-01-15T01:00:00-08:00"
+    assert stats[0]["last_at"] == "2026-01-15T01:00:00-08:00"
+
+
+def test_aggregate_daily_stats_orders_first_and_last_by_true_instant(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "daily-stats-mixed-order.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics_repo = AnalyticsRepository(db)
+            event_repo = EventRepository(db)
+
+            await db.execute(
+                """
+                INSERT INTO events (id, timestamp, source, event_type, data, metadata)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "legacy-offset",
+                    "2026-01-15T01:00:00-08:00",
+                    "gmail",
+                    "email.received",
+                    "{}",
+                    "{}",
+                ),
+            )
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "utc-normalized",
+                        datetime(2026, 1, 15, 8, 30, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    )
+                ]
+            )
+
+            await analytics_repo.aggregate_daily_stats(
+                "2026-01-15", timezone="America/Los_Angeles"
+            )
+            return await analytics_repo.get_daily_stats("2026-01-15")
+
+    stats = asyncio.run(exercise())
+
+    assert len(stats) == 1
+    assert stats[0]["count"] == 2
+    assert stats[0]["first_at"] == "2026-01-15T08:30:00+00:00"
+    assert stats[0]["last_at"] == "2026-01-15T01:00:00-08:00"
+
+
 def test_aggregate_time_blocks_buckets_events_into_2h_blocks(tmp_path):
     from pulse.store.analytics import AnalyticsRepository
     from pulse.store.db import connect_db
@@ -124,6 +272,49 @@ def test_aggregate_time_blocks_buckets_events_into_2h_blocks(tmp_path):
     assert by_block[5]["count"] == 1
     assert 11 in by_block
     assert by_block[11]["count"] == 1
+
+
+def test_aggregate_time_blocks_use_local_timezone_hour_buckets(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "time-blocks-local.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            event_repo = EventRepository(db)
+            analytics_repo = AnalyticsRepository(db)
+
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "midnight-local",
+                        datetime(2026, 1, 15, 8, 30, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "morning-local",
+                        datetime(2026, 1, 15, 15, 15, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                ]
+            )
+            await analytics_repo.aggregate_time_blocks(
+                "2026-01-15", timezone="America/Los_Angeles"
+            )
+            return await analytics_repo.get_time_blocks("2026-01-15")
+
+    blocks = asyncio.run(exercise())
+
+    by_block = {b["block"]: b for b in blocks}
+    assert set(by_block) == {0, 3}
+    assert by_block[0]["count"] == 1
+    assert by_block[3]["count"] == 1
 
 
 def test_aggregate_weekly_baselines_computes_averages(tmp_path):
@@ -198,6 +389,54 @@ def test_aggregate_weekly_baselines_computes_averages(tmp_path):
     assert baseline["event_type"] == "email.received"
     assert baseline["total"] == 7
     assert abs(baseline["avg_daily"] - 1.0) < 1e-9
+
+
+def test_aggregate_weekly_baselines_use_local_timezone_window(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "weekly-local.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            event_repo = EventRepository(db)
+            analytics_repo = AnalyticsRepository(db)
+
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "before-window",
+                        datetime(2026, 1, 5, 7, 59, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "inside-window",
+                        datetime(2026, 1, 5, 8, 0, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                    _make_event(
+                        "end-boundary",
+                        datetime(2026, 1, 12, 8, 0, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                    ),
+                ]
+            )
+            await analytics_repo.aggregate_weekly_baselines(
+                "2026-01-05", timezone="America/Los_Angeles"
+            )
+            return await analytics_repo.get_weekly_baselines("2026-01-05")
+
+    baselines = asyncio.run(exercise())
+
+    assert len(baselines) == 1
+    assert baselines[0]["total"] == 1
+    assert abs(baselines[0]["avg_daily"] - (1 / 7)) < 1e-9
 
 
 def test_upsert_and_list_insights(tmp_path):

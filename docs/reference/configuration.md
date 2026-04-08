@@ -32,7 +32,7 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 | `timezone` | `PULSE_TIMEZONE` | `UTC` | Used when resolving the current day for scheduled jobs. |
 | `telegram_bot_token` | `PULSE_TELEGRAM_BOT_TOKEN` | unset | Needed before Telegram notifications can be sent. |
 | `telegram_chat_id` | `PULSE_TELEGRAM_CHAT_ID` | unset | Paired with the bot token for outbound Telegram delivery. |
-| `corrections_webhook_secret` | `PULSE_CORRECTIONS_WEBHOOK_SECRET` | unset | When set, enables `POST /webhooks/corrections` with `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hmac>` (HMAC-SHA256 of the raw body). JSON body: `context_id`, `message`. Returns 404 when unset. |
+| `corrections_webhook_secret` | `PULSE_CORRECTIONS_WEBHOOK_SECRET` | unset | When set, enables `POST /webhooks/corrections` with `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hmac>` (HMAC-SHA256 of the raw body). JSON body: `context_id`, preferred `message_text`; `message` is accepted as a compatibility alias when `message_text` is absent. Returns 404 when unset. |
 | `ntfy_topic` | `PULSE_NTFY_TOPIC` | unset | ntfy topic; set to enable push via [ntfy.sh](https://ntfy.sh) or your own server. |
 | `ntfy_base_url` | `PULSE_NTFY_BASE_URL` | unset | ntfy server root (defaults to `https://ntfy.sh` when topic is set). |
 | `notification_webhook_url` | `PULSE_NOTIFICATION_WEBHOOK_URL` | unset | HTTPS URL that receives JSON `POST` bodies for each outbound notification. |
@@ -211,7 +211,7 @@ Optional commented **`[llm.corrections]`** in the example — omit to inherit di
 
 | Env var | Default | Notes |
 | --- | --- | --- |
-| `PULSE_COMPANION_TOKEN` | unset | Bearer for companion API; or `companion_token` in TOML. Unset = no auth check (avoid in prod). |
+| `PULSE_COMPANION_TOKEN` | unset | Shared token for the companion API and `/webhooks/companion`; accepts either `X-Pulse-Token: <token>` or `Authorization: Bearer <token>`. When unset, companion-authenticated routes return 401. |
 | `PULSE_FCM_SERVICE_ACCOUNT_PATH` | unset | Firebase JSON for FCM; unset skips push. |
 
 Enable companion:
@@ -220,12 +220,13 @@ Enable companion:
 [connectors.companion]
 enabled = true
 # The companion app pushes location and health events to /webhooks/companion.
-# Set companion_token here or PULSE_COMPANION_TOKEN in the environment for API auth.
+# Timestamps must include a timezone offset or `Z`; invalid companion timestamps return HTTP 400.
+# Set companion_token here or PULSE_COMPANION_TOKEN in the environment for API and webhook auth.
 ```
 
 Disabled → `/webhooks/companion` not mounted.
 
-When the companion connector (and API routes) are enabled, the mobile app reads patterns via **`GET /api/insights`** and **`GET /api/insights/{id}`** using the same **`X-Pulse-Token`** / `companion_token` as corrections and device registration.
+The mobile app reads patterns via **`GET /api/insights`** and **`GET /api/insights/{id}`**, and posts corrections / device tokens, using the same companion token in either **`X-Pulse-Token`** or **`Authorization: Bearer <token>`** form. For **`POST /api/corrections`**, send `context_id` plus preferred `message_text`; `message` remains accepted as a compatibility alias when `message_text` is absent.
 
 ## Token files
 

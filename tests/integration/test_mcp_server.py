@@ -123,6 +123,123 @@ def test_pulse_discovery_skipped_without_llm(tmp_path: Path) -> None:
     asyncio.run(_run())
 
 
+def test_pulse_events_for_day_defaults_to_configured_local_day(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from pulse.app.config import PulseConfig
+    from pulse.mcp import server as server_module
+
+    class FakeDatetime:
+        @staticmethod
+        def now(tz):
+            assert str(tz) == "America/Los_Angeles"
+            return datetime(2026, 1, 15, 23, 30, tzinfo=tz)
+
+    monkeypatch.setattr(server_module, "datetime", FakeDatetime)
+
+    async def _run() -> None:
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+            timezone="America/Los_Angeles",
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="local-day",
+                        timestamp=datetime(2026, 1, 15, 20, 0, tzinfo=UTC),
+                        source="calendar",
+                        event_type="calendar.event",
+                        data={"title": "Local day event"},
+                        metadata={},
+                    )
+                ]
+            )
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            result = await server_module.pulse_events_for_day(ctx=ctx)
+
+            parsed = json.loads(result)
+            assert [item["id"] for item in parsed] == ["local-day"]
+
+    asyncio.run(_run())
+
+
+def test_pulse_discovery_defaults_to_configured_local_day(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from pulse.app.config import LLMConfig, LLMRoleConfig, PulseConfig
+    from pulse.jobs.runners import JobResult
+    from pulse.mcp import server as server_module
+
+    observed: dict[str, object] = {}
+
+    class FakeDatetime:
+        @staticmethod
+        def now(tz):
+            assert str(tz) == "America/Los_Angeles"
+            return datetime(2026, 1, 15, 23, 30, tzinfo=tz)
+
+    class FakeLLM:
+        async def complete(self, prompt, *, system_prompt=None, model=None):
+            return "{}"
+
+    async def fake_run_aggregation_job(*, day, database_path, timezone):
+        observed["aggregation_day"] = day.isoformat()
+        observed["aggregation_timezone"] = timezone
+        return JobResult(status="success", detail="ok")
+
+    async def fake_run_discovery_job(**kwargs):
+        observed["discovery_day"] = kwargs["target_date"].isoformat()
+        observed["discovery_timezone"] = kwargs["timezone"]
+        return JobResult(status="success", detail="ok")
+
+    monkeypatch.setattr(server_module, "datetime", FakeDatetime)
+    monkeypatch.setattr(server_module, "run_aggregation_job", fake_run_aggregation_job)
+    monkeypatch.setattr(server_module, "run_discovery_job", fake_run_discovery_job)
+    monkeypatch.setattr(
+        server_module,
+        "create_providers_from_config",
+        lambda config: (None, FakeLLM()),
+    )
+
+    async def _run() -> None:
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+            timezone="America/Los_Angeles",
+            llm=LLMConfig(
+                discovery=LLMRoleConfig(provider="openai", model="gpt-5.4-mini")
+            ),
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            result = await server_module.pulse_discovery(ctx=ctx)
+
+            assert result == "success: ok"
+
+    asyncio.run(_run())
+
+    assert observed["aggregation_day"] == "2026-01-15"
+    assert observed["discovery_day"] == "2026-01-15"
+    assert observed["aggregation_timezone"] == "America/Los_Angeles"
+    assert observed["discovery_timezone"] == "America/Los_Angeles"
+
+
 def test_pulse_read_pattern_missing_file(tmp_path: Path) -> None:
     from pulse.app.config import PulseConfig
     from pulse.mcp import server as server_module

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -15,6 +15,10 @@ _ALLOWED_EVENT_TYPES = {
     "health.steps",
     "health.sleep",
 }
+
+
+class CompanionPayloadError(ValueError):
+    pass
 
 
 class CompanionConnector(PushConnector):
@@ -48,7 +52,14 @@ class CompanionConnector(PushConnector):
         try:
             timestamp = datetime.fromisoformat(timestamp_str)
         except (ValueError, TypeError):
-            return None
+            raise CompanionPayloadError(
+                "Companion timestamps must be ISO 8601 and timezone-aware"
+            )
+        if timestamp.tzinfo is None:
+            raise CompanionPayloadError(
+                "Companion timestamps must be ISO 8601 and timezone-aware"
+            )
+        timestamp = timestamp.astimezone(UTC)
 
         data = raw.get("data", {})
 

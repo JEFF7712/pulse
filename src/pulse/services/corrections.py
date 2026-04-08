@@ -205,7 +205,8 @@ class CorrectionService:
         )
 
     def _resolve_context_payload(self, context_id: str) -> _ResolvedContext:
-        assert self._vault_memory is not None
+        if self._vault_memory is None:
+            raise RuntimeError("Initialize correction vault memory")
 
         if _LEGACY_DATE_ONLY_CONTEXT_RE.fullmatch(context_id):
             return _ResolvedContext(
@@ -273,7 +274,8 @@ class CorrectionService:
         )
 
     async def _apply_action(self, action: CorrectionAction) -> None:
-        assert self._vault_memory is not None
+        if self._vault_memory is None:
+            raise RuntimeError("Initialize correction vault memory")
 
         if (
             action.target_type == "pattern"
@@ -334,7 +336,8 @@ class CorrectionService:
         summary: str,
         error_message: str | None = None,
     ) -> None:
-        assert self._correction_applications is not None
+        if self._correction_applications is None:
+            raise RuntimeError("Initialize correction application recorder")
 
         timestamp = datetime.now(UTC)
         await self._correction_applications.add(

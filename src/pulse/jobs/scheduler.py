@@ -66,10 +66,14 @@ def build_scheduler(
 
             # Supplementary jobs (if connector supports them)
             if hasattr(connector, "get_supplementary_jobs"):
-                for suffix, supp_interval, job_fn in connector.get_supplementary_jobs(cc):
+                for suffix, supp_interval, job_fn in connector.get_supplementary_jobs(
+                    cc
+                ):
                     scheduler.add_job(
                         _make_supplementary_job(job_fn, config),
-                        trigger=IntervalTrigger(seconds=int(supp_interval.total_seconds())),
+                        trigger=IntervalTrigger(
+                            seconds=int(supp_interval.total_seconds())
+                        ),
                         id=f"pull_{connector.get_source_name()}_{suffix}",
                     )
 
@@ -155,8 +159,14 @@ def _make_supplementary_job(job_fn, config):
 def _make_aggregation_job(config):
     async def job():
         from pulse.jobs.runners import run_aggregation_job
+
         day = _resolve_current_day(config)
-        return await run_aggregation_job(day=day, database_path=config.database_path)
+        return await run_aggregation_job(
+            day=day,
+            database_path=config.database_path,
+            timezone=config.timezone,
+        )
+
     return job
 
 
@@ -181,6 +191,7 @@ def _make_discovery_job(cadence, config):
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=disc_llm,
+                timezone=config.timezone,
                 notification_channel=channel,
                 summarization_model=summarization_model_for_source_summaries(config)
                 or "",

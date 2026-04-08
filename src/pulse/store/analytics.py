@@ -1,6 +1,27 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import aiosqlite
+
+
+def _local_day_bounds(day: str, timezone: str) -> tuple[str, str]:
+    day_date = date.fromisoformat(day)
+    tz = ZoneInfo(timezone)
+    start = datetime.combine(day_date, time.min, tzinfo=tz).astimezone(UTC)
+    end = datetime.combine(
+        day_date + timedelta(days=1), time.min, tzinfo=tz
+    ).astimezone(UTC)
+    return start.isoformat(), end.isoformat()
+
+
+def _local_window_bounds(start_day: str, days: int, timezone: str) -> tuple[str, str]:
+    day_date = date.fromisoformat(start_day)
+    tz = ZoneInfo(timezone)
+    start = datetime.combine(day_date, time.min, tzinfo=tz).astimezone(UTC)
+    end = datetime.combine(
+        day_date + timedelta(days=days), time.min, tzinfo=tz
+    ).astimezone(UTC)
+    return start.isoformat(), end.isoformat()
 
 
 class AnalyticsRepository:
@@ -11,9 +32,8 @@ class AnalyticsRepository:
     # Daily source stats
     # ------------------------------------------------------------------
 
-    async def aggregate_daily_stats(self, day: str) -> None:
-        start = date.fromisoformat(day).isoformat()
-        end = date.fromordinal(date.fromisoformat(day).toordinal() + 1).isoformat()
+    async def aggregate_daily_stats(self, day: str, timezone: str = "UTC") -> None:
+        start, end = _local_day_bounds(day, timezone)
 
         await self._db.execute(
             "DELETE FROM daily_source_stats WHERE date = ?",
@@ -21,19 +41,40 @@ class AnalyticsRepository:
         )
         await self._db.execute(
             """
+            WITH filtered_events AS (
+                SELECT source, event_type, timestamp
+                FROM events
+                WHERE unixepoch(timestamp) >= unixepoch(?)
+                  AND unixepoch(timestamp) < unixepoch(?)
+            ),
+            aggregated AS (
+                SELECT source, event_type, COUNT(*) AS count
+                FROM filtered_events
+                GROUP BY source, event_type
+            )
             INSERT INTO daily_source_stats (date, source, event_type, count, first_at, last_at)
             SELECT
                 ? AS date,
-                source,
-                event_type,
-                COUNT(*) AS count,
-                MIN(timestamp) AS first_at,
-                MAX(timestamp) AS last_at
-            FROM events
-            WHERE timestamp >= ? AND timestamp < ?
-            GROUP BY source, event_type
+                a.source,
+                a.event_type,
+                a.count,
+                (
+                    SELECT f.timestamp
+                    FROM filtered_events f
+                    WHERE f.source = a.source AND f.event_type = a.event_type
+                    ORDER BY unixepoch(f.timestamp) ASC, f.timestamp ASC
+                    LIMIT 1
+                ) AS first_at,
+                (
+                    SELECT f.timestamp
+                    FROM filtered_events f
+                    WHERE f.source = a.source AND f.event_type = a.event_type
+                    ORDER BY unixepoch(f.timestamp) DESC, f.timestamp DESC
+                    LIMIT 1
+                ) AS last_at
+            FROM aggregated a
             """,
-            (day, start, end),
+            (start, end, day),
         )
         await self._db.commit()
 
@@ -89,27 +130,41 @@ class AnalyticsRepository:
     # Time blocks
     # ------------------------------------------------------------------
 
-    async def aggregate_time_blocks(self, day: str) -> None:
-        start = date.fromisoformat(day).isoformat()
-        end = date.fromordinal(date.fromisoformat(day).toordinal() + 1).isoformat()
+    async def aggregate_time_blocks(self, day: str, timezone: str = "UTC") -> None:
+        start, end = _local_day_bounds(day, timezone)
+        tz = ZoneInfo(timezone)
 
         await self._db.execute(
             "DELETE FROM time_blocks WHERE date = ?",
             (day,),
         )
-        await self._db.execute(
+        cursor = await self._db.execute(
+            """
+            SELECT source, timestamp
+            FROM events
+            WHERE unixepoch(timestamp) >= unixepoch(?)
+              AND unixepoch(timestamp) < unixepoch(?)
+            """,
+            (start, end),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+
+        counts: dict[tuple[int, str], int] = {}
+        for source, timestamp in rows:
+            local_hour = datetime.fromisoformat(timestamp).astimezone(tz).hour
+            key = (local_hour // 2, source)
+            counts[key] = counts.get(key, 0) + 1
+
+        await self._db.executemany(
             """
             INSERT INTO time_blocks (date, block, source, count)
-            SELECT
-                ? AS date,
-                CAST(strftime('%H', timestamp) AS INTEGER) / 2 AS block,
-                source,
-                COUNT(*) AS count
-            FROM events
-            WHERE timestamp >= ? AND timestamp < ?
-            GROUP BY block, source
+            VALUES (?, ?, ?, ?)
             """,
-            (day, start, end),
+            [
+                (day, block, source, count)
+                for (block, source), count in sorted(counts.items())
+            ],
         )
         await self._db.commit()
 
@@ -139,9 +194,10 @@ class AnalyticsRepository:
     # Weekly baselines
     # ------------------------------------------------------------------
 
-    async def aggregate_weekly_baselines(self, week_start: str) -> None:
-        start = date.fromisoformat(week_start).isoformat()
-        end = (date.fromisoformat(week_start) + timedelta(days=7)).isoformat()
+    async def aggregate_weekly_baselines(
+        self, week_start: str, timezone: str = "UTC"
+    ) -> None:
+        start, end = _local_window_bounds(week_start, 7, timezone)
 
         await self._db.execute(
             "DELETE FROM weekly_baselines WHERE week_start = ?",
@@ -157,7 +213,8 @@ class AnalyticsRepository:
                 COUNT(*) / 7.0 AS avg_daily,
                 COUNT(*) AS total
             FROM events
-            WHERE timestamp >= ? AND timestamp < ?
+            WHERE unixepoch(timestamp) >= unixepoch(?)
+              AND unixepoch(timestamp) < unixepoch(?)
             GROUP BY source, event_type
             """,
             (week_start, start, end),
@@ -191,9 +248,9 @@ class AnalyticsRepository:
     # Convenience
     # ------------------------------------------------------------------
 
-    async def aggregate_day(self, day: str) -> None:
-        await self.aggregate_daily_stats(day)
-        await self.aggregate_time_blocks(day)
+    async def aggregate_day(self, day: str, timezone: str = "UTC") -> None:
+        await self.aggregate_daily_stats(day, timezone=timezone)
+        await self.aggregate_time_blocks(day, timezone=timezone)
 
     # ------------------------------------------------------------------
     # Insights

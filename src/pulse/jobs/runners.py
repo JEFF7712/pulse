@@ -14,11 +14,13 @@ class JobResult:
     detail: str
 
 
-async def run_aggregation_job(day: date, database_path: str | Path) -> JobResult:
+async def run_aggregation_job(
+    day: date, database_path: str | Path, timezone: str = "UTC"
+) -> JobResult:
     async with connect_db(database_path) as db:
         await bootstrap_schema(db)
         analytics = AnalyticsRepository(db)
-        await analytics.aggregate_day(day.isoformat())
+        await analytics.aggregate_day(day.isoformat(), timezone=timezone)
     return JobResult(status="success", detail=f"Aggregated stats for {day.isoformat()}")
 
 
@@ -28,6 +30,7 @@ async def run_discovery_job(
     database_path: str | Path,
     vault_path: str | Path,
     llm,
+    timezone: str = "UTC",
     notification_channel=None,
     summarization_model: str = "",
     discovery_model: str = "",
@@ -40,6 +43,7 @@ async def run_discovery_job(
         database_path=database_path,
         vault_root=Path(vault_path),
         llm=llm,
+        timezone=timezone,
         notification_channel=notification_channel,
         summarization_model=summarization_model,
         discovery_model=discovery_model,

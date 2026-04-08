@@ -1,6 +1,8 @@
 import asyncio
 from datetime import UTC, datetime
 
+import pytest
+
 
 def test_companion_connector_source_name():
     from pulse.connectors.companion import CompanionConnector
@@ -182,6 +184,27 @@ def test_companion_connector_returns_empty_for_missing_events_key():
 
     events = asyncio.run(connector.handle_webhook({}))
     assert events == []
+
+
+def test_companion_connector_rejects_naive_timestamp():
+    from pulse.connectors.companion import CompanionConnector
+
+    connector = CompanionConnector()
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        asyncio.run(
+            connector.handle_webhook(
+                {
+                    "events": [
+                        {
+                            "type": "location.enter",
+                            "timestamp": "2026-03-27T09:05:00",
+                            "data": {"place": "office", "lat": 40.7, "lng": -74.0},
+                        }
+                    ]
+                }
+            )
+        )
 
 
 def test_companion_connector_event_ids_are_prefixed_with_source_name():

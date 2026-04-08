@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from datetime import date, datetime
 from pathlib import Path
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None
 
 from pulse.app import cli_ui as ui
 from pulse.app.config_loader import PulseConfigNotFoundError, load_config
 from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 
 
-def discover(args) -> None:
-    from datetime import date
+def _resolve_current_day(timezone: str) -> date:
+    if ZoneInfo is None:
+        return date.today()
+    return datetime.now(ZoneInfo(timezone)).date()
 
+
+def discover(args) -> None:
     from pulse.jobs.runners import run_aggregation_job, run_discovery_job
     from pulse.llm.factory import (
         create_providers_from_config,
@@ -22,7 +32,11 @@ def discover(args) -> None:
     )
 
     config = load_config()
-    target = date.fromisoformat(args.date) if args.date else date.today()
+    target = (
+        date.fromisoformat(args.date)
+        if args.date
+        else _resolve_current_day(config.timezone)
+    )
 
     _, disc_llm = create_providers_from_config(config)
     if disc_llm is None:
@@ -33,7 +47,13 @@ def discover(args) -> None:
 
     ui.rule("pulse discover")
     ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
-    asyncio.run(run_aggregation_job(day=target, database_path=config.database_path))
+    asyncio.run(
+        run_aggregation_job(
+            day=target,
+            database_path=config.database_path,
+            timezone=config.timezone,
+        )
+    )
 
     ui.say(
         f"[accent]Running {args.cadence} discovery[/] for [bold]{target.isoformat()}[/]…"
@@ -46,6 +66,7 @@ def discover(args) -> None:
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=disc_llm,
+                timezone=config.timezone,
                 summarization_model=summarization_model_for_source_summaries(config)
                 or "",
                 discovery_model=discovery_model_for_discovery(config) or "",
@@ -275,4 +296,3 @@ def reset(args) -> None:
                 )
 
     asyncio.run(_do_reset())
-

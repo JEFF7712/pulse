@@ -1,4 +1,5 @@
 """Microsoft Graph mail → Pulse events (email.received)."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -44,7 +45,8 @@ class MicrosoftMailConnector(Connector):
         return self._auth_manager is not None and self._auth_manager.is_authorized()
 
     def _auth_headers(self) -> dict[str, str]:
-        assert self._auth_manager is not None
+        if self._auth_manager is None:
+            raise RuntimeError("Initialize Microsoft auth manager")
         token = self._auth_manager.get_valid_token()
         return {"Authorization": f"Bearer {token}"}
 
@@ -58,9 +60,13 @@ class MicrosoftMailConnector(Connector):
                 "$select": "id,subject,from,receivedDateTime",
             }
             if since is not None:
-                su = since.astimezone(UTC) if since.tzinfo else since.replace(tzinfo=UTC)
+                su = (
+                    since.astimezone(UTC) if since.tzinfo else since.replace(tzinfo=UTC)
+                )
                 # OData datetime literal
-                params["$filter"] = f"receivedDateTime ge {su.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                params["$filter"] = (
+                    f"receivedDateTime ge {su.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                )
 
             resp = await client.get(
                 f"{GRAPH_BASE}/me/messages",

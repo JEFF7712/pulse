@@ -31,9 +31,10 @@ def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
     resp = httpx.Response(429, request=req)
     rate_exc = anthropic.RateLimitError("rate", response=resp, body=None)
 
-    async def fake_run_aggregation_job(*, day, database_path: str):
+    async def fake_run_aggregation_job(*, day, database_path: str, timezone: str):
         from pulse.jobs.runners import JobResult
 
+        assert timezone == "UTC"
         return JobResult(status="success", detail="ok")
 
     async def fake_run_discovery_job(**kwargs):
@@ -48,9 +49,7 @@ def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
         vault_path=str(tmp_path / "vault"),
         anthropic_api_key="test-key",
         llm=LLMConfig(
-            discovery=LLMRoleConfig(
-                provider="anthropic", model="claude-sonnet-4-6"
-            ),
+            discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
         ),
     )
     client = TestClient(app)
@@ -105,9 +104,12 @@ def test_discover_action_creates_database_parent_directory_on_fresh_setup(
             observed["api_key"] = api_key
             observed["model"] = model
 
-    async def fake_run_aggregation_job(*, day, database_path: str) -> None:
+    async def fake_run_aggregation_job(
+        *, day, database_path: str, timezone: str
+    ) -> None:
         observed["day"] = day
         observed["database_path"] = database_path
+        observed["timezone"] = timezone
         assert database_path == str(database_path_obj)
         assert database_path_obj.parent.exists()
 
@@ -125,9 +127,7 @@ def test_discover_action_creates_database_parent_directory_on_fresh_setup(
         vault_path=str(tmp_path / "vault"),
         anthropic_api_key="test-key",
         llm=LLMConfig(
-            discovery=LLMRoleConfig(
-                provider="anthropic", model="claude-sonnet-4-6"
-            ),
+            discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
         ),
     )
     client = TestClient(app)
@@ -137,6 +137,7 @@ def test_discover_action_creates_database_parent_directory_on_fresh_setup(
     assert response.status_code in (302, 303)
     assert response.headers["location"] == "/?notice=discovery-complete"
     assert observed["database_path"] == str(database_path_obj)
+    assert observed["timezone"] == "UTC"
     assert observed["api_key"] == "test-key"
 
 

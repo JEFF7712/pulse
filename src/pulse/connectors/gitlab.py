@@ -1,4 +1,5 @@
 """GitLab user events → Pulse dev.* events."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -52,51 +53,68 @@ class GitLabConnector(Connector):
     def _headers(self) -> dict[str, str]:
         if self._personal_token:
             return {"PRIVATE-TOKEN": self._personal_token}
-        assert self._auth_manager is not None
+        if self._auth_manager is None:
+            raise RuntimeError("Initialize GitLab auth manager")
         return {"Authorization": f"Bearer {self._auth_manager.get_valid_token()}"}
 
     async def pull(self, since: datetime | None = None) -> list[Event]:
         client = self._http or httpx.AsyncClient(timeout=60.0)
         owns = self._http is None
         try:
-            resp = await client.get(
-                f"{self._base}/api/v4/events",
-                params={"per_page": _MAX_EVENTS},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            rows = resp.json()
             events: list[Event] = []
-            for row in rows:
-                created = row.get("created_at")
-                if not created:
-                    continue
-                ts = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                if since is not None and ts <= since.astimezone(UTC):
-                    continue
-                eid = str(row.get("id", ""))
-                target_title = row.get("target_title") or ""
-                proj = row.get("project_id")
-                repo = str(proj) if proj is not None else ""
-                action = row.get("action_name") or row.get("push_data", {}).get("action") or "activity"
-                et = _map_action_kind(str(action).lower())
-                title = target_title or f"{action} (project {repo})"
-                url = row.get("target_url") or self._base
-                events.append(
-                    Event(
-                        id=f"gitlab:{eid}",
-                        timestamp=ts,
-                        source="gitlab",
-                        event_type=et,
-                        data={
-                            "repo": repo,
-                            "action": str(action),
-                            "title": title,
-                            "url": url,
-                            "provider": "gitlab",
-                        },
-                    )
+            seen_ids: set[str] = set()
+            cutoff = since.astimezone(UTC) if since is not None else None
+            page = 1
+            reached_cutoff = False
+            while True:
+                resp = await client.get(
+                    f"{self._base}/api/v4/events",
+                    params={"per_page": _MAX_EVENTS, "page": page, "sort": "desc"},
+                    headers=self._headers(),
                 )
+                resp.raise_for_status()
+                rows = resp.json()
+                for row in rows:
+                    created = row.get("created_at")
+                    if not created:
+                        continue
+                    ts = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                    if cutoff is not None and ts <= cutoff:
+                        reached_cutoff = True
+                        break
+                    eid = str(row.get("id", ""))
+                    if eid in seen_ids:
+                        continue
+                    seen_ids.add(eid)
+                    target_title = row.get("target_title") or ""
+                    proj = row.get("project_id")
+                    repo = str(proj) if proj is not None else ""
+                    action = (
+                        row.get("action_name")
+                        or row.get("push_data", {}).get("action")
+                        or "activity"
+                    )
+                    et = _map_action_kind(str(action).lower())
+                    title = target_title or f"{action} (project {repo})"
+                    url = row.get("target_url") or self._base
+                    events.append(
+                        Event(
+                            id=f"gitlab:{eid}",
+                            timestamp=ts,
+                            source="gitlab",
+                            event_type=et,
+                            data={
+                                "repo": repo,
+                                "action": str(action),
+                                "title": title,
+                                "url": url,
+                                "provider": "gitlab",
+                            },
+                        )
+                    )
+                if reached_cutoff or len(rows) < _MAX_EVENTS:
+                    break
+                page += 1
             return events
         finally:
             if owns:

@@ -1,3 +1,5 @@
+import asyncio
+
 import anthropic
 
 
@@ -6,7 +8,9 @@ class AnthropicProvider:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
 
-    async def complete(self, prompt: str, *, system_prompt: str | None = None, model: str | None = None) -> str:
+    async def complete(
+        self, prompt: str, *, system_prompt: str | None = None, model: str | None = None
+    ) -> str:
         kwargs: dict = {
             "model": model or self._model,
             "max_tokens": 4096,
@@ -15,5 +19,6 @@ class AnthropicProvider:
         if system_prompt:
             kwargs["system"] = system_prompt
 
-        response = self._client.messages.create(**kwargs)
+        # Cancellation stops awaiting the SDK call, but the worker thread keeps running.
+        response = await asyncio.to_thread(self._client.messages.create, **kwargs)
         return response.content[0].text

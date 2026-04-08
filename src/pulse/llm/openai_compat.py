@@ -1,5 +1,8 @@
 """OpenAI-compatible LLM provider — covers OpenAI, Groq, Together, Mistral, Ollama, vLLM."""
+
 from __future__ import annotations
+
+import asyncio
 
 
 class OpenAICompatibleProvider:
@@ -34,7 +37,9 @@ class OpenAICompatibleProvider:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        response = self._client.chat.completions.create(
+        # Cancellation stops awaiting the SDK call, but the worker thread keeps running.
+        response = await asyncio.to_thread(
+            self._client.chat.completions.create,
             model=model or self._model,
             messages=messages,
             max_tokens=4096,

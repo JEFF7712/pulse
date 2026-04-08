@@ -1,4 +1,5 @@
 """Notion workspace search (and optional database queries) → Pulse notion.* events."""
+
 from __future__ import annotations
 
 import logging
@@ -108,7 +109,8 @@ class NotionConnector(Connector):
         return self._token is not None
 
     def _headers(self) -> dict[str, str]:
-        assert self._token is not None
+        if self._token is None:
+            raise RuntimeError("Configure Notion token")
         return {
             "Authorization": f"Bearer {self._token}",
             "Notion-Version": NOTION_VERSION,
@@ -231,7 +233,9 @@ class NotionConnector(Connector):
                 headers=self._headers(),
             )
             if resp.status_code == 404:
-                logger.warning("Notion database not found or not shared: %s", database_id)
+                logger.warning(
+                    "Notion database not found or not shared: %s", database_id
+                )
                 return
             resp.raise_for_status()
             data = resp.json()
@@ -314,7 +318,5 @@ def _normalize_uuid(raw: str) -> str:
     ):
         return s
     if re.fullmatch(r"[0-9a-fA-F]{32}", s):
-        return (
-            f"{s[0:8]}-{s[8:12]}-{s[12:16]}-{s[16:20]}-{s[20:32]}"
-        )
+        return f"{s[0:8]}-{s[8:12]}-{s[12:16]}-{s[16:20]}-{s[20:32]}"
     return s

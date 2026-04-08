@@ -83,8 +83,12 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "Same **`load_config()`**",
     "One configured role can cover both summarization and discovery if the other is omitted.",
     "PULSE_COMPANION_TOKEN",
+    "Authorization: Bearer <token>",
+    "X-Pulse-Token",
     "PULSE_FCM_SERVICE_ACCOUNT_PATH",
     "[connectors.companion]",
+    "preferred `message_text`",
+    "`message` is accepted as a compatibility alias when `message_text` is absent",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [
@@ -106,6 +110,10 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "/api/corrections",
     "/api/device-token",
     "PULSE_COMPANION_TOKEN",
+    "Authorization: Bearer <token>",
+    "X-Pulse-Token",
+    'Body: `{"context_id","message_text"}` preferred',
+    "corrections prefer `message_text`",
     "invalid-publisher",
     "pypi-trusted-publishing.md",
 ]

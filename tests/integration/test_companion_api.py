@@ -108,6 +108,22 @@ def test_post_correction_records_and_returns_id(tmp_path):
     assert "correction_id" in response.json()
 
 
+def test_post_correction_accepts_message_alias(tmp_path):
+    app = _build_test_app(tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/corrections",
+        headers={"X-Pulse-Token": "test-token"},
+        json={
+            "context_id": "pattern:test-slug",
+            "message": "The deadline is Friday.",
+        },
+    )
+    assert response.status_code == 202
+    assert "correction_id" in response.json()
+
+
 def test_post_device_token_stores_token(tmp_path):
     app = _build_test_app(tmp_path)
     client = TestClient(app)
@@ -147,6 +163,30 @@ def test_api_rejects_unauthenticated_request(tmp_path):
     assert response.status_code == 401
 
 
+def test_mounted_api_accepts_bearer_token_with_settings_override(tmp_path):
+    from pulse.app.api import build_api_router
+    from pulse.app.auth import build_require_companion_token
+    from pulse.app.dependencies import get_settings
+
+    app = FastAPI()
+    auth_dep = build_require_companion_token(get_settings)
+    app.include_router(build_api_router(get_settings, auth_dep))
+    app.dependency_overrides[get_settings] = lambda: PulseConfig(
+        database_path=str(tmp_path / "test.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="override-token",
+    )
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/insights",
+        headers={"Authorization": "Bearer override-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_companion_webhook_and_api_wired_in_full_app(tmp_path):
     from pulse.app.config import PulseConfig, ConnectorConfig
     from pulse.app.main import create_app
@@ -162,6 +202,7 @@ def test_companion_webhook_and_api_wired_in_full_app(tmp_path):
 
     registry = ConnectorRegistry()
     register_all(registry, settings)
+    asyncio.run(registry.build_active_connectors(settings))
 
     app = create_app(settings=settings, registry=registry)
     client = TestClient(app)
@@ -169,6 +210,7 @@ def test_companion_webhook_and_api_wired_in_full_app(tmp_path):
     # Companion webhook should be wired
     response = client.post(
         "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
         json={
             "events": [
                 {
@@ -200,3 +242,201 @@ def test_companion_webhook_and_api_wired_in_full_app(tmp_path):
         },
     )
     assert response.status_code == 202
+
+
+def test_companion_webhook_requires_token_in_full_app(tmp_path):
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+    asyncio.run(registry.build_active_connectors(settings))
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    response = client.post(
+        "/webhooks/companion",
+        json={"events": []},
+    )
+
+    assert response.status_code == 401
+
+
+def test_companion_webhook_accepts_bearer_token_in_full_app(tmp_path):
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+    asyncio.run(registry.build_active_connectors(settings))
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    response = client.post(
+        "/webhooks/companion",
+        headers={"Authorization": "Bearer integration-token"},
+        json={"events": []},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["events_received"] == 0
+
+
+def test_companion_webhook_not_mounted_when_connector_disabled(tmp_path):
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=False)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+    asyncio.run(registry.build_active_connectors(settings))
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    response = client.post(
+        "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
+        json={"events": []},
+    )
+
+    assert response.status_code == 404
+
+
+def test_companion_webhook_is_mounted_before_building_active_connectors(tmp_path):
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    unauthenticated = client.post("/webhooks/companion", json={"events": []})
+    authenticated = client.post(
+        "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
+        json={"events": []},
+    )
+
+    assert unauthenticated.status_code == 401
+    assert authenticated.status_code == 200
+    assert authenticated.json()["events_received"] == 0
+
+
+def test_companion_webhook_returns_400_for_naive_timestamp(tmp_path):
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    settings = PulseConfig(
+        database_path=str(tmp_path / "full.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    registry = ConnectorRegistry()
+    register_all(registry, settings)
+
+    app = create_app(settings=settings, registry=registry)
+    client = TestClient(app)
+
+    response = client.post(
+        "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
+        json={
+            "events": [
+                {
+                    "type": "location.enter",
+                    "timestamp": "2026-03-27T09:00:00",
+                    "data": {"place": "office", "lat": 40.7, "lng": -74.0},
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert "timezone-aware" in response.json()["detail"]
+
+
+def test_companion_webhook_respects_dependency_overrides_when_app_built_without_settings(
+    tmp_path,
+):
+    from pulse.app.config import PulseConfig, ConnectorConfig
+    from pulse.app.dependencies import get_settings
+    from pulse.app.main import create_app
+    from pulse.connectors import register_all
+    from pulse.connectors.registry import ConnectorRegistry
+
+    registry = ConnectorRegistry()
+    register_all(registry, PulseConfig())
+
+    app = create_app(registry=registry)
+    client = TestClient(app)
+
+    app.dependency_overrides[get_settings] = lambda: PulseConfig(
+        database_path=str(tmp_path / "enabled.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=True)},
+    )
+
+    unauthenticated = client.post("/webhooks/companion", json={"events": []})
+    authenticated = client.post(
+        "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
+        json={"events": []},
+    )
+
+    assert unauthenticated.status_code == 401
+    assert authenticated.status_code == 200
+
+    app.dependency_overrides[get_settings] = lambda: PulseConfig(
+        database_path=str(tmp_path / "disabled.db"),
+        vault_path=str(tmp_path / "vault"),
+        companion_token="integration-token",
+        connectors={"companion": ConnectorConfig(enabled=False)},
+    )
+
+    disabled = client.post(
+        "/webhooks/companion",
+        headers={"X-Pulse-Token": "integration-token"},
+        json={"events": []},
+    )
+
+    assert disabled.status_code == 404

@@ -71,6 +71,7 @@ class DiscoveryEngine:
         database_path,
         vault_root,
         llm,
+        timezone: str = "UTC",
         notification_channel=None,
         summarization_model: str = "",
         discovery_model: str = "",
@@ -78,6 +79,7 @@ class DiscoveryEngine:
         self._db_path = database_path
         self._vault = VaultMemory(vault_root)
         self._llm = llm
+        self._timezone = timezone
         self._channel = notification_channel
         self._summarization_model = summarization_model
         self._discovery_model = discovery_model
@@ -92,7 +94,9 @@ class DiscoveryEngine:
 
             current = start_date
             while current <= target_date:
-                await analytics.aggregate_day(current.isoformat())
+                await analytics.aggregate_day(
+                    current.isoformat(), timezone=self._timezone
+                )
                 current += timedelta(days=1)
 
             end_date = target_date + timedelta(days=1)
@@ -103,14 +107,18 @@ class DiscoveryEngine:
             all_events = []
             current = start_date
             while current <= target_date:
-                day_events = await event_repo.list_events_for_day(current.isoformat())
+                day_events = await event_repo.list_events_for_day(
+                    current.isoformat(), timezone=self._timezone
+                )
                 all_events.extend(day_events)
                 current += timedelta(days=1)
 
             baselines: list[dict] = []
             for weeks_back in range(1, 5):
                 week_start = target_date - timedelta(weeks=weeks_back)
-                await analytics.aggregate_weekly_baselines(week_start.isoformat())
+                await analytics.aggregate_weekly_baselines(
+                    week_start.isoformat(), timezone=self._timezone
+                )
                 week_baselines = await analytics.get_weekly_baselines(
                     week_start.isoformat()
                 )

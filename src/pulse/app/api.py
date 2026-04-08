@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 
 from pulse.app.config import PulseConfig
+from pulse.app.corrections_webhook import normalize_correction_payload
 from pulse.services.corrections import build_correction_service
 from pulse.store.analytics import AnalyticsRepository
 from pulse.store.correction_applications import CorrectionApplicationRepository
@@ -57,7 +58,9 @@ def build_api_router(
 
     @router.get("/insights")
     async def get_insights_list(
-        status: str | None = Query(default=None, description="Filter by insight status"),
+        status: str | None = Query(
+            default=None, description="Filter by insight status"
+        ),
     ) -> list[dict[str, Any]]:
         settings = get_settings()
         async with connect_db(settings.database_path) as db:
@@ -90,12 +93,7 @@ def build_api_router(
     @router.post("/corrections", status_code=status.HTTP_202_ACCEPTED)
     async def post_correction(body: dict[str, str]) -> dict[str, str]:
         settings = get_settings()
-        context_id = body.get("context_id", "")
-        message_text = body.get("message_text", "")
-        if not context_id or not message_text:
-            raise HTTPException(
-                status_code=400, detail="context_id and message_text required."
-            )
+        context_id, message_text = normalize_correction_payload(body)
 
         async with connect_db(settings.database_path) as db:
             await bootstrap_schema(db)
@@ -115,9 +113,7 @@ def build_api_router(
         token = body.get("token", "")
         platform = body.get("platform", "")
         if not token or not platform:
-            raise HTTPException(
-                status_code=400, detail="token and platform required."
-            )
+            raise HTTPException(status_code=400, detail="token and platform required.")
 
         async with connect_db(settings.database_path) as db:
             await bootstrap_schema(db)

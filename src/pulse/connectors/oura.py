@@ -1,4 +1,5 @@
 """Oura Ring sleep, readiness, daily activity, and workouts → Pulse health.* events."""
+
 from __future__ import annotations
 
 import logging
@@ -53,7 +54,8 @@ class OuraConnector(Connector):
     def _bearer(self) -> str:
         if self._pat:
             return self._pat
-        assert self._auth is not None
+        if self._auth is None:
+            raise RuntimeError("Initialize Oura auth manager")
         return self._auth.get_valid_token()
 
     def _headers(self) -> dict[str, str]:
@@ -207,7 +209,9 @@ def _sleep_event(row: dict[str, Any]) -> Event | None:
         eid = f"sleep:{day_s}"
 
     score = row.get("score")
-    contributors = row.get("contributors") if isinstance(row.get("contributors"), dict) else {}
+    contributors = (
+        row.get("contributors") if isinstance(row.get("contributors"), dict) else {}
+    )
 
     return Event(
         id=f"oura:sleep:{eid}",
@@ -243,7 +247,9 @@ def _readiness_event(row: dict[str, Any]) -> Event | None:
         eid = f"readiness:{day_s}"
 
     score = row.get("score")
-    contributors = row.get("contributors") if isinstance(row.get("contributors"), dict) else {}
+    contributors = (
+        row.get("contributors") if isinstance(row.get("contributors"), dict) else {}
+    )
 
     return Event(
         id=f"oura:readiness:{eid}",
@@ -279,7 +285,9 @@ def _activity_event(row: dict[str, Any]) -> Event | None:
             "day": day_s,
             "score": row.get("score"),
             "steps": row.get("steps"),
-            "equivalent_walking_distance_meters": row.get("equivalent_walking_distance"),
+            "equivalent_walking_distance_meters": row.get(
+                "equivalent_walking_distance"
+            ),
             "high_activity_met_minutes": row.get("high_activity_met_minutes"),
             "medium_activity_met_minutes": row.get("medium_activity_met_minutes"),
             "low_activity_met_minutes": row.get("low_activity_met_minutes"),

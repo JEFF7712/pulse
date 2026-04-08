@@ -5,7 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from datetime import date, datetime
 from pathlib import Path
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None
 
 from pulse.app import cli_ui as ui
 from pulse.app.commands.serve import quiet_noisy_loggers
@@ -74,6 +80,12 @@ If no date is known, use [unknown].
 _PROFILE_PASTE_END_SENTINEL = "---END---"
 
 
+def _resolve_current_day(config) -> date:
+    if ZoneInfo is None:
+        return date.today()
+    return datetime.now(ZoneInfo(config.timezone)).date()
+
+
 def _print_llm_assistant_import_hint() -> None:
     ui.say("")
     ui.say(
@@ -83,7 +95,9 @@ def _print_llm_assistant_import_hint() -> None:
         "Then paste the reply in the terminal as instructed.[/]"
     )
     ui.muted_line("─" * 76)
-    ui.console.print(_LLM_ASSISTANT_EXPORT_PROMPT, markup=False, highlight=False, end="")
+    ui.console.print(
+        _LLM_ASSISTANT_EXPORT_PROMPT, markup=False, highlight=False, end=""
+    )
     if not _LLM_ASSISTANT_EXPORT_PROMPT.endswith("\n"):
         ui.console.print()
     ui.muted_line("─" * 76)
@@ -164,8 +178,6 @@ def init_profile(
     profile_text: str | None = None,
     config_dir: Path | None = None,
 ) -> None:
-    from datetime import date, datetime
-
     from pulse.analysis.vault_memory import VaultMemory
     from pulse.connectors import register_all
     from pulse.connectors.registry import ConnectorRegistry
@@ -261,9 +273,13 @@ def init_profile(
 
     # --- Step 3: Aggregate ---
     ui.step("Aggregating stats")
-    today = date.today()
+    today = _resolve_current_day(config)
     result = asyncio.run(
-        run_aggregation_job(day=today, database_path=config.database_path)
+        run_aggregation_job(
+            day=today,
+            database_path=config.database_path,
+            timezone=config.timezone,
+        )
     )
     ui.muted_line(result.detail)
 
@@ -291,6 +307,7 @@ def init_profile(
                     database_path=config.database_path,
                     vault_path=config.vault_path,
                     llm=disc_llm,
+                    timezone=config.timezone,
                     notification_channel=channel,
                     summarization_model=summarization_model_for_source_summaries(config)
                     or "",
@@ -366,4 +383,3 @@ def _collect_profile(
 
     vault.write_config_file("profile.md", profile_content)
     ui.success("Profile saved.")
-

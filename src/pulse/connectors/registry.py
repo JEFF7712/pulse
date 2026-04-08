@@ -49,7 +49,8 @@ class ConnectorRegistry:
 
             else:
                 logger.warning(
-                    "Config entry '%s' has no registered connector class, skipping", name
+                    "Config entry '%s' has no registered connector class, skipping",
+                    name,
                 )
 
     def get_pull_connectors(self) -> list[tuple[Connector, ConnectorConfig]]:
@@ -65,3 +66,12 @@ class ConnectorRegistry:
         build_active_connectors() to have been called first.
         """
         return [factory() for factory in self._push_factories.values()]
+
+    def get_enabled_push_connector_instances(
+        self, config: PulseConfig
+    ) -> list[PushConnector]:
+        return [
+            factory()
+            for name, factory in self._push_factories.items()
+            if config.connectors.get(name, ConnectorConfig()).enabled
+        ]

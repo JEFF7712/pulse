@@ -20,17 +20,17 @@ Paths, timezone, scheduler + connector counts. **POST** actions return to `/` wi
 ## Webhooks and MCP
 
 - **`POST /webhooks/telegram`** — always mounted; valid replies → 202, bad payload → 400. Stores correction + `correction_applications`; vault updates when corrections LLM + target resolve. **`pulse_correct`** (MCP) uses the same pipeline.
-- **`POST /webhooks/corrections`** — only if `PULSE_CORRECTIONS_WEBHOOK_SECRET` set; else 404. Body: `{"context_id","message"}`. Auth: `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hmac(raw body)>`.
+- **`POST /webhooks/corrections`** — only if `PULSE_CORRECTIONS_WEBHOOK_SECRET` set; else 404. Body: `{"context_id","message_text"}` preferred; `message` still works as a compatibility alias when `message_text` is absent. Auth: `Authorization: Bearer <secret>` or `X-Pulse-Signature: sha256=<hmac(raw body)>`.
 
 Default install: pull connectors only unless you register push connectors with webhook paths.
 
-## Companion (when `[connectors.companion]` enabled)
+## Companion
 
-- `POST /webhooks/companion` — events (Bearer if `PULSE_COMPANION_TOKEN` set)
-- `GET /api/insights`, `GET /api/insights/{id}` — pattern metadata + markdown for the companion app
-- `POST /api/corrections`, `POST /api/device-token` (FCM when `PULSE_FCM_SERVICE_ACCOUNT_PATH` set)
+- `POST /webhooks/companion` — mounted only when `[connectors.companion]` is enabled; auth is `X-Pulse-Token: <token>` or `Authorization: Bearer <token>` from `PULSE_COMPANION_TOKEN`
+- `GET /api/insights`, `GET /api/insights/{id}` — pattern metadata + markdown for the companion app; same token auth
+- `POST /api/corrections`, `POST /api/device-token` — same token auth (FCM delivery when `PULSE_FCM_SERVICE_ACCOUNT_PATH` set); corrections prefer `message_text`, with `message` accepted only for compatibility when `message_text` is absent
 
-Disabled → routes not mounted (404).
+Disabled companion connector → `/webhooks/companion` not mounted (404).
 
 ## Scheduler (baseline jobs)
 

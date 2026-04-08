@@ -1,4 +1,5 @@
 """Microsoft Graph calendar → Pulse events (calendar.event)."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -49,7 +50,8 @@ class MicrosoftCalendarConnector(Connector):
         return self._auth_manager is not None and self._auth_manager.is_authorized()
 
     def _auth_headers(self) -> dict[str, str]:
-        assert self._auth_manager is not None
+        if self._auth_manager is None:
+            raise RuntimeError("Initialize Microsoft auth manager")
         token = self._auth_manager.get_valid_token()
         return {"Authorization": f"Bearer {token}"}
 
@@ -70,7 +72,9 @@ class MicrosoftCalendarConnector(Connector):
                 "$select": "id,subject,start,end,lastModifiedDateTime",
             }
             if since is not None:
-                su = since.astimezone(UTC) if since.tzinfo else since.replace(tzinfo=UTC)
+                su = (
+                    since.astimezone(UTC) if since.tzinfo else since.replace(tzinfo=UTC)
+                )
                 params["$filter"] = (
                     f"lastModifiedDateTime ge {su.strftime('%Y-%m-%dT%H:%M:%S.0000000Z')}"
                 )

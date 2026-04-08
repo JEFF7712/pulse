@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from pulse.app.api import build_api_router
-from pulse.app.auth import build_require_companion_token
+from pulse.app.auth import build_require_companion_token, verify_companion_token
 from pulse.app.config import PulseConfig
 from pulse.app.dependencies import get_settings
 from pulse.app.home_actions import (
@@ -19,6 +19,7 @@ from pulse.app.corrections_webhook import (
     verify_corrections_webhook,
 )
 from pulse.app.homepage import HomepageNotice, HomepageStatus, render_homepage
+from pulse.connectors.companion import CompanionPayloadError
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import extract_reply_context
 from pulse.jobs.scheduler import build_scheduler
@@ -112,6 +113,8 @@ def create_app(
     ) -> dict[str, str]:
         return {"status": "ok"}
 
+    auth_dep = build_require_companion_token(settings_dependency)
+
     @app.post("/webhooks/telegram", status_code=status.HTTP_202_ACCEPTED)
     async def telegram_webhook(
         payload: dict[str, Any],
@@ -179,7 +182,6 @@ def create_app(
             _register_push_route(app, push_conn, settings_dependency)
 
     # Wire companion app API
-    auth_dep = build_require_companion_token(settings_dependency)
     api_router = build_api_router(settings_dependency, auth_dep)
     app.include_router(api_router)
 
@@ -188,14 +190,29 @@ def create_app(
 
 def _register_push_route(app: FastAPI, push_conn, settings_dependency) -> None:
     path = push_conn.get_webhook_path()
+    source_name = push_conn.get_source_name()
 
     async def handler(
         request: Request,
         s: Annotated[PulseConfig, Depends(settings_dependency)],
         _conn=push_conn,
     ):
+        connector_config = s.connectors.get(source_name)
+        if connector_config is None or not connector_config.enabled:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        if source_name == "companion":
+            verify_companion_token(
+                s,
+                request.headers.get("X-Pulse-Token"),
+                request.headers.get("Authorization"),
+            )
+
         payload = await request.json()
-        events = await _conn.handle_webhook(payload)
+        try:
+            events = await _conn.handle_webhook(payload)
+        except CompanionPayloadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if events:
             async with connect_db(s.database_path) as db:
                 await bootstrap_schema(db)

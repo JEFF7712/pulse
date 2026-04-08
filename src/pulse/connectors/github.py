@@ -1,4 +1,5 @@
 """GitHub user events → Pulse dev.* events."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -78,7 +79,8 @@ class GitHubConnector(Connector):
         return self._auth_manager is not None and self._auth_manager.is_authorized()
 
     def _headers(self) -> dict[str, str]:
-        assert self._auth_manager is not None
+        if self._auth_manager is None:
+            raise RuntimeError("Initialize GitHub auth manager")
         token = self._auth_manager.get_valid_token()
         return {
             "Authorization": f"Bearer {token}",
@@ -90,40 +92,52 @@ class GitHubConnector(Connector):
         client = self._http or httpx.AsyncClient(timeout=60.0)
         owns = self._http is None
         try:
-            params: dict[str, str | int] = {"per_page": _MAX_EVENTS}
-            resp = await client.get(
-                f"{GITHUB_API}/user/events",
-                params=params,
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            rows = resp.json()
             events: list[Event] = []
-            for row in rows:
-                created = row.get("created_at")
-                if not created:
-                    continue
-                ts = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                if since is not None and ts <= since.astimezone(UTC):
-                    continue
-                repo_name = (row.get("repo") or {}).get("name", "")
-                et = _map_event_type(row.get("type", ""))
-                eid = str(row.get("id", ""))
-                events.append(
-                    Event(
-                        id=f"github:{eid}",
-                        timestamp=ts,
-                        source="github",
-                        event_type=et,
-                        data={
-                            "repo": repo_name,
-                            "action": row.get("type", ""),
-                            "title": _title_for_event(row),
-                            "url": _url_for_event(row),
-                            "provider": "github",
-                        },
-                    )
+            seen_ids: set[str] = set()
+            cutoff = since.astimezone(UTC) if since is not None else None
+            page = 1
+            reached_cutoff = False
+            while True:
+                params: dict[str, str | int] = {"per_page": _MAX_EVENTS, "page": page}
+                resp = await client.get(
+                    f"{GITHUB_API}/user/events",
+                    params=params,
+                    headers=self._headers(),
                 )
+                resp.raise_for_status()
+                rows = resp.json()
+                for row in rows:
+                    created = row.get("created_at")
+                    if not created:
+                        continue
+                    ts = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                    if cutoff is not None and ts <= cutoff:
+                        reached_cutoff = True
+                        break
+                    eid = str(row.get("id", ""))
+                    if eid in seen_ids:
+                        continue
+                    seen_ids.add(eid)
+                    repo_name = (row.get("repo") or {}).get("name", "")
+                    et = _map_event_type(row.get("type", ""))
+                    events.append(
+                        Event(
+                            id=f"github:{eid}",
+                            timestamp=ts,
+                            source="github",
+                            event_type=et,
+                            data={
+                                "repo": repo_name,
+                                "action": row.get("type", ""),
+                                "title": _title_for_event(row),
+                                "url": _url_for_event(row),
+                                "provider": "github",
+                            },
+                        )
+                    )
+                if reached_cutoff or len(rows) < _MAX_EVENTS:
+                    break
+                page += 1
             return events
         finally:
             if owns:

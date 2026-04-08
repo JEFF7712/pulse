@@ -1,10 +1,26 @@
 import json
-from datetime import date
-from datetime import datetime
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import aiosqlite
 
 from pulse.domain.events import Event
+
+
+def _local_day_bounds(day: str, timezone: str) -> tuple[str, str]:
+    day_date = date.fromisoformat(day)
+    tz = ZoneInfo(timezone)
+    start = datetime.combine(day_date, time.min, tzinfo=tz).astimezone(UTC)
+    end = datetime.combine(
+        day_date + timedelta(days=1), time.min, tzinfo=tz
+    ).astimezone(UTC)
+    return start.isoformat(), end.isoformat()
+
+
+def _normalize_timestamp(timestamp: datetime) -> datetime:
+    if timestamp.tzinfo is None:
+        raise ValueError("Event timestamps must be timezone-aware")
+    return timestamp.astimezone(UTC)
 
 
 class EventRepository:
@@ -44,7 +60,7 @@ class EventRepository:
             [
                 (
                     event.id,
-                    event.timestamp.isoformat(),
+                    _normalize_timestamp(event.timestamp).isoformat(),
                     event.source,
                     event.event_type,
                     json.dumps(event.data),
@@ -56,16 +72,16 @@ class EventRepository:
         await self._db.commit()
         return len(events) - len(existing)
 
-    async def list_events_for_day(self, day: str) -> list[Event]:
-        start = date.fromisoformat(day).isoformat()
-        end = date.fromordinal(date.fromisoformat(day).toordinal() + 1).isoformat()
+    async def list_events_for_day(self, day: str, timezone: str = "UTC") -> list[Event]:
+        start, end = _local_day_bounds(day, timezone)
 
         cursor = await self._db.execute(
             """
             SELECT id, timestamp, source, event_type, data, metadata
             FROM events
-            WHERE timestamp >= ? AND timestamp < ?
-            ORDER BY timestamp ASC, id ASC
+            WHERE unixepoch(timestamp) >= unixepoch(?)
+              AND unixepoch(timestamp) < unixepoch(?)
+            ORDER BY unixepoch(timestamp) ASC, id ASC
             """,
             (start, end),
         )

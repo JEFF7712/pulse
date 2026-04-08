@@ -33,19 +33,31 @@ def parse_corrections_webhook_payload(body: bytes) -> tuple[str, str]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Body must be a JSON object.",
         )
+    return normalize_correction_payload(payload)
+
+
+def normalize_correction_payload(payload: Any) -> tuple[str, str]:
+    """Return normalized (context_id, message_text) for correction payloads."""
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Body must be a JSON object.",
+        )
     context_id = payload.get("context_id")
-    message = payload.get("message")
+    message_text = payload.get("message_text")
+    if message_text is None:
+        message_text = payload.get("message")
     if not isinstance(context_id, str) or not context_id.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing context_id.",
         )
-    if not isinstance(message, str) or not message.strip():
+    if not isinstance(message_text, str) or not message_text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing message.",
+            detail="Missing message_text (or legacy message).",
         )
-    return context_id.strip(), message.strip()
+    return context_id.strip(), message_text.strip()
 
 
 def _authorized(request: Request, body: bytes, secret: str) -> bool:
