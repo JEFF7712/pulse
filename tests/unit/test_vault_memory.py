@@ -48,6 +48,12 @@ def test_write_pattern_creates_markdown_file(tmp_path: Path) -> None:
 
     content = path.read_text(encoding="utf-8")
 
+    assert content.startswith("---\n")
+    assert "pulse: true" in content
+    assert "type: pattern" in content
+    assert "slug: late-night-coding" in content
+    assert "tags: [pulse, pulse/pattern]" in content
+
     # Header
     assert "# Pattern: Late-night coding sessions" in content
 
@@ -68,8 +74,14 @@ def test_write_pattern_creates_markdown_file(tmp_path: Path) -> None:
     assert "## Trend" in content
     assert "Strengthening" in content
 
+    assert "## Related days" in content
+    assert "[[01-Daily/2026-01-10]]" in content
+    assert "[[01-Daily/2026-02-14]]" in content
+    assert "[[01-Daily/2026-03-20]]" in content
+
     assert "## User Notes" in content
     assert "_None yet._" in content
+    assert "#pulse #pulse/pattern" in content
 
 
 def test_write_pattern_with_user_notes(tmp_path: Path) -> None:

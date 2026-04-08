@@ -948,6 +948,8 @@ def test_discovery_updates_preserve_existing_insight_title(tmp_path):
     assert insight is not None
     assert insight["title"] == "Night Owl Deep Work"
     assert "# Pattern: Night Owl Deep Work" in pattern_content
+    assert "type: pattern" in pattern_content
+    assert "## Related days" in pattern_content
 
 
 def test_discovery_canonicalizes_updated_pattern_slugs(tmp_path):

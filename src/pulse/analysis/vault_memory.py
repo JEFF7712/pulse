@@ -5,6 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from pulse.domain.pattern_statuses import normalize_pattern_status
+from pulse.vault.obsidian_meta import (
+    collect_pattern_related_iso_days,
+    format_pattern_frontmatter,
+    format_pattern_related_days_section,
+)
 
 _DEFAULT_NOTES = "_None yet._"
 _RESERVED_CONFIG_SECTIONS = {
@@ -44,8 +49,14 @@ class VaultMemory:
         normalized_status = normalize_pattern_status(status)
         notes_section = user_notes if user_notes is not None else _DEFAULT_NOTES
         evidence_lines = "\n".join(f"- {item}" for item in evidence_log)
+        related_days = collect_pattern_related_iso_days(
+            first_seen, last_updated, evidence_log
+        )
+        related_section = format_pattern_related_days_section(related_days)
+        fm = format_pattern_frontmatter(slug)
 
         content = (
+            f"{fm}"
             f"# Pattern: {title}\n"
             "\n"
             f"**Status:** {normalized_status}\n"
@@ -62,12 +73,15 @@ class VaultMemory:
             "## Trend\n"
             f"{trend}\n"
             "\n"
+            f"{related_section}"
             "## User Notes\n"
             f"{notes_section}\n"
         )
 
         if extra_sections.strip():
             content = f"{content.rstrip()}\n\n{extra_sections.strip()}\n"
+
+        content = f"{content.rstrip()}\n\n#pulse #pulse/pattern\n"
 
         path = self._pattern_path(slug)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -350,6 +364,7 @@ class VaultMemory:
             "## Observation",
             "## Evidence Log",
             "## Trend",
+            "## Related days",
             "## User Notes",
         }
         extra_sections = [

@@ -49,9 +49,11 @@ Everything else in those files is yours to edit freely; Pulse tries to preserve 
 - **Pattern `## User Notes`** — your commentary on each pattern.
 - **Any new notes** you add in this vault — Pulse ignores files and folders it does not manage.
 
-## Wikilinks (Obsidian)
+## Wikilinks, graph, and tags (Obsidian)
 
-Daily digest notes include **path-qualified** links to the previous and next calendar day, for example `[[01-Daily/2026-03-29]]`. In [Obsidian](https://obsidian.md/), those become clickable and contribute to the graph. Targets use the `01-Daily/` prefix so the link resolves even if other files share the same `YYYY-MM-DD` stem elsewhere in the vault. Neighbor days may not exist yet; Obsidian will still show the link (often as “unresolved”) until you generate that digest.
+Daily digest notes include **path-qualified** links to the previous and next calendar day, for example `[[01-Daily/2026-03-29]]`, plus a **Pulse links** section to `[[04-Config/profile]]` and `[[03-Life/routines]]`. Pattern notes under **`02-Insights/patterns/`** include a **Related days** section linking back to relevant `[[01-Daily/YYYY-MM-DD]]` digests (from first/last seen dates and dated evidence lines).
+
+Pulse-written notes start with YAML **frontmatter** (`pulse: true`, `type`, `tags` such as `pulse/digest` / `pulse/pattern`) and may end with inline **`#pulse`** hashtags for the tag pane. In [Obsidian](https://obsidian.md/), wikilinks show up as graph edges; tags group notes in the tag view. Neighbor digest days may not exist yet — links may appear unresolved until you generate that digest.
 
 ## AI assistants
 

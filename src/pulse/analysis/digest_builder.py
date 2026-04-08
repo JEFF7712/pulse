@@ -4,6 +4,10 @@ from __future__ import annotations
 from datetime import date
 
 from pulse.analysis.preprocessor import PreprocessedDay
+from pulse.vault.obsidian_meta import (
+    format_daily_digest_frontmatter,
+    format_daily_pulse_links_section,
+)
 from pulse.vault.wikilinks import format_daily_digest_nav_line
 
 
@@ -79,7 +83,11 @@ class DigestBuilder:
         if preprocessed.notion_edits:
             sections.extend(["## Notion", self._build_notion(preprocessed), ""])
 
-        return "\n".join(sections)
+        sections.append(format_daily_pulse_links_section())
+
+        iso = day.isoformat()
+        body = "\n".join(sections)
+        return f"{format_daily_digest_frontmatter(iso)}{body}"
 
     def _build_glance(self, narratives: dict[str, str]) -> str:
         # Combine first sentence of each narrative

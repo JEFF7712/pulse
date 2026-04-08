@@ -37,6 +37,8 @@ def test_daily_summarizer_renders_markdown_digest_from_events():
     assert summary.day == day
     # New DigestBuilder format: timeline with time-block headers, email section, no spending/health/tags
     assert "# 2026-03-22" in summary.markdown
+    assert "type: daily-digest" in summary.markdown
+    assert "## Pulse links" in summary.markdown
     assert "[[01-Daily/2026-03-21]]" in summary.markdown
     assert "[[01-Daily/2026-03-23]]" in summary.markdown
     assert "## Timeline" in summary.markdown

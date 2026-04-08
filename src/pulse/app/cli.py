@@ -8,9 +8,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from rich import box
-from rich.panel import Panel
-from rich.text import Text
 from rich_argparse import RichHelpFormatter
 
 from pulse.app import cli_ui as ui
@@ -353,12 +350,18 @@ def main() -> None:
 
 
 def _onboard(args) -> None:
-    """Interactive first-time setup: configure, OAuth, init, then `pulse run`."""
+    """Interactive first-time setup: configure (same hub menus as ``pulse configure``), OAuth, init, then `pulse run`."""
     ui.banner_tagline()
     ui.rule("pulse onboard")
     _onboard_print_prerequisites()
     config_dir = getattr(args, "config_dir", None)
-    _configure(offer_oauth=False, interactive_menu=False, config_dir=config_dir)
+    _configure(
+        offer_oauth=False,
+        menu_walkthrough=True,
+        suppress_banner=True,
+        submenu_exit_label="→ Next",
+        config_dir=config_dir,
+    )
     config = load_config(config_dir=config_dir)
     strict = args.strict
 
@@ -619,11 +622,37 @@ def _prompt_env_field(
         return value
 
 
-# Core, integration, model-provider, and notification keys — pulse.toml root emit order in configure.
+# Core paths & timezone — one submenu row each in `pulse configure` → Core settings.
+_CORE_SETTING_DEFS: list[tuple[str, str, str, list[tuple[str, str, str, bool]]]] = [
+    (
+        "database",
+        "Database",
+        "🗄️",
+        [
+            ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
+        ],
+    ),
+    (
+        "vault",
+        "Obsidian vault",
+        "📓",
+        [
+            ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
+        ],
+    ),
+    (
+        "timezone",
+        "Timezone",
+        "🌍",
+        [
+            ("PULSE_TIMEZONE", "Timezone (e.g., America/Chicago)", "UTC", False),
+        ],
+    ),
+]
+
+# Flat list for full wizard core pass and pulse.toml root emit order in configure.
 _CONFIGURE_CORE_FIELDS: list[tuple[str, str, str, bool]] = [
-    ("PULSE_DATABASE_PATH", "Database path", "data/pulse.db", False),
-    ("PULSE_VAULT_PATH", "Obsidian vault path", "Pulse-Vault", False),
-    ("PULSE_TIMEZONE", "Timezone (e.g., America/Chicago)", "UTC", False),
+    fld for *_, flds in _CORE_SETTING_DEFS for fld in flds
 ]
 
 # Flat list for full wizard “integrations” pass. Per-connector menus reuse the same keys
@@ -958,26 +987,46 @@ _CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
 }
 
 _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
-    ("core", "Core settings (paths, timezone)"),
+    ("core", "⚙️ Core settings (paths, timezone)"),
     (
         "connectors",
-        "Connectors (pulse.toml credentials + blocks, OAuth / Plaid / Oura when needed)",
+        "🔌 Connectors (pulse.toml credentials + blocks, OAuth / Plaid / Oura when needed)",
     ),
     (
         "notifications",
-        "Notifications (Telegram, SMTP, webhooks, companion/FCM, …)",
+        "🔔 Notifications (Telegram, SMTP, webhooks, companion/FCM, …)",
     ),
     (
-        "model_providers",
-        "Model providers (Anthropic, OpenAI, Gemini, Ollama …)",
+        "model",
+        "🧠 Model (provider API keys + [llm] provider & summarization / discovery models)",
     ),
+    ("full", "✨ Full wizard (all of the above)"),
+    ("done", "✅ Done"),
+]
+
+# Submenu under `pulse configure` → Model (API keys vs [llm] roles).
+_MODEL_HUB_ITEMS: list[tuple[str, str]] = [
+    ("api_keys", "🔑 Provider API keys (Anthropic, OpenAI, Gemini, Ollama …)"),
     (
         "llm_roles",
-        "LLM in pulse.toml (provider + summarization & discovery models)",
+        "💬 LLM in pulse.toml (provider + summarization & discovery models)",
     ),
-    ("full", "Full wizard (all of the above)"),
-    ("done", "Done"),
 ]
+
+# Main configure areas in walkthrough order (excludes Full wizard & Done) — e.g. `pulse onboard`.
+_CONFIGURE_SEQUENTIAL_ORDER: tuple[str, ...] = (
+    "core",
+    "connectors",
+    "notifications",
+    "model",
+)
+
+_CONFIGURE_SECTION_BANNER: dict[str, str] = {
+    "core": "Core settings",
+    "connectors": "Connectors",
+    "notifications": "Notifications",
+    "model": "Model",
+}
 
 
 def _pick_configure_menu_action() -> str:
@@ -1706,6 +1755,8 @@ def _connector_submenu_row_label(
 def _pick_connector_submenu(
     working_env: dict[str, str],
     state: dict[str, dict],
+    *,
+    exit_label: str = "← Back",
 ) -> str | None:
     rows: list[tuple[str, str]] = []
     for name, default_interval, _label in _CONNECTOR_DEFS:
@@ -1713,7 +1764,7 @@ def _pick_connector_submenu(
             name, default_interval, working_env, state
         )
         rows.append((name, disp))
-    rows.append(("__back__", "← Back"))
+    rows.append(("__back__", exit_label))
 
     labels = [r[1] for r in rows]
     val_by_label = {r[1]: r[0] for r in rows}
@@ -1761,6 +1812,7 @@ def _configure_connectors_hub(
     toml_path: Path,
     *,
     offer_oauth: bool,
+    submenu_exit_label: str = "← Back",
 ) -> None:
     showed_connector_legend = False
     while True:
@@ -1772,7 +1824,9 @@ def _configure_connectors_hub(
                 "OAuth / Plaid Link / Oura run here if that source needs tokens."
             )
             showed_connector_legend = True
-        pick = _pick_connector_submenu(working_env, state)
+        pick = _pick_connector_submenu(
+            working_env, state, exit_label=submenu_exit_label
+        )
         if pick is None or pick == "__back__":
             break
         if pick == "__invalid__":
@@ -1952,6 +2006,104 @@ def _configure_core_only(working_env: dict[str, str]) -> None:
         working_env[key] = _prompt_env_field(key, label, current, is_secret)
 
 
+def _core_setting_ready(setting_id: str, env: dict[str, str]) -> bool:
+    row = next(r for r in _CORE_SETTING_DEFS if r[0] == setting_id)
+    _sid, _label, _emoji, fields = row
+    return all((env.get(f[0]) or "").strip() for f in fields)
+
+
+def _core_setting_submenu_row_label(
+    setting_id: str, short: str, emoji: str, working_env: dict[str, str]
+) -> str:
+    circle = "●" if _core_setting_ready(setting_id, working_env) else "○"
+    return f"{circle} {emoji} {short}"
+
+
+def _pick_core_setting_submenu(
+    working_env: dict[str, str],
+    *,
+    exit_label: str = "← Back",
+) -> str | None:
+    rows: list[tuple[str, str]] = []
+    for sid, short, emoji, _fields in _CORE_SETTING_DEFS:
+        disp = _core_setting_submenu_row_label(sid, short, emoji, working_env)
+        rows.append((sid, disp))
+    rows.append(("__back__", exit_label))
+
+    labels = [r[1] for r in rows]
+    val_by_label = {r[1]: r[0] for r in rows}
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]Pick a core setting to configure[/]")
+        for i, (_, disp) in enumerate(rows, start=1):
+            ui.muted_line(f"  {i}) {disp}")
+        raw = input(f"Choose [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            return "__invalid__"
+        if idx < 1 or idx > len(rows):
+            return "__invalid__"
+        return rows[idx - 1][0]
+
+    import questionary
+    from questionary import Style
+
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "Core settings",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "__back__"
+    return val_by_label[chosen]
+
+
+def _configure_core_hub(
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    submenu_exit_label: str = "← Back",
+) -> None:
+    showed_legend = False
+    while True:
+        if not showed_legend:
+            ui.muted_line(
+                "● = value set in pulse.toml · ○ = empty · "
+                "Database file, Obsidian vault, and timezone for scheduling and digests."
+            )
+            showed_legend = True
+        pick = _pick_core_setting_submenu(
+            working_env, exit_label=submenu_exit_label
+        )
+        if pick is None or pick == "__back__":
+            break
+        if pick == "__invalid__":
+            ui.warning("Invalid choice.")
+            continue
+        row = next(r for r in _CORE_SETTING_DEFS if r[0] == pick)
+        _sid, label, _emoji, fields = row
+        ui.step(label)
+        ui.muted_line("Values for this setting (saved in pulse.toml; leave blank to skip).")
+        for key, fld_label, default, is_secret in fields:
+            current = working_env.get(key, "") or default
+            working_env[key] = _prompt_env_field(key, fld_label, current, is_secret)
+        _save_pulse_settings(toml_path, working_env)
+        ui.success(f"Saved {toml_path}")
+
+
 def _configure_integrations_only(working_env: dict[str, str], toml_path: Path) -> None:
     ui.step("Credentials (integrations)")
     ui.muted_line("OAuth clients and API keys for data sources. Leave blank to skip.")
@@ -1987,12 +2139,16 @@ def _model_provider_submenu_row_label(
     return f"{circle} {emoji} {short}"
 
 
-def _pick_model_provider_submenu(working_env: dict[str, str]) -> str | None:
+def _pick_model_provider_submenu(
+    working_env: dict[str, str],
+    *,
+    exit_label: str = "← Back",
+) -> str | None:
     rows: list[tuple[str, str]] = []
     for pid, short, emoji, _fields in _MODEL_PROVIDER_DEFS:
         disp = _model_provider_submenu_row_label(pid, short, emoji, working_env)
         rows.append((pid, disp))
-    rows.append(("__back__", "← Back"))
+    rows.append(("__back__", exit_label))
 
     labels = [r[1] for r in rows]
     val_by_label = {r[1]: r[0] for r in rows}
@@ -2035,7 +2191,12 @@ def _pick_model_provider_submenu(working_env: dict[str, str]) -> str | None:
     return val_by_label[chosen]
 
 
-def _configure_model_providers_hub(working_env: dict[str, str], toml_path: Path) -> None:
+def _configure_model_providers_hub(
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    submenu_exit_label: str = "← Back",
+) -> None:
     showed_legend = False
     while True:
         if not showed_legend:
@@ -2044,7 +2205,9 @@ def _configure_model_providers_hub(working_env: dict[str, str], toml_path: Path)
                 "Match [llm] / [llm.summarization] / … provider values in pulse.toml."
             )
             showed_legend = True
-        pick = _pick_model_provider_submenu(working_env)
+        pick = _pick_model_provider_submenu(
+            working_env, exit_label=submenu_exit_label
+        )
         if pick is None or pick == "__back__":
             break
         if pick == "__invalid__":
@@ -2124,12 +2287,16 @@ def _notification_submenu_row_label(
     return f"{circle} {emoji} {short}"
 
 
-def _pick_notification_provider_submenu(working_env: dict[str, str]) -> str | None:
+def _pick_notification_provider_submenu(
+    working_env: dict[str, str],
+    *,
+    exit_label: str = "← Back",
+) -> str | None:
     rows: list[tuple[str, str]] = []
     for pid, short, emoji, _fields in _NOTIFICATION_PROVIDER_DEFS:
         disp = _notification_submenu_row_label(pid, short, emoji, working_env)
         rows.append((pid, disp))
-    rows.append(("__back__", "← Back"))
+    rows.append(("__back__", exit_label))
 
     labels = [r[1] for r in rows]
     val_by_label = {r[1]: r[0] for r in rows}
@@ -2172,7 +2339,12 @@ def _pick_notification_provider_submenu(working_env: dict[str, str]) -> str | No
     return val_by_label[chosen]
 
 
-def _configure_notifications_hub(working_env: dict[str, str], toml_path: Path) -> None:
+def _configure_notifications_hub(
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    submenu_exit_label: str = "← Back",
+) -> None:
     showed_legend = False
     while True:
         if not showed_legend:
@@ -2181,7 +2353,9 @@ def _configure_notifications_hub(working_env: dict[str, str], toml_path: Path) -
                 "Several channels can be active; digests broadcast to all that are ready."
             )
             showed_legend = True
-        pick = _pick_notification_provider_submenu(working_env)
+        pick = _pick_notification_provider_submenu(
+            working_env, exit_label=submenu_exit_label
+        )
         if pick is None or pick == "__back__":
             break
         if pick == "__invalid__":
@@ -2218,7 +2392,11 @@ _WIZARD_DEFAULT_ANTHROPIC_SUMM = "claude-haiku-4-5-20251001"
 _WIZARD_DEFAULT_ANTHROPIC_DISC = "claude-sonnet-4-6"
 
 
-def _configure_llm_roles_wizard(toml_path: Path) -> None:
+def _configure_llm_roles_wizard(
+    toml_path: Path,
+    *,
+    submenu_exit_label: str = "← Back",
+) -> None:
     """Prompt for [llm] provider, summarization model, discovery model; merge into pulse.toml."""
 
     defaults_map: dict[str, tuple[str, str]] = {
@@ -2246,7 +2424,7 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
     ui.step("LLM roles in pulse.toml")
     ui.muted_line(
         "Sets [llm] provider plus [llm.summarization] and [llm.discovery] model ids. "
-        "API keys live in pulse.toml (Model providers menu). Existing [llm.corrections] is kept."
+        "API keys live in pulse.toml (Model → Provider API keys). Existing [llm.corrections] is kept."
     )
 
     if not sys.stdin.isatty():
@@ -2254,7 +2432,12 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
         ui.say("[accent]LLM provider[/]")
         for i, p in enumerate(_LLM_ROLES_PROVIDERS, start=1):
             ui.muted_line(f"  {i}) {p}")
-        ui.muted_line("  0) Cancel")
+        forward_exit = (
+            "next" in submenu_exit_label.lower()
+            and "back" not in submenu_exit_label.lower()
+        )
+        non_tty_exit = submenu_exit_label if forward_exit else "Cancel"
+        ui.muted_line(f"  0) {non_tty_exit}")
         raw = input(f"Choose [0-{len(_LLM_ROLES_PROVIDERS)}]: ").strip()
         if raw == "0":
             return
@@ -2280,7 +2463,7 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
                 ("highlighted", "fg:cyan bold"),
             ]
         )
-        choices = list(_LLM_ROLES_PROVIDERS) + ["← Back"]
+        choices = list(_LLM_ROLES_PROVIDERS) + [submenu_exit_label]
         chosen = questionary.select(
             "LLM provider (one for summarization and discovery)",
             choices=choices,
@@ -2288,7 +2471,7 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
             style=style,
             instruction=" (↑↓ move · Enter to select)",
         ).ask()
-        if chosen is None or chosen == "← Back":
+        if chosen is None or chosen == submenu_exit_label:
             return
         provider = chosen
 
@@ -2396,6 +2579,83 @@ def _configure_llm_roles_wizard(toml_path: Path) -> None:
     ui.success(f"Saved {toml_path}")
 
 
+def _pick_model_hub_section(*, exit_label: str = "← Back") -> str | None:
+    rows: list[tuple[str, str]] = list(_MODEL_HUB_ITEMS)
+    rows.append(("__back__", exit_label))
+
+    labels = [r[1] for r in rows]
+    val_by_label = {r[1]: r[0] for r in rows}
+
+    if not sys.stdin.isatty():
+        ui.muted_line("")
+        ui.say("[accent]Model — choose what to configure[/]")
+        for i, (_, disp) in enumerate(rows, start=1):
+            ui.muted_line(f"  {i}) {disp}")
+        raw = input(f"Choose [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            return "__invalid__"
+        if idx < 1 or idx > len(rows):
+            return "__invalid__"
+        return rows[idx - 1][0]
+
+    import questionary
+    from questionary import Style
+
+    style = Style(
+        [
+            ("qmark", "fg:default"),
+            ("question", "bold"),
+            ("answer", "fg:cyan bold"),
+            ("pointer", "fg:cyan bold"),
+            ("highlighted", "fg:cyan bold"),
+        ]
+    )
+    chosen = questionary.select(
+        "Model",
+        choices=labels,
+        qmark="›",
+        style=style,
+        instruction=" (↑↓ move · Enter to select)",
+    ).ask()
+    if chosen is None:
+        return "__back__"
+    return val_by_label[chosen]
+
+
+def _configure_model_hub(
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    submenu_exit_label: str = "← Back",
+) -> None:
+    showed_legend = False
+    while True:
+        if not showed_legend:
+            ui.muted_line(
+                "Provider API keys are stored in pulse.toml; LLM roles set [llm] provider "
+                "and summarization / discovery model ids (also in pulse.toml)."
+            )
+            showed_legend = True
+        pick = _pick_model_hub_section(exit_label=submenu_exit_label)
+        if pick is None or pick == "__back__":
+            break
+        if pick == "__invalid__":
+            ui.warning("Invalid choice.")
+            continue
+        if pick == "api_keys":
+            ui.step("Provider API keys")
+            _configure_model_providers_hub(
+                working_env, toml_path, submenu_exit_label=submenu_exit_label
+            )
+        elif pick == "llm_roles":
+            ui.step("LLM roles in pulse.toml")
+            _configure_llm_roles_wizard(
+                toml_path, submenu_exit_label=submenu_exit_label
+            )
+
+
 def _run_configure_full_wizard(
     working_env: dict[str, str],
     toml_path: Path,
@@ -2438,16 +2698,97 @@ def _default_env_values(paths: PulsePaths) -> dict[str, str]:
     }
 
 
-def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True, config_dir: Path | None = None) -> None:
+def _execute_configure_menu_choice(
+    choice: str,
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    offer_oauth: bool,
+    submenu_exit_label: str = "← Back",
+) -> None:
+    """Run one top-level ``pulse configure`` area (same hubs as the interactive menu)."""
+    if choice == "core":
+        ui.step("Core settings")
+        _configure_core_hub(
+            working_env, toml_path, submenu_exit_label=submenu_exit_label
+        )
+    elif choice == "connectors":
+        ui.step("Connectors")
+        _configure_connectors_hub(
+            working_env,
+            toml_path,
+            offer_oauth=offer_oauth,
+            submenu_exit_label=submenu_exit_label,
+        )
+    elif choice == "notifications":
+        ui.step("Notifications")
+        _configure_notifications_hub(
+            working_env, toml_path, submenu_exit_label=submenu_exit_label
+        )
+    elif choice == "model":
+        ui.step("Model")
+        _configure_model_hub(
+            working_env, toml_path, submenu_exit_label=submenu_exit_label
+        )
+    else:
+        raise ValueError(f"unknown configure menu choice: {choice!r}")
+
+
+def _run_configure_sequential_sections(
+    working_env: dict[str, str],
+    toml_path: Path,
+    *,
+    offer_oauth: bool,
+    submenu_exit_label: str = "← Back",
+) -> None:
+    """Walk through each main configure area in order (same UIs as ``pulse configure``)."""
+    order = _CONFIGURE_SEQUENTIAL_ORDER
+    n = len(order)
+    ui.muted_line(
+        f"Same menus as [cmd]pulse configure[/]: choose [bold]{submenu_exit_label}[/] at the bottom "
+        f"when you are done with an area; then the next step ({n} areas) continues automatically."
+    )
+    for i, key in enumerate(order, start=1):
+        title = _CONFIGURE_SECTION_BANNER[key]
+        ui.muted_line("")
+        ui.say(f"[accent]Setup {i}/{n} · {title}[/]")
+        _execute_configure_menu_choice(
+            key,
+            working_env,
+            toml_path,
+            offer_oauth=offer_oauth,
+            submenu_exit_label=submenu_exit_label,
+        )
+
+
+def _configure(
+    *,
+    offer_oauth: bool = True,
+    interactive_menu: bool = True,
+    config_dir: Path | None = None,
+    menu_walkthrough: bool = False,
+    suppress_banner: bool = False,
+    submenu_exit_label: str = "← Back",
+) -> None:
     paths = resolve_pulse_paths(config_dir=config_dir)
     paths.config_dir.mkdir(parents=True, exist_ok=True)
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     toml_path = paths.toml_path
 
-    ui.banner_tagline()
+    if not suppress_banner:
+        ui.banner_tagline()
     ui.rule("Pulse configuration")
 
     working_env = _pulse_config_to_working_env(load_config(toml_path))
+
+    if menu_walkthrough:
+        _run_configure_sequential_sections(
+            working_env,
+            toml_path,
+            offer_oauth=offer_oauth,
+            submenu_exit_label=submenu_exit_label,
+        )
+        return
 
     if not interactive_menu:
         _run_configure_full_wizard(
@@ -2463,31 +2804,18 @@ def _configure(*, offer_oauth: bool = True, interactive_menu: bool = True, confi
         if choice == "done":
             ui.rule("Done")
             break
-        if choice == "core":
-            _configure_core_only(working_env)
-            _save_pulse_settings(toml_path, working_env)
-            ui.success(f"Saved {toml_path}")
-        elif choice == "connectors":
-            ui.step("Connectors")
-            _configure_connectors_hub(
-                working_env,
-                toml_path,
-                offer_oauth=offer_oauth,
-            )
-        elif choice == "notifications":
-            ui.step("Notifications")
-            _configure_notifications_hub(working_env, toml_path)
-        elif choice == "model_providers":
-            ui.step("Model providers")
-            _configure_model_providers_hub(working_env, toml_path)
-        elif choice == "llm_roles":
-            ui.step("LLM roles in pulse.toml")
-            _configure_llm_roles_wizard(toml_path)
-        elif choice == "full":
+        if choice == "full":
             _run_configure_full_wizard(
                 working_env, toml_path, offer_oauth=offer_oauth
             )
             break
+        _execute_configure_menu_choice(
+            choice,
+            working_env,
+            toml_path,
+            offer_oauth=offer_oauth,
+            submenu_exit_label=submenu_exit_label,
+        )
 
 
 _PROFILE_STRUCTURE_MODEL = "claude-haiku-4-5-20251001"
@@ -2547,27 +2875,45 @@ If no date is known, use [unknown].
 - Wrap the entire export in a single code block for easy copying.
 - After the code block, say whether this is everything you have or if more factual detail might exist."""
 
+# Line the user types alone to finish pasting (TTY); avoids ``stdin.read()`` waiting for EOF after Enter.
+_PROFILE_PASTE_END_SENTINEL = "---END---"
+
 
 def _print_llm_assistant_import_hint() -> None:
     ui.say("")
     ui.say(
         "[accent]Import from another AI[/] [muted](optional)[/]\n"
-        "[muted]Copy the boxed prompt into ChatGPT, Claude, Gemini, or similar. "
-        "Paste the reply below as your baseline profile, "
-        "or skip and describe yourself in your own words.[/]"
+        "[muted]Copy only the plain text between the rules below — no box borders. "
+        "Paste it into ChatGPT, Claude, Gemini, or similar. "
+        "Then paste the reply in the terminal as instructed.[/]"
     )
-    ui.say(
-        Panel(
-            Text(_LLM_ASSISTANT_EXPORT_PROMPT),
-            title="[accent]Prompt to copy[/]",
-            border_style=SITE_ACCENT,
-            box=box.ROUNDED,
-        )
-    )
+    ui.muted_line("─" * 76)
+    ui.console.print(_LLM_ASSISTANT_EXPORT_PROMPT, markup=False, highlight=False, end="")
+    if not _LLM_ASSISTANT_EXPORT_PROMPT.endswith("\n"):
+        ui.console.print()
+    ui.muted_line("─" * 76)
+
+
+def _read_multiline_profile_from_tty() -> str:
+    """Read pasted profile until a sentinel line or EOF (``stdin.read()`` never ends on TTY after one Enter)."""
     ui.muted_line(
-        "Then paste here (outer ``` fences are stripped automatically). "
-        "End input with Ctrl-D (macOS/Linux) or Ctrl-Z then Enter (Windows)."
+        f"When finished pasting, type [bold]{_PROFILE_PASTE_END_SENTINEL}[/] on its own line and press Enter. "
+        "Or use Ctrl-D (macOS/Linux) or Ctrl-Z then Enter (Windows) on a new line. "
+        "Outer ``` fences are stripped automatically."
     )
+    lines: list[str] = []
+    while True:
+        try:
+            line = sys.stdin.readline()
+        except KeyboardInterrupt:
+            ui.warning("Cancelled.")
+            return ""
+        if not line:
+            break
+        if line.rstrip("\r\n") == _PROFILE_PASTE_END_SENTINEL:
+            break
+        lines.append(line)
+    return "".join(lines).strip()
 
 
 def _read_profile_raw_text(
@@ -2586,13 +2932,9 @@ def _read_profile_raw_text(
         return sys.stdin.read().strip()
     _print_llm_assistant_import_hint()
     ui.say(
-        "\n[accent]Paste[/] your profile [muted](exported facts or free-form: who you are, work, projects, context for your data).[/]\n"
+        "\n[accent]Paste[/] your profile [muted](exported facts or free-form: who you are, work, projects, context for your data).[/]"
     )
-    try:
-        return sys.stdin.read().strip()
-    except KeyboardInterrupt:
-        ui.warning("Cancelled.")
-        return ""
+    return _read_multiline_profile_from_tty()
 
 
 def _profile_markdown_without_llm(raw: str) -> str:

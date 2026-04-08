@@ -55,13 +55,13 @@ If you use Google, Spotify, Microsoft 365, GitHub, GitLab, or Plaid, create OAut
 pulse configure
 ```
 
-**Menu:** Core (database, vault, timezone), **Connectors** (per-source creds + OAuth/Plaid/Oura when ●), Notifications, Model providers, LLM block in TOML, Full wizard. TTY: arrows + Enter; else digits `0`–`6` (`0` = Done). **`PULSE_*`** overrides top-level TOML when set in the environment.
+**Menu:** Core (database, vault, timezone), **Connectors** (per-source creds + OAuth/Plaid/Oura when ●), Notifications, **Model** (provider API keys + LLM roles in TOML), Full wizard. TTY: arrows + Enter; else digits `0`–`5` (`0` = Done). **`PULSE_*`** overrides top-level TOML when set in the environment.
 
 **Config file:** Prefer **`.config/pulse.toml`** or repo-root **`pulse.toml`**. Override with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`**. Start from `pulse.toml.example`; connectors default to disabled until you enable them.
 
 There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (localhost callbacks on `8888`, `8890`–`8894` as applicable). Complete this **before** `pulse init` if the first pull should hit those APIs. Notion, Linear (API key), browser, and feeds skip browser OAuth here.
 
-**Shortcut:** `pulse onboard` runs the same configure-style path plus auth when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
+**Shortcut:** `pulse onboard` walks through the same configure areas as [cmd]pulse configure[/] (core → connectors → notifications → model), then runs connector OAuth / Plaid / Oura when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
 
 ## 2. `pulse init`
 
@@ -70,6 +70,8 @@ pulse init
 ```
 
 Ensures vault **`README.md`** and **`Meta/AGENTS.md`** exist (created once if missing), writes **`04-Config/profile.md`**, runs initial pulls, optional discovery when LLM + notification config allows.
+
+Interactive **TTY** profile step: copy the plain-text export prompt (between rules, no box borders), paste the assistant’s reply, then type **`---END---`** on its own line and press Enter (or finish with **Ctrl-D** / **Ctrl-Z**+Enter). Use **`-f`** / **`--profile-text`** to skip prompts.
 
 ## 3. `pulse run`
 

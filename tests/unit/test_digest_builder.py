@@ -57,6 +57,15 @@ def test_digest_builder_produces_narrative_markdown():
     builder = DigestBuilder()
     md = builder.build(date(2026, 3, 26), day, narratives)
 
+    assert md.startswith("---\n")
+    assert "pulse: true" in md
+    assert "type: daily-digest" in md
+    assert "date: 2026-03-26" in md
+    assert "tags: [pulse, pulse/digest]" in md
+    assert "## Pulse links" in md
+    assert "[[04-Config/profile]]" in md
+    assert "[[03-Life/routines]]" in md
+    assert "#pulse #pulse/digest" in md
     assert "# 2026-03-26" in md
     assert "[[01-Daily/2026-03-25]]" in md
     assert "[[01-Daily/2026-03-27]]" in md
@@ -87,6 +96,8 @@ def test_digest_builder_fallback_without_narratives():
     md = builder.build(date(2026, 3, 26), day, narratives=None)
 
     # Should still produce valid markdown without Day at a Glance
+    assert "type: daily-digest" in md
+    assert "## Pulse links" in md
     assert "# 2026-03-26" in md
     assert "[[01-Daily/2026-03-25]]" in md
     assert "Hello" in md
