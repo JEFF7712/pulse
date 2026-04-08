@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened discovery response parsing (noisy JSON extraction, partial apply, optional repair completion).
 - Canonical `event_type` registry (`src/pulse/domain/event_types.py`) for connector alignment.
 
+### Fixed
+
+- E2E operator-flow test targets `/actions/discover` when no LLM is configured (digest route removed).
+
 ### Changed
 
 - Config key `summarization_model_for_digest` renamed to `summarization_model_for_source_summaries`.
