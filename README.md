@@ -236,3 +236,9 @@ src/pulse/
 3. **Full transparency** — all data stored as human-readable markdown in Obsidian
 4. **Extensible** — clean interfaces for connectors, LLM providers, and notification channels
 5. **Self-hosted** — runs on your hardware, data stays local
+
+## Releases and versioning
+
+- **PyPI package:** `pulse-agent` (CLI entry points `pulse` and `pulse-mcp`).
+- **Versioning:** [Semantic Versioning](https://semver.org/) — **MAJOR** for incompatible changes (including config or behavior you must act on), **MINOR** for backward-compatible features, **PATCH** for fixes. Review **`CHANGELOG.md`** before upgrading.
+- **Shipping a release:** tag `v*` (for example `v1.0.0`); CI builds, publishes to PyPI, and builds Docker as defined in `.github/workflows/release-publish.yml`. Copy **`CHANGELOG.md`** into the GitHub release notes for that tag.
