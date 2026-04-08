@@ -125,7 +125,7 @@ grep -q 'weeks with two strength workouts' <<<"$html"
 grep -q 'most focused' <<<"$html"
 grep -q 'Every observation lands as readable notes' <<<"$html"
 grep -q 'Obsidian' <<<"$html"
-grep -q 'Together they turn scattered signals into one readable picture' <<<"$html"
+grep -q 'Together they turn scattered signals into unique and actionable insights' <<<"$html"
 grep -q 'Self-hosted, readable, and under your control\.' <<<"$html"
 [[ "$(grep -o '<h3>' <<<"$html" | wc -l | tr -d ' ')" -eq 4 ]]
 grep -q '<h3>The Problem</h3>' <<<"$html"

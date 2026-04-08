@@ -1,13 +1,16 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.13-slim
 
-ARG PULSE_WHEEL
 ENV PULSE_CONFIG_DIR=/config \
     PULSE_DATABASE_PATH=/data/pulse.db \
     PULSE_VAULT_PATH=/data/Pulse-Vault
 
-COPY ${PULSE_WHEEL} /tmp/pulse.whl
-RUN pip install --no-cache-dir /tmp/pulse.whl && rm /tmp/pulse.whl
+# Copy all build artifacts; install the pulse_agent wheel (avoids COPY glob + build-arg issues in CI).
+COPY dist/ /tmp/dist/
+RUN set -eux; \
+    wheel="$(ls /tmp/dist/pulse_agent-*.whl | sort -V | tail -n1)"; \
+    pip install --no-cache-dir "$wheel"; \
+    rm -rf /tmp/dist
 
 RUN mkdir -p /config /data
 VOLUME ["/config", "/data"]

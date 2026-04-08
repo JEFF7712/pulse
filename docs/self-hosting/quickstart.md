@@ -31,10 +31,10 @@ pipx install pulse-agent
 
 **Docker**
 
-- **Image from this repo** — after `uv build`:  
-  `docker build -t pulse -f Dockerfile --build-arg PULSE_WHEEL=dist/pulse_agent-*.whl .`  
+- **Image from this repo** — after `uv build` (wheel must be under `dist/`):  
+  `docker build -t pulse -f Dockerfile .`  
   `docker run -p 8000:8000 -v pulse-config:/config -v pulse-data:/data pulse`  
-  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.
+  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) copies `dist/` and installs the `pulse_agent-*.whl` inside the image. It uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.
 - **Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host dirs to match), then `pulse run --host 0.0.0.0 --port 8000`.
 
 Check with `pulse --help` after any install path.

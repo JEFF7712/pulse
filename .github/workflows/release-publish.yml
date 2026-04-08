@@ -51,5 +51,3 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          build-args: |
-            PULSE_WHEEL=dist/pulse_agent-*.whl

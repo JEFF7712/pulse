@@ -106,6 +106,8 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "/api/corrections",
     "/api/device-token",
     "PULSE_COMPANION_TOKEN",
+    "invalid-publisher",
+    "pypi-trusted-publishing.md",
 ]
 
 QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
