@@ -111,4 +111,8 @@ def test_backend_first_vertical_slice_records_reply_and_writes_digest(tmp_path) 
             "The email should mention the roadmap, not the project update.",
         )
     ]
-    assert (vault_path / "01-Daily" / "2026-03-22.md").exists()
+    digest_text = (vault_path / "01-Daily" / "2026-03-22.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Team sync" in digest_text
+    assert "Project update" in digest_text
