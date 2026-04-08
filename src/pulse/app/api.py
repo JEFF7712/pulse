@@ -7,15 +7,46 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from pulse.app.config import PulseConfig
 from pulse.services.corrections import build_correction_service
+from pulse.store.analytics import AnalyticsRepository
 from pulse.store.correction_applications import CorrectionApplicationRepository
 from pulse.store.corrections import CorrectionRepository
 from pulse.store.db import connect_db
 from pulse.store.device_tokens import DeviceTokenRepository
 from pulse.store.schema import bootstrap_schema
+
+
+def _safe_vault_file(vault_root: Path, vault_rel: str) -> Path:
+    """Resolve a vault-relative path under vault_root (no traversal)."""
+    rel = Path(vault_rel)
+    if rel.is_absolute() or ".." in rel.parts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid vault path.",
+        )
+    root = vault_root.resolve()
+    full = (root / rel).resolve()
+    try:
+        full.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid vault path.",
+        ) from exc
+    return full
+
+
+def _safe_insight_id(insight_id: str) -> str:
+    cleaned = insight_id.strip()
+    if not cleaned or "/" in cleaned or "\\" in cleaned or ".." in cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid insight id.",
+        )
+    return cleaned
 
 
 def build_api_router(
@@ -24,28 +55,37 @@ def build_api_router(
 ) -> APIRouter:
     router = APIRouter(prefix="/api", dependencies=[auth_dependency])
 
-    @router.get("/digests/latest")
-    async def get_latest_digest() -> dict[str, str]:
+    @router.get("/insights")
+    async def get_insights_list(
+        status: str | None = Query(default=None, description="Filter by insight status"),
+    ) -> list[dict[str, Any]]:
         settings = get_settings()
-        daily_dir = Path(settings.vault_path) / "01-Daily"
-        if not daily_dir.exists():
-            raise HTTPException(status_code=404, detail="No digests found.")
-        files = sorted(daily_dir.glob("*.md"), reverse=True)
-        if not files:
-            raise HTTPException(status_code=404, detail="No digests found.")
-        date_slug = files[0].stem
-        return {
-            "date": date_slug,
-            "markdown": files[0].read_text(encoding="utf-8"),
-        }
+        async with connect_db(settings.database_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            return await analytics.list_insights(status=status)
 
-    @router.get("/digests/{date_slug}")
-    async def get_digest(date_slug: str) -> dict[str, str]:
+    @router.get("/insights/{insight_id}")
+    async def get_insight_with_body(insight_id: str) -> dict[str, Any]:
         settings = get_settings()
-        path = Path(settings.vault_path) / "01-Daily" / f"{date_slug}.md"
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Digest not found.")
-        return {"date": date_slug, "markdown": path.read_text(encoding="utf-8")}
+        iid = _safe_insight_id(insight_id)
+        async with connect_db(settings.database_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            row = await analytics.get_insight(iid)
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Insight not found.",
+            )
+        path = _safe_vault_file(Path(settings.vault_path), row["vault_path"])
+        if not path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Pattern file missing on disk.",
+            )
+        markdown = path.read_text(encoding="utf-8")
+        return {**row, "markdown": markdown}
 
     @router.post("/corrections", status_code=status.HTTP_202_ACCEPTED)
     async def post_correction(body: dict[str, str]) -> dict[str, str]:

@@ -6,11 +6,11 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 
 import '../app_navigator.dart';
-import '../models/digest_preview.dart';
+import '../models/insight_preview.dart';
 import '../services/companion_sensor_coordinator.dart';
 import '../services/push_notifications.dart';
 import '../state/session_controller.dart';
-import 'digest_browser_screen.dart';
+import 'pattern_screens.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +20,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  DigestPreview? _digest;
+  InsightPreview? _insight;
   bool _loading = true;
   String? _loadError;
   final _correctionCtrl = TextEditingController();
@@ -73,17 +73,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _loadError = null;
     });
     try {
-      final json = await client.getLatestDigest();
+      final rows = await client.listInsights();
+      if (rows.isEmpty) {
+        setState(() {
+          _loading = false;
+          _insight = null;
+          _loadError =
+              'No patterns yet — run discovery on the server (CLI, web UI, or MCP).';
+        });
+        return;
+      }
+      final first = Map<String, dynamic>.from(rows.first as Map);
+      final id = first['id'] as String? ?? '';
+      if (id.isEmpty) {
+        setState(() {
+          _loading = false;
+          _insight = null;
+          _loadError = 'Invalid insights response from server.';
+        });
+        return;
+      }
+      final detail = await client.getInsight(id);
       setState(() {
-        _digest = DigestPreview.fromJson(json);
+        _insight = InsightPreview.fromDetailJson(detail);
         _loading = false;
       });
     } catch (e) {
       setState(() {
         _loading = false;
-        _digest = null;
+        _insight = null;
         if (e is DioException && e.response?.statusCode == 404) {
-          _loadError = 'No digest yet — run a digest on the server.';
+          _loadError = 'No patterns found.';
         } else {
           _loadError = SessionController.describeDioError(e);
         }
@@ -96,8 +116,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (text.isEmpty) {
       return;
     }
-    final digest = _digest;
-    if (digest == null || digest.date.isEmpty) {
+    final insight = _insight;
+    if (insight == null || insight.id.isEmpty) {
       return;
     }
     final client = context.read<SessionController>().apiClient;
@@ -110,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     try {
       await client.submitCorrection(
-        contextId: digest.date,
+        contextId: 'pattern:${insight.id}',
         messageText: text,
       );
       _correctionCtrl.clear();
@@ -163,12 +183,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         title: const Text('Pulse'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month),
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: 'Browse patterns',
             onPressed: () async {
               await Navigator.push<void>(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => const DigestBrowserScreen(),
+                  builder: (_) => const PatternBrowserScreen(),
                 ),
               );
               if (context.mounted) {
@@ -207,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               )
-            else if (_digest != null)
+            else if (_insight != null)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -215,12 +236,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        _digest!.date,
+                        _insight!.title.isNotEmpty
+                            ? _insight!.title
+                            : _insight!.id,
                         style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        _insight!.id,
+                        style: Theme.of(context).textTheme.labelSmall,
                       ),
                       const SizedBox(height: 8),
                       MarkdownBody(
-                        data: _digest!.markdown,
+                        data: _insight!.markdown,
                         shrinkWrap: true,
                       ),
                       const Divider(height: 32),
@@ -232,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       TextField(
                         controller: _correctionCtrl,
                         decoration: const InputDecoration(
-                          hintText: 'Applies to this digest date',
+                          hintText: 'Applies to this pattern (pattern:id)',
                           border: OutlineInputBorder(),
                         ),
                         minLines: 2,

@@ -20,7 +20,7 @@ Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
 
 1. **Connectors** pull data from your accounts and normalize it into timestamped events
 2. **Event Store** persists everything in a local SQLite database
-3. **Analysis Engine** generates daily digests and morning briefings
+3. **Analysis Engine** runs scheduled insight discovery and writes patterns to your vault
 4. **Vault** writes human-readable markdown files you can browse in Obsidian
 5. **Notifications** push insights via Telegram, [ntfy](https://ntfy.sh), [Gotify](https://gotify.net/), email (SMTP), generic JSON webhooks, [Discord](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) / [Slack](https://api.slack.com/messaging/webhooks) incoming webhooks, [Pushover](https://pushover.net/)—configure one or more
 6. **Corrections** let you reply to fix anything the agent gets wrong
@@ -29,7 +29,7 @@ Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
 
 **Standalone** — Pulse runs as its own service with FastAPI, APScheduler, and Telegram notifications. Good for `docker run` deployments.
 
-**Agent integration** — Pulse exposes an [MCP server](https://modelcontextprotocol.io/) so any compatible agent (Claude Code, OpenClaw, etc.) can query your events, generate digests, and record corrections using its own scheduling and LLM capabilities.
+**Agent integration** — Pulse exposes an [MCP server](https://modelcontextprotocol.io/) so any compatible agent (Claude Code, OpenClaw, etc.) can query your events, run discovery, inspect patterns, and record corrections using its own scheduling and LLM capabilities.
 
 ## Installation
 
@@ -115,7 +115,7 @@ Connector toggles and nested connector settings live under `[connectors.*]` in `
 
 LLM features require **`[llm.summarization]`**, **`[llm.discovery]`**, and/or **`[llm.corrections]`** in `pulse.toml` (see `pulse.toml.example`). Set `[llm] provider` once and use different `model` values per role (e.g. fast summarization + stronger discovery), or set `provider` on each block when mixing vendors. Put API keys in `pulse.toml` (`anthropic_api_key`, `openai_api_key`, `gemini_api_key`) or use `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` in the environment. For **up-to-date model id examples** (Claude 4.6 family, GPT-5.4 variants, Gemini 2.5, etc.) and links to each vendor’s model list, see [**LLM provider configuration** in the configuration reference](docs/reference/configuration.md#llm-provider-configuration).
 
-The scheduled `daily_digest` job, `pulse digest`, the homepage **Digest** action, and MCP `pulse_digest` all use the same path: they aggregate stats, then run the digest job with the configured summarization provider when one resolves, otherwise they fall back to the non-LLM summarizer.
+Discovery (scheduled, `pulse discover`, homepage **run discovery**, and MCP `pulse_discovery`) aggregates stats for the target window, then runs the LLM insight pipeline with your configured summarization and discovery models.
 
 The full runtime config reference is in [`docs/reference/configuration.md`](docs/reference/configuration.md).
 
@@ -148,7 +148,7 @@ uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 
 ## Use as an MCP server
 
-Pulse ships an [MCP](https://modelcontextprotocol.io/) server so you can use your **existing AI agents**—**Claude Code**, **OpenClaw**, Cursor, and any other MCP-capable client—to read events, run digests, check connectors, and record corrections through the same SQLite store and vault as the standalone app. The agent brings scheduling and models; Pulse brings your personal data and digest pipeline.
+Pulse ships an [MCP](https://modelcontextprotocol.io/) server so you can use your **existing AI agents**—**Claude Code**, **OpenClaw**, Cursor, and any other MCP-capable client—to read events, run discovery, list patterns, check connectors, and record corrections through the same SQLite store and vault as the standalone app. The agent brings scheduling and models; Pulse brings your personal data and insight pipeline.
 
 **Before you wire MCP**
 
@@ -202,8 +202,9 @@ When you rely on repo-root **`pulse.toml`**, set a server **`cwd`** to that repo
 | `pulse_events_for_day` | Query events for a specific date, optionally filtered by source |
 | `pulse_ingest_event` | Manually push an event into the store |
 | `pulse_correct` | Record a correction or feedback about an insight |
-| `pulse_digest` | Generate a daily digest and save it to the vault |
-| `pulse_read_digest` | Read an existing digest from the vault |
+| `pulse_discovery` | Run LLM insight discovery for a cadence and date |
+| `pulse_insights` | List discovery patterns from the database |
+| `pulse_read_pattern` | Read a pattern markdown file from the vault |
 | `pulse_connector_status` | Check sync state of all connectors |
 
 ### Available resources
@@ -213,20 +214,24 @@ When you rely on repo-root **`pulse.toml`**, set a server **`cwd`** to that repo
 | Today's events | `pulse://events/today` |
 | Connector status | `pulse://connectors/status` |
 
+## Mobile companion (optional)
+
+The **Flutter** app under [`companion_app/`](companion_app/README.md) talks to the same server with `X-Pulse-Token` / `companion_token`. Enable **`[connectors.companion]`** to mount the webhook and API routes. Pattern content uses **`GET /api/insights`** and **`GET /api/insights/{id}`** (replacing removed digest endpoints).
+
 ## Project structure
 
 ```
 src/pulse/
 ├── app/            # FastAPI server, config, dependencies
-├── analysis/       # Summarizer, morning briefing builder
+├── analysis/       # Preprocessing, source summaries, discovery engine
 ├── connectors/     # Gmail, Calendar, YouTube, Spotify, M365, GitHub, GitLab, Plaid, browser, feeds, …
 ├── domain/         # Core types and protocols
-├── jobs/           # Scheduled tasks (daily digest, morning briefing)
+├── jobs/           # Scheduled tasks (aggregation, discovery)
 ├── mcp/            # MCP server for agent integration
 ├── notifications/  # Telegram channel
 ├── services/       # Business logic (corrections)
 ├── store/          # SQLite repositories (events, sync state, corrections)
-└── vault/          # Markdown renderer and file writer
+└── vault/          # Vault onboarding and Obsidian helpers
 ```
 
 ## Design principles

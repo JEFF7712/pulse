@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urlparse
 
+from pulse.domain.event_types import DEV_EVENT_TYPES
 from pulse.domain.events import Event
 
 
@@ -111,16 +112,6 @@ class NotionEdit:
     timestamp: datetime
     object_type: str
     via: str
-
-
-_DEV_EVENT_TYPES = frozenset({
-    "dev.push",
-    "dev.issue",
-    "dev.pull_request",
-    "dev.comment",
-    "dev.repo_activity",
-    "dev.linear.issue",
-})
 
 
 @dataclass(slots=True)
@@ -339,7 +330,7 @@ class EventPreprocessor:
     def _build_dev_activities(self, events: list[Event]) -> list[DevActivity]:
         rows: list[DevActivity] = []
         for e in events:
-            if e.event_type not in _DEV_EVENT_TYPES:
+            if e.event_type not in DEV_EVENT_TYPES:
                 continue
             rows.append(
                 DevActivity(
@@ -459,7 +450,13 @@ class EventPreprocessor:
     def _build_finance_summary(self, events: list[Event]) -> FinanceDaySummary | None:
         if not events:
             return None
-        omit_amounts = any(bool(e.data.get("omit_amount_in_digest")) for e in events)
+        omit_amounts = any(
+            bool(
+                e.data.get("omit_amount_in_summary")
+                or e.data.get("omit_amount_in_digest")  # legacy Plaid event field
+            )
+            for e in events
+        )
         by_merchant: dict[str, list[float]] = defaultdict(list)
         for e in events:
             name = str(e.data.get("name") or e.data.get("merchant_name") or "Unknown")

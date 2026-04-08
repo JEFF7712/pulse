@@ -53,7 +53,7 @@ def test_corrections_webhook_bearer_accepts_and_stores(tmp_path) -> None:
 
     response = client.post(
         "/webhooks/corrections",
-        json={"context_id": "digest-ctx", "message": "Please fix the title."},
+        json={"context_id": "webhook-test-ctx", "message": "Please fix the title."},
         headers={"Authorization": "Bearer my-shared-secret"},
     )
     assert response.status_code == 202
@@ -73,7 +73,7 @@ def test_corrections_webhook_bearer_accepts_and_stores(tmp_path) -> None:
             return [(row[0], row[1]) for row in rows]
 
     assert asyncio.run(fetch()) == [
-        ("digest-ctx", "Please fix the title."),
+        ("webhook-test-ctx", "Please fix the title."),
     ]
 
 

@@ -193,30 +193,6 @@ class VaultMemory:
         return path
 
     # ------------------------------------------------------------------
-    # Daily digests (01-Daily/)
-    # ------------------------------------------------------------------
-
-    def read_daily_digest(self, date_slug: str) -> str:
-        """Return daily digest contents, or ``""`` if not found."""
-        path = self._daily_digest_path(date_slug)
-        if not path.exists():
-            return ""
-        return path.read_text(encoding="utf-8")
-
-    def daily_digest_exists(self, date_slug: str) -> bool:
-        """Return True when the daily digest file exists."""
-        return self._daily_digest_path(date_slug).exists()
-
-    def append_daily_correction(self, date_slug: str, note: str) -> Path:
-        """Append a correction note under the reserved digest corrections section."""
-        path = self._daily_digest_path(date_slug)
-        existing = path.read_text(encoding="utf-8") if path.exists() else ""
-        updated = self._append_section_bullet(existing, "## Corrections", note)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(updated, encoding="utf-8")
-        return path
-
-    # ------------------------------------------------------------------
     # Life files (03-Life/)
     # ------------------------------------------------------------------
 
@@ -337,10 +313,6 @@ class VaultMemory:
         start = idx + len(marker)
         end = content.find("\n", start)
         return content[start:end].strip() if end != -1 else content[start:].strip()
-
-    def _daily_digest_path(self, date_slug: str) -> Path:
-        date_slug = self._validate_vault_name(date_slug)
-        return self._root / "01-Daily" / f"{date_slug}.md"
 
     def _pattern_path(self, slug: str) -> Path:
         slug = self._validate_vault_name(slug)

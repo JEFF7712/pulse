@@ -55,7 +55,7 @@ def test_plaid_pull_maps_transactions_and_persists_cursor(tmp_path):
 
     fake_client = FakeApiClient()
 
-    conn = PlaidConnector(config, token_path, omit_amounts_in_digest=True)
+    conn = PlaidConnector(config, token_path, omit_amounts_in_summary=True)
 
     with patch(
         "pulse.connectors.plaid_connector.make_plaid_client",
@@ -68,7 +68,7 @@ def test_plaid_pull_maps_transactions_and_persists_cursor(tmp_path):
     assert e.event_type == "finance.transaction"
     assert e.id == "plaid:txn-1"
     assert e.data["amount"] == 9.99
-    assert e.data["omit_amount_in_digest"] is True
+    assert e.data["omit_amount_in_summary"] is True
     assert "Food" in e.data["category"]
 
     blob = json.loads(token_path.read_text())

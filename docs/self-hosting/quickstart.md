@@ -79,7 +79,7 @@ Interactive **TTY** profile step: copy the plain-text export prompt (between rul
 pulse run
 ```
 
-Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull, Digest, Discover, Test Telegram (same pipelines as CLI where noted).
+Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull, Discover, Test Telegram (same pipelines as CLI where noted).
 
 ## 4. Inspect
 
@@ -93,7 +93,6 @@ pulse insights
 | Command | Purpose |
 | --- | --- |
 | `pulse pull [sources…]` | Immediate connector pulls |
-| `pulse digest [--date YYYY-MM-DD]` | Daily digest file for that day |
 | `pulse discover [--cadence …]` | Manual discovery pass |
 | `pulse test-telegram` | One-off Telegram test |
 
@@ -101,7 +100,7 @@ Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
-Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_digest`, `pulse_correct`, …) against the same database and vault as this install.
+Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_discovery`, `pulse_insights`, `pulse_correct`, …) against the same database and vault as this install.
 
 **Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
 
@@ -113,4 +112,4 @@ Read https://raw.githubusercontent.com/JEFF7712/pulse/main/docs/self-hosting/mcp
 
 Output lives under **`vault_path`** / **`PULSE_VAULT_PATH`**. Common patterns: dedicated folder as its own vault; subfolder inside an existing vault; or symlink (mobile/sync may not handle symlinks well). First vault use may create **`README.md`** (structure + reserved headings) and **`Meta/AGENTS.md`**.
 
-Daily digests include **wikilinks** to the previous and next day as `[[01-Daily/YYYY-MM-DD]]` for navigation and graph edges in Obsidian.
+Discovery writes **patterns** under `02-Insights/patterns/`; older installs may still have legacy `01-Daily/` files from removed daily digests.

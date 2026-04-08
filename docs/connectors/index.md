@@ -50,7 +50,7 @@ Use **Configure → Connectors** for each source: credentials, enable (●), the
 
 ## Plaid
 
-**Need:** Plaid dev account, `PULSE_PLAID_*`, `[connectors.plaid]` on; optional `omit_amounts_in_digest`. Link UI on **`localhost:8893`**. Tokens in **`plaid_tokens.json`** next to DB.
+**Need:** Plaid dev account, `PULSE_PLAID_*`, `[connectors.plaid]` on; optional `omit_amounts_in_summary`. Link UI on **`localhost:8893`**. Tokens in **`plaid_tokens.json`** next to DB.
 
 **Pulls:** Transactions via `/transactions/sync`.
 
@@ -70,7 +70,7 @@ Use **Configure → Connectors** for each source: credentials, enable (●), the
 
 **OAuth:** App → **`http://localhost:8894/callback`**, client id/secret. Re-auth if workouts were added later (needs workout scope).
 
-**Pulls:** Sleep, readiness, activity, workouts (`health.*`). Days keyed as noon UTC for digest bucketing.
+**Pulls:** Sleep, readiness, activity, workouts (`health.*`). Days keyed as noon UTC for day-level aggregation.
 
 ## Browser
 

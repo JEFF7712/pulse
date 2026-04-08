@@ -98,8 +98,8 @@ def test_correction_roundtrip(tmp_path: Path) -> None:
     asyncio.run(_run())
 
 
-def test_pulse_digest_writes_vault_file(tmp_path: Path) -> None:
-    """MCP pulse_digest matches CLI path: aggregate, then digest from DB into vault."""
+def test_pulse_discovery_skipped_without_llm(tmp_path: Path) -> None:
+    """MCP pulse_discovery returns a clear message when no LLM is configured."""
     from pulse.app.config import PulseConfig
     from pulse.mcp import server as server_module
 
@@ -117,21 +117,33 @@ def test_pulse_digest_writes_vault_file(tmp_path: Path) -> None:
             ctx = SimpleNamespace(
                 request_context=SimpleNamespace(lifespan_context=pulse_ctx)
             )
-            result = await server_module.pulse_digest(day="2026-03-23", ctx=ctx)
-            assert "2026-03-23" in result
-            digest_path = Path(pulse_ctx.vault_path) / "01-Daily" / "2026-03-23.md"
-            assert digest_path.exists()
-            content = digest_path.read_text()
-            assert "Team sync" in content
-            assert "Q1 Report" in content
+            result = await server_module.pulse_discovery(day="2026-03-23", ctx=ctx)
+            assert "skipped" in result.lower()
 
     asyncio.run(_run())
 
 
-def test_read_digest_missing_file(tmp_path: Path) -> None:
-    """Reading a non-existent digest returns a not-found indicator."""
-    digest_path = tmp_path / "vault" / "01-Daily" / "2026-01-01.md"
-    assert not digest_path.exists()
+def test_pulse_read_pattern_missing_file(tmp_path: Path) -> None:
+    from pulse.app.config import PulseConfig
+    from pulse.mcp import server as server_module
+
+    async def _run() -> None:
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+            result = await server_module.pulse_read_pattern("missing-slug", ctx=ctx)
+            assert "No pattern file" in result
+
+    asyncio.run(_run())
 
 
 def test_connector_status_fresh_db(tmp_path: Path) -> None:

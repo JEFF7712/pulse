@@ -144,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pulse",
         description=(
             f"[bold {SITE_ACCENT}]Pulse[/] — [{SITE_CREAM}]self-hosted personal intelligence[/] "
-            f"[dim {SITE_MUTED_FG}](connectors · digests · insights)[/]"
+            f"[dim {SITE_MUTED_FG}](connectors · insights)[/]"
         ),
         formatter_class=RichHelpFormatter,
     )
@@ -220,15 +220,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pull_parser.add_argument(
         "sources", nargs="*", help="Connectors to pull (default: all)"
-    )
-
-    digest_parser = subparsers.add_parser(
-        "digest",
-        parents=[config_parent],
-        help="Build daily digest markdown in the vault for a date (default: today)",
-    )
-    digest_parser.add_argument(
-        "--date", default=None, help="Date to digest (YYYY-MM-DD, default: today)"
     )
 
     discover_parser = subparsers.add_parser(
@@ -322,8 +313,6 @@ def main() -> None:
         _onboard(args)
     elif args.command == "pull":
         _pull(args)
-    elif args.command == "digest":
-        _digest(args)
     elif args.command == "discover":
         _discover(args)
     elif args.command == "configure":
@@ -1352,8 +1341,10 @@ def _connector_emit_lines(
         escaped = bu.replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'gitlab_base_url = "{escaped}"')
     if name == "plaid":
-        omit = bool(sec.get("omit_amounts_in_digest", False))
-        lines.append(f"omit_amounts_in_digest = {'true' if omit else 'false'}")
+        omit = bool(
+            sec.get("omit_amounts_in_summary") or sec.get("omit_amounts_in_digest", False)
+        )
+        lines.append(f"omit_amounts_in_summary = {'true' if omit else 'false'}")
     if name == "notion":
         prev_dbs = sec.get("database_ids") or []
         if isinstance(prev_dbs, str):
@@ -1462,7 +1453,7 @@ def _serialize_pulse_toml_document(full: dict) -> str:
             lines.extend(_emit_generic_connectors_table(name, sec))
     llm = full.get("llm")
     if isinstance(llm, dict) and llm:
-        lines.append("# --- LLM (digest summarization, discovery, corrections) ---")
+        lines.append("# --- LLM (source summarization, discovery, corrections) ---")
         lines.append("")
         lines.extend(_emit_llm_sections(llm))
     skip_top = frozenset(("connectors", "llm")) | _PULSE_ROOT_FIELD_NAMES
@@ -1659,16 +1650,20 @@ def _prompt_one_connector_toml_section(
         section["gitlab_base_url"] = base_url
 
     if name == "plaid":
-        omit = bool((existing or {}).get("omit_amounts_in_digest", False))
+        raw_existing = existing or {}
+        omit = bool(
+            raw_existing.get("omit_amounts_in_summary")
+            or raw_existing.get("omit_amounts_in_digest", False)
+        )
         if enabled:
             yn = (
-                input("    Omit transaction amounts from digest markdown? [y/N] ")
+                input("    Omit transaction amounts from finance summaries? [y/N] ")
                 .strip()
                 .lower()
             )
             if yn in ("y", "yes"):
                 omit = True
-        section["omit_amounts_in_digest"] = omit
+        section["omit_amounts_in_summary"] = omit
 
     if name == "notion":
         prev_dbs: list = list(existing.get("database_ids", [])) if existing else []
@@ -2082,7 +2077,7 @@ def _configure_core_hub(
         if not showed_legend:
             ui.muted_line(
                 "● = value set in pulse.toml · ○ = empty · "
-                "Database file, Obsidian vault, and timezone for scheduling and digests."
+                "Database file, Obsidian vault, and timezone for scheduling."
             )
             showed_legend = True
         pick = _pick_core_setting_submenu(
@@ -2350,7 +2345,7 @@ def _configure_notifications_hub(
         if not showed_legend:
             ui.muted_line(
                 "● = required values set in pulse.toml for that channel · ○ = incomplete · "
-                "Several channels can be active; digests broadcast to all that are ready."
+                "Several channels can be active; notifications broadcast to all that are ready."
             )
             showed_legend = True
         pick = _pick_notification_provider_submenu(
@@ -3076,7 +3071,7 @@ def _init(
     from pulse.llm.factory import (
         create_providers_from_config,
         discovery_model_for_discovery,
-        summarization_model_for_digest,
+        summarization_model_for_source_summaries,
     )
 
     _, disc_llm = create_providers_from_config(config)
@@ -3097,7 +3092,8 @@ def _init(
                     vault_path=config.vault_path,
                     llm=disc_llm,
                     notification_channel=channel,
-                    summarization_model=summarization_model_for_digest(config) or "",
+                    summarization_model=summarization_model_for_source_summaries(config)
+                    or "",
                     discovery_model=discovery_model_for_discovery(config) or "",
                 )
             )
@@ -3172,40 +3168,6 @@ def _collect_profile(
     ui.success("Profile saved.")
 
 
-def _digest(args) -> None:
-    from datetime import date
-
-    from pulse.jobs.runners import run_aggregation_job, run_daily_digest_job
-    from pulse.llm.factory import (
-        create_providers_from_config,
-        summarization_model_for_digest,
-    )
-
-    config = load_config()
-    target = date.fromisoformat(args.date) if args.date else date.today()
-
-    ui.rule("pulse digest")
-    ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
-    result = asyncio.run(
-        run_aggregation_job(day=target, database_path=config.database_path)
-    )
-    ui.muted_line(result.detail)
-
-    summ_llm, _ = create_providers_from_config(config)
-
-    ui.say(f"[accent]Generating digest[/] for [bold]{target.isoformat()}[/]…")
-    result = asyncio.run(
-        run_daily_digest_job(
-            day=target,
-            database_path=config.database_path,
-            vault_path=config.vault_path,
-            llm=summ_llm,
-            summarization_model=summarization_model_for_digest(config) or "",
-        )
-    )
-    ui.say(f"[bold]{result.status}[/]: {result.detail}")
-
-
 def _discover(args) -> None:
     from datetime import date
 
@@ -3213,7 +3175,7 @@ def _discover(args) -> None:
     from pulse.llm.factory import (
         create_providers_from_config,
         discovery_model_for_discovery,
-        summarization_model_for_digest,
+        summarization_model_for_source_summaries,
     )
 
     config = load_config()
@@ -3241,7 +3203,8 @@ def _discover(args) -> None:
                 database_path=config.database_path,
                 vault_path=config.vault_path,
                 llm=disc_llm,
-                summarization_model=summarization_model_for_digest(config) or "",
+                summarization_model=summarization_model_for_source_summaries(config)
+                or "",
                 discovery_model=discovery_model_for_discovery(config) or "",
             )
         )

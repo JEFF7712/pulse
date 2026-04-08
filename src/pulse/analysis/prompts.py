@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
+from json import JSONDecoder
+
+logger = logging.getLogger(__name__)
 
 from pulse.domain.pattern_statuses import PATTERN_STATUS_CHOICES
 
@@ -17,9 +21,21 @@ Analyze the user's personal data streams (calendar, email, browsing, music, etc.
 ## Rules
 - Only report interesting or actionable findings — skip noise
 - Update existing patterns with new evidence rather than duplicating them
-- Use only the bounded pattern statuses in the schema below
+- Use only the bounded pattern statuses in the schema below (on `updated_patterns.status` only)
 - Be specific: include concrete data points, counts, and time references
 - Actively look for cross-source connections (e.g., browsing topics after meetings, music mood shifts after heavy email days)
+- For `new_patterns[].evidence` and `updated_patterns[].new_evidence`, start each bullet with an ISO date `YYYY-MM-DD` when the fact refers to a specific day, so evidence is easy to trace on a timeline.
+
+## Trend vs lifecycle status
+- **`new_patterns[].trend`** — Trajectory only: `increasing` | `decreasing` | `stable` | `new`. New patterns have no lifecycle `status` field in your output.
+- **`updated_patterns[].status`** — Lifecycle only: the allowed values from the schema (`emerging`, `active`, …). Do not put lifecycle labels in `trend`.
+- **`updated_patterns[].trend`** — How the pattern's support or salience is moving (`increasing` | `decreasing` | `stable`); not interchangeable with `status`.
+
+## Notifications
+- **`notifications[].pattern_slug`**: Must match an existing pattern slug **exactly** as shown under *Your Active Patterns* (e.g. `late-night-coding`), or JSON **`null`** if the notification is not tied to one pattern. Do not invent slugs.
+
+## baseline_updates
+- **`baseline_updates`**: A string describing baseline/routine updates for the user, or JSON **`null`** (the literal null token — **not** the string `"null"`) when there is nothing to update.
 
 ## Rejection Criteria — Do NOT Report
 - That the user uses email, calendar, or browsing regularly — that is baseline, not a pattern
@@ -61,10 +77,10 @@ A pattern MUST involve at least one of:
       "title": "Notification title",
       "body": "Notification body text",
       "priority": "high | medium | low",
-      "pattern_slug": "pattern-slug-if-this-notification-is-about-a-pattern | null"
+      "pattern_slug": null
     }
   ],
-  "baseline_updates": "Updated baseline description or null"
+  "baseline_updates": null
 }
 ```
 
@@ -226,18 +242,39 @@ def _strip_code_fences(text: str) -> str:
     return stripped.strip()
 
 
+def _loads_discovery_dict(text: str) -> dict | None:
+    """Parse a JSON object from text, tolerating leading/trailing prose."""
+    cleaned = _strip_code_fences(text.strip())
+    if not cleaned:
+        return None
+    try:
+        data = json.loads(cleaned)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        pass
+    start = cleaned.find("{")
+    if start == -1:
+        return None
+    try:
+        data, _ = JSONDecoder().raw_decode(cleaned, start)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def parse_discovery_response(raw: str) -> DiscoveryResponse:
     """Parse a raw LLM JSON response string into a DiscoveryResponse.
 
     On malformed or missing JSON, returns an empty DiscoveryResponse rather
     than raising.
     """
-    try:
-        cleaned = _strip_code_fences(raw)
-        data = json.loads(cleaned)
-    except (json.JSONDecodeError, ValueError):
-        return DiscoveryResponse()
-    if not isinstance(data, dict):
+    data = _loads_discovery_dict(raw)
+    if data is None:
+        if raw and raw.strip():
+            logger.warning(
+                "Discovery response could not be parsed as JSON (len=%d)",
+                len(raw),
+            )
         return DiscoveryResponse()
 
     new_patterns = [
@@ -249,6 +286,7 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
             trend=_as_str(p.get("trend")),
         )
         for p in _as_dict_list(data.get("new_patterns"))
+        if _as_str(p.get("title"))
     ]
 
     updated_patterns = [
@@ -261,6 +299,7 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
             trend=_as_str(p.get("trend")),
         )
         for p in _as_dict_list(data.get("updated_patterns"))
+        if _as_str(p.get("slug"))
     ]
 
     notifications = [
@@ -271,6 +310,7 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
             pattern_slug=_as_str(n.get("pattern_slug")) or None,
         )
         for n in _as_dict_list(data.get("notifications"))
+        if _as_str(n.get("title")) and _as_str(n.get("body"))
     ]
 
     baseline_updates = data.get("baseline_updates")
@@ -279,9 +319,20 @@ def parse_discovery_response(raw: str) -> DiscoveryResponse:
     else:
         baseline_updates = baseline_updates.strip() or None
 
-    return DiscoveryResponse(
+    result = DiscoveryResponse(
         new_patterns=new_patterns,
         updated_patterns=updated_patterns,
         notifications=notifications,
         baseline_updates=baseline_updates,
     )
+    if (
+        raw.strip()
+        and not new_patterns
+        and not updated_patterns
+        and not notifications
+        and baseline_updates is None
+    ):
+        logger.warning(
+            "Discovery JSON parsed but contained no patterns, notifications, or baseline updates"
+        )
+    return result

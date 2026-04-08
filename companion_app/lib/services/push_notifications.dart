@@ -6,11 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import '../screens/digest_browser_screen.dart';
+import '../screens/pattern_screens.dart';
+import '../utils/context_id_parser.dart';
 import 'pulse_api_client.dart';
 
-const _androidChannelId = 'pulse_digest';
-const _androidChannelName = 'Pulse digest';
+const _androidChannelId = 'pulse_insights';
+const _androidChannelName = 'Pulse insights';
 
 /// Top-level handler for data-only / background FCM (must be a top-level function).
 @pragma('vm:entry-point')
@@ -36,7 +37,7 @@ class PushNotificationsCoordinator {
   String? _lastRegisteredToken;
 
   /// Registers FCM, posts device tokens to Pulse, shows foreground notifications,
-  /// and opens [DigestBrowserScreen] when the user taps a notification with [context_id].
+  /// and opens [PatternDetailScreen] when [context_id] maps to a pattern slug.
   Future<void> start({
     required GlobalKey<NavigatorState> navigatorKey,
     required PulseApiClient apiClient,
@@ -101,14 +102,14 @@ class PushNotificationsCoordinator {
 
     _subscriptions.add(
       FirebaseMessaging.onMessageOpenedApp.listen((m) {
-        _openDigestFromData(m.data);
+        _openPatternFromMessageData(m.data);
       }),
     );
 
     final initial = await messaging.getInitialMessage();
     if (initial != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openDigestFromData(initial.data);
+        _openPatternFromMessageData(initial.data);
       });
     }
   }
@@ -152,7 +153,7 @@ class PushNotificationsCoordinator {
       const AndroidNotificationChannel(
         _androidChannelId,
         _androidChannelName,
-        description: 'Digest and Pulse alerts',
+        description: 'Insight and Pulse alerts',
         importance: Importance.defaultImportance,
       ),
     );
@@ -189,7 +190,7 @@ class PushNotificationsCoordinator {
         android: AndroidNotificationDetails(
           _androidChannelId,
           _androidChannelName,
-          channelDescription: 'Digest and Pulse alerts',
+          channelDescription: 'Insight and Pulse alerts',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
         ),
@@ -202,25 +203,27 @@ class PushNotificationsCoordinator {
   void _onLocalNotificationTapped(NotificationResponse response) {
     final payload = response.payload;
     if (payload != null && payload.isNotEmpty) {
-      _openDigestForSlug(payload);
+      _openPatternFromContextId(payload);
     }
   }
 
-  void _openDigestFromData(Map<String, dynamic> data) {
+  void _openPatternFromMessageData(Map<String, dynamic> data) {
     final id = data['context_id'] as String?;
-    if (id != null && id.isNotEmpty) {
-      _openDigestForSlug(id);
-    }
+    _openPatternFromContextId(id);
   }
 
-  void _openDigestForSlug(String slug) {
+  void _openPatternFromContextId(String? contextId) {
+    final slug = insightIdFromContextId(contextId);
+    if (slug == null || slug.isEmpty) {
+      return;
+    }
     final nav = _navigatorKey?.currentState;
     if (nav == null) {
       return;
     }
     nav.push(
       MaterialPageRoute<void>(
-        builder: (_) => DigestBrowserScreen(initialDateSlug: slug),
+        builder: (_) => PatternDetailScreen(insightId: slug),
       ),
     );
   }

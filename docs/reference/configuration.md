@@ -81,7 +81,7 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 
 Providers: **`anthropic`**, **`openai`**, **`gemini`**, **`ollama`**. Keys in TOML or **`ANTHROPIC_API_KEY`** / **`OPENAI_API_KEY`** / **`GEMINI_API_KEY`** / **`PULSE_*`**. `ollama` uses OpenAI-compatible transport; placeholder API key ok if unset.
 
-Digest, discovery, scheduled jobs, and MCP digest need a resolved LLM role. **`pulse init`** profile structuring uses Anthropic only when summarization or discovery is already Anthropic.
+Discovery, scheduled jobs, and MCP `pulse_discovery` need a resolved LLM role (summarization + discovery; they may share one block). **`pulse init`** profile structuring uses Anthropic only when summarization or discovery is already Anthropic.
 
 **Corrections:** `[llm.corrections]` first, else inherits discovery; if neither resolves, corrections are stored but vault application is skipped.
 
@@ -188,7 +188,7 @@ gitlab_base_url = "https://gitlab.com"
 [connectors.plaid]
 enabled = false
 poll_interval = "6h"
-omit_amounts_in_digest = false
+omit_amounts_in_summary = false
 
 [connectors.browser]
 enabled = false
@@ -223,23 +223,24 @@ enabled = true
 
 Disabled → `/webhooks/companion` not mounted.
 
+When the companion connector (and API routes) are enabled, the mobile app reads patterns via **`GET /api/insights`** and **`GET /api/insights/{id}`** using the same **`X-Pulse-Token`** / `companion_token` as corrections and device registration.
+
 ## Token files
 
 OAuth refresh tokens live next to the DB: `google_tokens.json`, `spotify_tokens.json`, `microsoft_tokens.json`, `github_tokens.json`, `gitlab_tokens.json`, `plaid_tokens.json`. Directory = parent of **`database_path`** — changing **`PULSE_DATABASE_PATH`** moves them.
 
 ## App, CLI, MCP
 
-Same **`load_config()`**: `pulse.toml` + env. Telegram, MCP **`pulse_correct`**, and **`POST /webhooks/corrections`** share the corrections pipeline (store text, `correction_applications` row, optional vault edit when LLM + target resolve). **`pulse_digest`** matches CLI/scheduler digest path.
+Same **`load_config()`**: `pulse.toml` + env. Telegram, MCP **`pulse_correct`**, and **`POST /webhooks/corrections`** share the corrections pipeline (store text, `correction_applications` row, optional vault edit when LLM + target resolve). MCP **`pulse_discovery`** matches CLI/scheduler discovery.
 
 **MCP-only:** the `pulse-mcp` process calls **`load_config(require_files=True)`**, so a **`pulse.toml` file must exist** at the resolved location before the server starts. If your agent spawns MCP with an unexpected working directory, set **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`** in the MCP server `env` so Pulse finds the same config as `pulse` / `uvicorn`.
 
 ## Runtime notes
 
 - **`/health`** — process up; not connector/LLM proof.
-- Scheduler registers digest, briefing, discovery, aggregation; jobs **skip** when notify channel or LLM is missing (see [Runbook](../operations/runbook.md)).
-- Digest: CLI, web, MCP, and cron share one summarization path (LLM or fallback).
-- Briefing: needs summarization LLM + ≥1 notify channel; multi-channel = duplicate sends.
-- Discovery: one shared summarization/discovery role; no role → skip.
+- Scheduler registers aggregation and discovery jobs; discovery **skips** when no LLM role resolves (see [Runbook](../operations/runbook.md)).
+- Discovery: per-source summaries use the summarization role; the main insight pass uses the discovery role; either may inherit the other when one block is omitted.
+- Insight notifications: sent when discovery emits them and a notify channel is configured.
 
 ## Env-only deploy
 

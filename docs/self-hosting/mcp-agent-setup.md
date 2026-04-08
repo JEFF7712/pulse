@@ -62,5 +62,5 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); open t
 ## Reference
 
 - Human-oriented walkthrough: [Self-Hosting Quickstart](./quickstart.md).
-- Config, env, digest/corrections behavior: [Configuration Reference](../reference/configuration.md) (see *App, CLI, MCP* and *Runtime notes*).
+- Config, env, discovery/corrections behavior: [Configuration Reference](../reference/configuration.md) (see *App, CLI, MCP* and *Runtime notes*).
 - Tool and resource list: repository **README** (*Use as an MCP server*).

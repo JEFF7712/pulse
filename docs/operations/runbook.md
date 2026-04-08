@@ -14,7 +14,6 @@ Paths, timezone, scheduler + connector counts. **POST** actions return to `/` wi
 | Action | Effect |
 | --- | --- |
 | `/actions/pull` | Pull all active pull connectors |
-| `/actions/digest` | Today’s digest (LLM if configured, else fallback) |
 | `/actions/discover` | **Daily** discovery only — use `pulse discover` for weekly/monthly |
 | `/actions/test-telegram` | Test Telegram (needs tokens) |
 
@@ -28,16 +27,16 @@ Default install: pull connectors only unless you register push connectors with w
 ## Companion (when `[connectors.companion]` enabled)
 
 - `POST /webhooks/companion` — events (Bearer if `PULSE_COMPANION_TOKEN` set)
-- `GET /api/digests`, `GET /api/digests/{date}`
+- `GET /api/insights`, `GET /api/insights/{id}` — pattern metadata + markdown for the companion app
 - `POST /api/corrections`, `POST /api/device-token` (FCM when `PULSE_FCM_SERVICE_ACCOUNT_PATH` set)
 
 Disabled → routes not mounted (404).
 
 ## Scheduler (baseline jobs)
 
-`daily_digest` (24h), `morning_briefing` (08:00 daily), `aggregation` (hourly), `discovery_daily` (23:00), `discovery_weekly` (Sun 20:00), `discovery_monthly` (1st 10:00).
+`aggregation` (hourly), `discovery_daily` (23:00), `discovery_weekly` (Sun 20:00), `discovery_monthly` (1st 10:00).
 
-**Skips:** `morning_briefing` without any notify channel; discovery without a resolved LLM role. Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
+**Skips:** discovery without a resolved LLM role. Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
 
 ## Recovery
 
@@ -50,7 +49,7 @@ Disabled → routes not mounted (404).
 | Symptom | Likely cause |
 | --- | --- |
 | `/health` OK, empty logs | Connectors off, missing creds, or no pulls yet |
-| Ingest OK, no briefing | No notification channel configured |
+| Ingest OK, no insight notifications | No notification channel configured (discovery still writes the vault) |
 | Ingest OK, no discovery | No summarization/discovery LLM (or missing API key) |
 | Telegram webhook 400 | Reply missing thread/context for correction |
 | Corrections in DB, no vault edit | Status `skipped` / `needs_review` — check `correction_applications` |

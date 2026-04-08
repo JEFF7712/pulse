@@ -49,22 +49,10 @@ def test_build_scheduler_keeps_analysis_jobs():
     scheduler = build_scheduler(registry=registry, config=config)
     jobs = {job.id: job for job in scheduler.get_jobs()}
 
-    assert "daily_digest" in jobs
-    assert "morning_briefing" in jobs
-    assert isinstance(jobs["daily_digest"].trigger, IntervalTrigger)
-    assert isinstance(jobs["morning_briefing"].trigger, CronTrigger)
-
-
-def test_build_scheduler_morning_briefing_skips_without_telegram():
-    """Equivalent of old test_morning_briefing_job_skips_when_telegram_is_not_configured."""
-    from pulse.jobs.scheduler import build_scheduler
-
-    config = PulseConfig()  # No telegram_bot_token or telegram_chat_id
-    scheduler = build_scheduler(registry=ConnectorRegistry(), config=config)
-    jobs = {job.id: job for job in scheduler.get_jobs()}
-
-    # Morning briefing job is registered — it handles skip logic internally
-    assert "morning_briefing" in jobs
+    assert "aggregation" in jobs
+    assert isinstance(jobs["aggregation"].trigger, IntervalTrigger)
+    assert "discovery_daily" in jobs
+    assert isinstance(jobs["discovery_daily"].trigger, CronTrigger)
 
 
 def test_parse_interval_handles_various_units():

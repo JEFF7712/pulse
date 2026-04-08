@@ -15,7 +15,7 @@ def test_finance_summary_groups_merchants():
             data={
                 "name": "Cafe",
                 "amount": 4.5,
-                "omit_amount_in_digest": False,
+                "omit_amount_in_summary": False,
             },
         ),
         Event(
@@ -26,7 +26,7 @@ def test_finance_summary_groups_merchants():
             data={
                 "name": "Cafe",
                 "amount": 3.0,
-                "omit_amount_in_digest": False,
+                "omit_amount_in_summary": False,
             },
         ),
     ]
@@ -45,7 +45,7 @@ def test_finance_omit_amounts_flag():
             timestamp=datetime(2026, 3, 26, 12, 0, tzinfo=UTC),
             source="plaid",
             event_type="finance.transaction",
-            data={"name": "X", "amount": 10.0, "omit_amount_in_digest": True},
+            data={"name": "X", "amount": 10.0, "omit_amount_in_summary": True},
         ),
     ]
     day = p.preprocess(events)

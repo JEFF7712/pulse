@@ -53,7 +53,7 @@ def test_plaid_pull_cycle_stores_finance_events(tmp_path):
             plaid_env="sandbox",
             connectors={"plaid": ConnectorConfig(enabled=True, poll_interval="6h")},
         )
-        connector = PlaidConnector(config, token_path, omit_amounts_in_digest=False)
+        connector = PlaidConnector(config, token_path, omit_amounts_in_summary=False)
 
         registry = ConnectorRegistry()
         registry.register_pull("plaid", lambda: connector)

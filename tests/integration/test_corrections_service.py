@@ -66,7 +66,9 @@ class RaisingLLM:
         raise RuntimeError("LLM unavailable")
 
 
-def test_correction_service_applies_digest_correction_and_records_audit_row(tmp_path):
+def test_correction_service_iso_date_context_records_needs_review(tmp_path):
+    """YYYY-MM-DD contexts were for legacy daily digests; they are no longer supported."""
+
     async def exercise() -> None:
         from pulse.analysis.vault_memory import VaultMemory
         from pulse.services.correction_interpreter import LLMCorrectionInterpreter
@@ -79,31 +81,12 @@ def test_correction_service_applies_digest_correction_and_records_audit_row(tmp_
         db_path = tmp_path / "corrections.db"
         vault_path = tmp_path / "vault"
         vault = VaultMemory(vault_path)
-        digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text(
-            "# Daily Digest\n\n## Summary\nMorning walk.\n", encoding="utf-8"
-        )
 
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             correction_repository = CorrectionRepository(db)
             application_repository = CorrectionApplicationRepository(db)
-            interpreter = LLMCorrectionInterpreter(
-                FakeLLM(
-                    """
-                    {
-                      "target_type": "digest",
-                      "operation": "append_note",
-                      "target_ref": "2026-03-22",
-                      "section": "Corrections",
-                      "content": "The walk happened after lunch.",
-                      "summary": "Append a correction to the daily digest.",
-                      "confidence": 0.94
-                    }
-                    """
-                )
-            )
+            interpreter = LLMCorrectionInterpreter(FakeLLM("{}"))
             service = CorrectionService(
                 correction_repository,
                 correction_applications=application_repository,
@@ -121,16 +104,9 @@ def test_correction_service_applies_digest_correction_and_records_audit_row(tmp_
             )
 
             assert len(applications) == 1
-            assert applications[0].status == "applied"
-            assert applications[0].target_type == "digest"
-            assert applications[0].target_ref == "2026-03-22"
-            assert applications[0].operation == "append_note"
-            assert applications[0].summary == "Append a correction to the daily digest."
-            assert applications[0].error_message is None
-
-        digest_text = digest_path.read_text(encoding="utf-8")
-        assert "## Corrections" in digest_text
-        assert "- The walk happened after lunch." in digest_text
+            assert applications[0].status == "needs_review"
+            assert applications[0].operation == "needs_review"
+            assert "no longer supported" in applications[0].summary.lower()
 
     asyncio.run(exercise())
 
@@ -195,10 +171,16 @@ def test_correction_service_records_needs_review_for_invalid_interpreter_output(
         db_path = tmp_path / "corrections.db"
         vault_path = tmp_path / "vault"
         vault = VaultMemory(vault_path)
-        digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text(
-            "# Daily Digest\n\n## Summary\nMorning walk.\n", encoding="utf-8"
+        pattern_path = (
+            vault_path / "02-Insights" / "patterns" / "morning-walk.md"
+        )
+        pattern_path.parent.mkdir(parents=True, exist_ok=True)
+        pattern_path.write_text(
+            "# Pattern: Morning walk\n\n**Status:** active\n**Confidence:** 0.5\n"
+            "**First seen:** 2026-03-22\n**Last updated:** 2026-03-22\n\n"
+            "## Observation\nWalk before work.\n\n## Evidence Log\n- 2026-03-22: 20 min\n\n"
+            "## Trend\nStable.\n\n## User Notes\n_Note._\n",
+            encoding="utf-8",
         )
 
         async with connect_db(db_path) as db:
@@ -214,7 +196,7 @@ def test_correction_service_records_needs_review_for_invalid_interpreter_output(
             )
 
             correction = await service.record_correction(
-                context_id="2026-03-22",
+                context_id="pattern:morning-walk",
                 message_text="The walk happened after lunch, not in the morning.",
             )
 
@@ -225,15 +207,12 @@ def test_correction_service_records_needs_review_for_invalid_interpreter_output(
             assert len(applications) == 1
             assert applications[0].status == "needs_review"
             assert applications[0].target_type == "none"
-            assert applications[0].target_ref == "2026-03-22"
+            assert applications[0].target_ref == "pattern:morning-walk"
             assert applications[0].operation == "needs_review"
             assert (
                 applications[0].summary == "LLM correction output could not be parsed"
             )
             assert applications[0].error_message is None
-
-        digest_text = digest_path.read_text(encoding="utf-8")
-        assert "## Corrections" not in digest_text
 
     asyncio.run(exercise())
 
@@ -251,13 +230,13 @@ def test_correction_service_records_needs_review_when_context_resolution_raises(
         from pulse.store.schema import bootstrap_schema
 
         class BrokenVaultMemory(VaultMemory):
-            def read_daily_digest(self, date_slug: str) -> str:
+            def read_pattern_by_slug(self, slug: str) -> str:
                 raise OSError("vault read failed")
 
         db_path = tmp_path / "corrections.db"
-        digest_path = tmp_path / "vault" / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text("# Daily Digest\n", encoding="utf-8")
+        pattern_path = tmp_path / "vault" / "02-Insights" / "patterns" / "x.md"
+        pattern_path.parent.mkdir(parents=True, exist_ok=True)
+        pattern_path.write_text("# Pattern\n\n**Status:** active\n", encoding="utf-8")
 
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
@@ -265,7 +244,7 @@ def test_correction_service_records_needs_review_when_context_resolution_raises(
             application_repository = CorrectionApplicationRepository(db)
             interpreter = LLMCorrectionInterpreter(
                 FakeLLM(
-                    '{"target_type":"digest","operation":"append_note","target_ref":"2026-03-22","section":"Corrections","content":"Later.","summary":"Append correction.","confidence":0.9}'
+                    '{"target_type":"pattern","operation":"update_pattern_notes","target_ref":"x","section":"User Notes","content":"Later.","summary":"Note.","confidence":0.9}'
                 )
             )
             service = CorrectionService(
@@ -276,7 +255,7 @@ def test_correction_service_records_needs_review_when_context_resolution_raises(
             )
 
             correction = await service.record_correction(
-                context_id="2026-03-22",
+                context_id="pattern:x",
                 message_text="The walk happened later.",
             )
 
@@ -307,9 +286,14 @@ def test_correction_service_records_needs_review_when_interpreter_raises(tmp_pat
 
         db_path = tmp_path / "corrections.db"
         vault_path = tmp_path / "vault"
-        digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text("# Daily Digest\n", encoding="utf-8")
+        pattern_path = vault_path / "02-Insights" / "patterns" / "y.md"
+        pattern_path.parent.mkdir(parents=True, exist_ok=True)
+        pattern_path.write_text(
+            "# Pattern: Y\n\n**Status:** active\n**Confidence:** 0.5\n"
+            "**First seen:** 2026-03-22\n**Last updated:** 2026-03-22\n\n"
+            "## Observation\nTest.\n\n## Evidence Log\n\n## Trend\n\n## User Notes\n_Note._\n",
+            encoding="utf-8",
+        )
 
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
@@ -323,7 +307,7 @@ def test_correction_service_records_needs_review_when_interpreter_raises(tmp_pat
             )
 
             correction = await service.record_correction(
-                context_id="2026-03-22",
+                context_id="pattern:y",
                 message_text="The walk happened later.",
             )
 
@@ -353,14 +337,19 @@ def test_correction_service_records_needs_review_when_apply_raises(tmp_path):
         from pulse.store.schema import bootstrap_schema
 
         class BrokenVaultMemory(VaultMemory):
-            def append_daily_correction(self, date_slug: str, note: str):
+            def update_pattern_notes(self, slug: str, notes: str):
                 raise RuntimeError("disk full")
 
         db_path = tmp_path / "corrections.db"
         vault_path = tmp_path / "vault"
-        digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text("# Daily Digest\n", encoding="utf-8")
+        pattern_path = vault_path / "02-Insights" / "patterns" / "z.md"
+        pattern_path.parent.mkdir(parents=True, exist_ok=True)
+        pattern_path.write_text(
+            "# Pattern: Z\n\n**Status:** active\n**Confidence:** 0.5\n"
+            "**First seen:** 2026-03-22\n**Last updated:** 2026-03-22\n\n"
+            "## Observation\nTest.\n\n## Evidence Log\n\n## Trend\n\n## User Notes\n_Note._\n",
+            encoding="utf-8",
+        )
 
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
@@ -368,7 +357,7 @@ def test_correction_service_records_needs_review_when_apply_raises(tmp_path):
             application_repository = CorrectionApplicationRepository(db)
             interpreter = LLMCorrectionInterpreter(
                 FakeLLM(
-                    '{"target_type":"digest","operation":"append_note","target_ref":"2026-03-22","section":"Corrections","content":"Later.","summary":"Append correction.","confidence":0.9}'
+                    '{"target_type":"pattern","operation":"update_pattern_notes","target_ref":"z","section":"User Notes","content":"Later.","summary":"Append correction.","confidence":0.9}'
                 )
             )
             service = CorrectionService(
@@ -379,7 +368,7 @@ def test_correction_service_records_needs_review_when_apply_raises(tmp_path):
             )
 
             correction = await service.record_correction(
-                context_id="2026-03-22",
+                context_id="pattern:z",
                 message_text="The walk happened later.",
             )
 
@@ -388,8 +377,8 @@ def test_correction_service_records_needs_review_when_apply_raises(tmp_path):
             )
             assert len(applications) == 1
             assert applications[0].status == "failed"
-            assert applications[0].target_type == "digest"
-            assert applications[0].operation == "append_note"
+            assert applications[0].target_type == "pattern"
+            assert applications[0].operation == "update_pattern_notes"
             assert applications[0].summary == "Append correction."
             assert applications[0].error_message == "disk full"
 
@@ -532,57 +521,6 @@ def test_correction_service_applies_pattern_status_correction_and_records_audit_
     asyncio.run(exercise())
 
 
-def test_correction_service_records_needs_review_when_digest_target_file_is_missing(
-    tmp_path,
-):
-    async def exercise() -> None:
-        from pulse.analysis.vault_memory import VaultMemory
-        from pulse.services.correction_interpreter import LLMCorrectionInterpreter
-        from pulse.services.corrections import CorrectionService
-        from pulse.store.correction_applications import CorrectionApplicationRepository
-        from pulse.store.corrections import CorrectionRepository
-        from pulse.store.db import connect_db
-        from pulse.store.schema import bootstrap_schema
-
-        db_path = tmp_path / "corrections.db"
-        vault_path = tmp_path / "vault"
-        missing_digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-
-        async with connect_db(db_path) as db:
-            await bootstrap_schema(db)
-            correction_repository = CorrectionRepository(db)
-            application_repository = CorrectionApplicationRepository(db)
-            interpreter = LLMCorrectionInterpreter(
-                FakeLLM(
-                    '{"target_type":"digest","operation":"append_note","target_ref":"2026-03-22","section":"Corrections","content":"Later.","summary":"Append correction.","confidence":0.9}'
-                )
-            )
-            service = CorrectionService(
-                correction_repository,
-                correction_applications=application_repository,
-                vault_memory=VaultMemory(vault_path),
-                interpreter=interpreter,
-            )
-
-            correction = await service.record_correction(
-                context_id="2026-03-22",
-                message_text="The walk happened later.",
-            )
-
-            applications = await application_repository.list_for_correction(
-                correction.id
-            )
-            assert len(applications) == 1
-            assert applications[0].status == "needs_review"
-            assert applications[0].operation == "needs_review"
-            assert applications[0].summary == "Correction target file is missing"
-            assert applications[0].error_message is None
-
-        assert not missing_digest_path.exists()
-
-    asyncio.run(exercise())
-
-
 def test_correction_service_records_needs_review_when_interpreter_retargets_context(
     tmp_path,
 ):
@@ -597,10 +535,13 @@ def test_correction_service_records_needs_review_when_interpreter_retargets_cont
 
         db_path = tmp_path / "corrections.db"
         vault_path = tmp_path / "vault"
-        digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-        digest_path.parent.mkdir(parents=True, exist_ok=True)
-        digest_path.write_text(
-            "# Daily Digest\n\n## Summary\nMorning walk.\n", encoding="utf-8"
+        pattern_path = vault_path / "02-Insights" / "patterns" / "retarget-me.md"
+        pattern_path.parent.mkdir(parents=True, exist_ok=True)
+        pattern_path.write_text(
+            "# Pattern: Retarget me\n\n**Status:** active\n**Confidence:** 0.5\n"
+            "**First seen:** 2026-03-22\n**Last updated:** 2026-03-22\n\n"
+            "## Observation\nWalk.\n\n## Evidence Log\n\n## Trend\n\n## User Notes\n_Note._\n",
+            encoding="utf-8",
         )
 
         async with connect_db(db_path) as db:
@@ -630,7 +571,7 @@ def test_correction_service_records_needs_review_when_interpreter_retargets_cont
             )
 
             correction = await service.record_correction(
-                context_id="2026-03-22",
+                context_id="pattern:retarget-me",
                 message_text="This was after lunch.",
             )
 
@@ -644,9 +585,6 @@ def test_correction_service_records_needs_review_when_interpreter_retargets_cont
                 applications[0].summary
                 == "Correction action did not match the resolved target"
             )
-
-        digest_text = digest_path.read_text(encoding="utf-8")
-        assert "## Corrections" not in digest_text
 
     asyncio.run(exercise())
 

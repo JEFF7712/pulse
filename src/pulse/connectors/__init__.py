@@ -135,10 +135,10 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
     registry.register_pull("gitlab", _gitlab_factory)
 
     plaid_cc = config.connectors.get("plaid")
+    plaid_raw = plaid_cc.model_dump(mode="python") if plaid_cc else {}
     plaid_omit = bool(
-        (plaid_cc.model_dump(mode="python") if plaid_cc else {}).get(
-            "omit_amounts_in_digest", False
-        )
+        plaid_raw.get("omit_amounts_in_summary")
+        or plaid_raw.get("omit_amounts_in_digest", False)
     )
     plaid_token_path = Path(config.database_path).parent / "plaid_tokens.json"
     registry.register_pull(
@@ -146,7 +146,7 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
         lambda: PlaidConnector(
             config=config,
             token_path=plaid_token_path,
-            omit_amounts_in_digest=plaid_omit,
+            omit_amounts_in_summary=plaid_omit,
         ),
     )
 

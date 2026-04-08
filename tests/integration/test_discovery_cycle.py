@@ -68,8 +68,9 @@ def test_pattern_evolution_across_multiple_passes(tmp_path):
 
         class FakeLLM:
             async def complete(self, prompt, *, system_prompt=None, model=None):
-                # Source summarizer calls have no system_prompt; discovery calls do
-                if system_prompt is None:
+                # Source summarizer uses timeline-oriented prompts; discovery uses the insight engine prompt
+                sp = system_prompt or ""
+                if "insight engine" not in sp:
                     return "Summary narrative."
                 pass_count["n"] += 1
                 if pass_count["n"] == 1:

@@ -8,11 +8,11 @@ from apscheduler.triggers.interval import IntervalTrigger
 from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.connectors.registry import ConnectorRegistry
-from pulse.jobs.runners import run_daily_digest_job, run_morning_briefing_job, JobResult
+from pulse.jobs.runners import JobResult
 from pulse.llm.factory import (
     create_providers_from_config,
     discovery_model_for_discovery,
-    summarization_model_for_digest,
+    summarization_model_for_source_summaries,
 )
 from pulse.notifications.factory import build_notification_channel
 
@@ -72,21 +72,6 @@ def build_scheduler(
                         trigger=IntervalTrigger(seconds=int(supp_interval.total_seconds())),
                         id=f"pull_{connector.get_source_name()}_{suffix}",
                     )
-
-    # Analysis jobs (unchanged)
-    scheduler.add_job(
-        _make_daily_digest_job(config),
-        "interval",
-        days=1,
-        id="daily_digest",
-    )
-    scheduler.add_job(
-        _make_morning_briefing_job(config),
-        "cron",
-        hour=8,
-        minute=0,
-        id="morning_briefing",
-    )
 
     # Aggregation job — hourly
     scheduler.add_job(
@@ -167,55 +152,6 @@ def _make_supplementary_job(job_fn, config):
     return job
 
 
-def _make_daily_digest_job(config):
-    async def job():
-        try:
-            day = _resolve_current_day(config)
-
-            summ_llm, _ = create_providers_from_config(config)
-
-            return await run_daily_digest_job(
-                day=day,
-                database_path=config.database_path,
-                vault_path=config.vault_path,
-                llm=summ_llm,
-                summarization_model=summarization_model_for_digest(config) or "",
-            )
-        except Exception as e:
-            _log_llm_related_job_failure("daily_digest", e)
-            raise
-    return job
-
-
-def _make_morning_briefing_job(config):
-    async def job():
-        try:
-            day = _resolve_current_day(config)
-            channel = build_notification_channel(config)
-            if channel is None:
-                return JobResult(
-                    status="skipped",
-                    detail=(
-                        f"Skipped morning briefing for {day.isoformat()}: "
-                        "no notification channel configured"
-                    ),
-                )
-            summ_llm, _ = create_providers_from_config(config)
-            return await run_morning_briefing_job(
-                day=day,
-                database_path=config.database_path,
-                vault_path=config.vault_path,
-                channel=channel,
-                llm=summ_llm,
-                summarization_model=summarization_model_for_digest(config) or "",
-            )
-        except Exception as e:
-            _log_llm_related_job_failure("morning_briefing", e)
-            raise
-
-    return job
-
-
 def _make_aggregation_job(config):
     async def job():
         from pulse.jobs.runners import run_aggregation_job
@@ -246,7 +182,8 @@ def _make_discovery_job(cadence, config):
                 vault_path=config.vault_path,
                 llm=disc_llm,
                 notification_channel=channel,
-                summarization_model=summarization_model_for_digest(config) or "",
+                summarization_model=summarization_model_for_source_summaries(config)
+                or "",
                 discovery_model=discovery_model_for_discovery(config) or "",
             )
         except Exception as e:

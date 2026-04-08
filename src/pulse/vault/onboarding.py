@@ -6,7 +6,7 @@ from pathlib import Path
 
 _README_MD = """# Pulse vault
 
-This folder is **Pulse’s markdown memory**: daily digests, discovered patterns, and a small amount of config you can edit. Pulse writes here automatically; you can open the same directory in [Obsidian](https://obsidian.md/) or any editor.
+This folder is **Pulse’s markdown memory**: discovered patterns and a small amount of config you can edit. Pulse writes here automatically; you can open the same directory in [Obsidian](https://obsidian.md/) or any editor.
 
 Configure the path with `vault_path` in `pulse.toml` or the **`PULSE_VAULT_PATH`** environment variable.
 
@@ -14,17 +14,17 @@ Configure the path with `vault_path` in `pulse.toml` or the **`PULSE_VAULT_PATH`
 
 | Path | Purpose |
 | --- | --- |
-| `01-Daily/` | One file per day (`YYYY-MM-DD.md`) — timeline-style digest |
 | `02-Insights/patterns/` | Recurring insights (“patterns”) with evidence and trends |
 | `03-Life/` | Longer-lived context (e.g. `routines.md` baselines from discovery) |
 | `04-Config/` | `profile.md` and other operator-facing notes |
 | `Meta/` | This README’s companion: **`AGENTS.md`** (rules for AI tools) |
 
+Older installs may still have an `01-Daily/` folder from legacy daily digests; Pulse no longer writes there.
+
 Some folders appear only after Pulse has generated content (for example patterns after discovery).
 
 ## What Pulse updates automatically
 
-- **Daily digests** — new or overwritten for each date when the digest job runs.
 - **Pattern files** — created and updated by discovery; observations and evidence accumulate over time.
 - **`03-Life/routines.md`** — may be rewritten when discovery proposes baseline updates.
 - **Corrections** — when you send a correction (Telegram reply, webhook, or MCP), Pulse may append or patch **only the sections listed below**.
@@ -35,7 +35,6 @@ Do not rename these headings if you want corrections and automation to keep work
 
 | File | Heading / field | Used for |
 | --- | --- | --- |
-| `01-Daily/*.md` | `## Corrections` | User corrections appended as bullets |
 | `02-Insights/patterns/*.md` | `## User Notes` | Correction text may replace this section |
 | `02-Insights/patterns/*.md` | `**Status:**` line | Status may be updated by corrections |
 | `04-Config/profile.md` | `## Learned Corrections` | Bounded correction summaries |
@@ -51,9 +50,9 @@ Everything else in those files is yours to edit freely; Pulse tries to preserve 
 
 ## Wikilinks, graph, and tags (Obsidian)
 
-Daily digest notes include **path-qualified** links to the previous and next calendar day, for example `[[01-Daily/2026-03-29]]`, plus a **Pulse links** section to `[[04-Config/profile]]` and `[[03-Life/routines]]`. Pattern notes under **`02-Insights/patterns/`** include a **Related days** section linking back to relevant `[[01-Daily/YYYY-MM-DD]]` digests (from first/last seen dates and dated evidence lines).
+Pattern notes under **`02-Insights/patterns/`** include a **Related days** section listing ISO dates from evidence (plain text).
 
-Pulse-written notes start with YAML **frontmatter** (`pulse: true`, `type`, `tags` such as `pulse/digest` / `pulse/pattern`) and may end with inline **`#pulse`** hashtags for the tag pane. In [Obsidian](https://obsidian.md/), wikilinks show up as graph edges; tags group notes in the tag view. Neighbor digest days may not exist yet — links may appear unresolved until you generate that digest.
+Pulse-written pattern notes start with YAML **frontmatter** (`pulse: true`, `type: pattern`, `tags`) and may end with inline **`#pulse`** hashtags for the tag pane.
 
 ## AI assistants
 
@@ -71,22 +70,18 @@ This directory is a **Pulse** knowledge vault (plain Markdown on disk). The huma
 ## Read first
 
 1. Parent **`README.md`** — full folder map and **reserved section** list (do not rename those `##` headings).
-2. Recent **`01-Daily/`** notes for factual timeline context.
+2. **`02-Insights/patterns/`** for discovered patterns and evidence.
 3. **`04-Config/profile.md`** for user-stated preferences and goals.
 
 ## Defaults
 
 - Prefer **narrow edits**: append bullets under reserved headings rather than rewriting whole files.
-- **Do not** delete or rename **`01-Daily/`**, **`02-Insights/patterns/`**, or reserved headings unless the user explicitly asks.
+- **Do not** delete or rename **`02-Insights/patterns/`** or reserved headings unless the user explicitly asks.
 - **Do not** assume every file exists yet; list or read before editing.
-
-## Wikilinks
-
-Daily digests may contain Obsidian wikilinks such as `[[01-Daily/YYYY-MM-DD]]` for adjacent days. Prefer that path form when linking digest files so names stay unique.
 
 ## Operator config
 
-Vault path is set by the operator (`vault_path` / `PULSE_VAULT_PATH`). Pulse MCP and CLI expose events, digests, and corrections against this tree.
+Vault path is set by the operator (`vault_path` / `PULSE_VAULT_PATH`). Pulse MCP and CLI expose events, discovery, patterns, and corrections against this tree.
 
 ---
 

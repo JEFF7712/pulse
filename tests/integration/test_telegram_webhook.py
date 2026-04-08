@@ -51,22 +51,12 @@ def test_telegram_webhook_records_reply_correction(tmp_path) -> None:
     ]
 
 
-def test_telegram_webhook_applies_digest_correction_and_records_audit_row(
-    tmp_path, monkeypatch
-) -> None:
+def test_telegram_webhook_iso_date_context_records_needs_review(tmp_path, monkeypatch) -> None:
+    """Legacy YYYY-MM-DD Telegram contexts are rejected before the corrections LLM runs."""
+
     class FakeLLM:
         async def complete(self, prompt, *, system_prompt=None, model=None):
-            return """
-            {
-              "target_type": "digest",
-              "operation": "append_note",
-              "target_ref": "2026-03-22",
-              "section": "Corrections",
-              "content": "The walk happened after lunch.",
-              "summary": "Append a correction to the daily digest.",
-              "confidence": 0.96
-            }
-            """
+            return "{}"
 
     from pulse.services import corrections as corrections_module
 
@@ -78,11 +68,6 @@ def test_telegram_webhook_applies_digest_correction_and_records_audit_row(
 
     db_path = tmp_path / "telegram-webhook.db"
     vault_path = tmp_path / "vault"
-    digest_path = vault_path / "01-Daily" / "2026-03-22.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        "# Daily Digest\n\n## Summary\nMorning walk.\n", encoding="utf-8"
-    )
 
     app = create_app(
         settings=Settings(
@@ -104,7 +89,7 @@ def test_telegram_webhook_applies_digest_correction_and_records_audit_row(
                 "text": "The walk happened after lunch, not in the morning.",
                 "reply_to_message": {
                     "message_id": 100,
-                    "text": "Morning briefing for 2026-03-22\n\nContext: 2026-03-22",
+                    "text": "Insight for 2026-03-22\n\nContext: 2026-03-22",
                 },
             },
         },
@@ -141,9 +126,7 @@ def test_telegram_webhook_applies_digest_correction_and_records_audit_row(
     assert corrections == [
         ("2026-03-22", "The walk happened after lunch, not in the morning."),
     ]
-    assert applications == [("applied", "digest", "append_note")]
-    assert "## Corrections" in digest_path.read_text(encoding="utf-8")
-    assert "- The walk happened after lunch." in digest_path.read_text(encoding="utf-8")
+    assert applications == [("needs_review", "none", "needs_review")]
 
 
 def test_telegram_webhook_applies_pattern_correction_and_records_audit_row(

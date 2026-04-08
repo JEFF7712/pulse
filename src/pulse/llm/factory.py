@@ -148,7 +148,7 @@ def effective_llm_role_configs(
     )
 
 
-def summarization_model_for_digest(config: PulseConfig) -> str | None:
+def summarization_model_for_source_summaries(config: PulseConfig) -> str | None:
     """Model id for SourceSummarizer when a summarization role resolves; else ``None``."""
     summ_config, _ = effective_llm_role_configs(config)
     if summ_config is None:

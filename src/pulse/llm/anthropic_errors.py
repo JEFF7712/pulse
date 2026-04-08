@@ -54,7 +54,7 @@ def _for_one(exc: BaseException) -> str | None:
         return f"{base} API said: {detail}" if detail else base
     if isinstance(exc, anthropic.RateLimitError):
         return (
-            "Anthropic rate limit (429). Wait a few minutes or reduce how often discovery/digest runs; "
+            "Anthropic rate limit (429). Wait a few minutes or reduce how often discovery runs; "
             "see usage limits on your Anthropic plan."
         )
     if isinstance(exc, anthropic.APITimeoutError):

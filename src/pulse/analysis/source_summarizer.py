@@ -5,11 +5,24 @@ import asyncio
 
 from pulse.analysis.preprocessor import PreprocessedDay
 
+_SOURCE_SUMMARIZER_SYSTEM = (
+    "You summarize private personal activity logs for the user's timeline. "
+    "Stay factual and concise; do not give medical, legal, or financial advice; "
+    "do not moralize or lecture."
+)
+
 
 class SourceSummarizer:
     def __init__(self, llm, model: str = "claude-haiku-4-5-20251001") -> None:
         self._llm = llm
         self._model = model
+
+    async def _complete(self, prompt: str) -> str:
+        return await self._llm.complete(
+            prompt,
+            model=self._model,
+            system_prompt=_SOURCE_SUMMARIZER_SYSTEM,
+        )
 
     async def summarize(self, day: PreprocessedDay) -> dict[str, str]:
         """Summarize each active source into a short narrative. Returns {source: narrative}."""
@@ -53,7 +66,7 @@ class SourceSummarizer:
             "Focus on what topics they explored, how long they spent, and anything notable.\n\n"
             f"Browsing clusters:\n" + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_email(self, day: PreprocessedDay) -> str:
         lines = []
@@ -76,7 +89,7 @@ class SourceSummarizer:
             "Focus on what conversations were active and what seemed important.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_calendar(self, day: PreprocessedDay) -> str:
         total_minutes = sum(b.duration_minutes for b in day.calendar_blocks)
@@ -96,7 +109,7 @@ class SourceSummarizer:
             "Note meeting density, gaps, and what kind of day it was.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_media(self, day: PreprocessedDay) -> str:
         lines = []
@@ -112,7 +125,7 @@ class SourceSummarizer:
             "Note what they listened to or watched and any themes.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_dev(self, day: PreprocessedDay) -> str:
         lines = []
@@ -123,7 +136,7 @@ class SourceSummarizer:
             "Focus on what they shipped, reviewed, or discussed.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_notion(self, day: PreprocessedDay) -> str:
         lines = []
@@ -136,7 +149,7 @@ class SourceSummarizer:
             "Note which pages or databases changed and any themes — stay factual.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_health(self, day: PreprocessedDay) -> str:
         lines = []
@@ -170,7 +183,7 @@ class SourceSummarizer:
             "Do not diagnose; describe scores and patterns only.\n\n"
             + "\n".join(lines)
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)
 
     async def _summarize_finance(self, day: PreprocessedDay) -> str:
         fs = day.finance_summary
@@ -192,4 +205,4 @@ class SourceSummarizer:
             "Do not moralize; stay factual.\n\n"
             f"{body}"
         )
-        return await self._llm.complete(prompt, model=self._model)
+        return await self._complete(prompt)

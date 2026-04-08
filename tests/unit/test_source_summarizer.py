@@ -17,7 +17,9 @@ class FakeLLM:
         self.calls: list[dict] = []
 
     async def complete(self, prompt, *, system_prompt=None, model=None):
-        self.calls.append({"prompt": prompt, "model": model})
+        self.calls.append(
+            {"prompt": prompt, "model": model, "system_prompt": system_prompt}
+        )
         return f"Summary for prompt about {len(prompt)} chars."
 
 
@@ -58,8 +60,12 @@ def test_source_summarizer_calls_llm_per_active_source():
 
     # Should call LLM for browsing, email, and calendar (3 active sources)
     assert len(llm.calls) == 3
-    # All calls should use haiku model
+    # All calls should use haiku model and shared factual-summary system prompt
     assert all(c["model"] == "claude-haiku-4-5-20251001" for c in llm.calls)
+    assert all(
+        c.get("system_prompt") and "factual" in c["system_prompt"].lower()
+        for c in llm.calls
+    )
     # Result should have narratives keyed by source
     assert "browsing" in result
     assert "email" in result

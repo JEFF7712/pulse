@@ -24,20 +24,6 @@ def test_pull_action_redirects_back_to_home_with_result_token(tmp_path) -> None:
     assert response.headers["location"] == "/?notice=pull-skipped"
 
 
-def test_digest_action_redirects_back_to_home_with_result_token(tmp_path) -> None:
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        database_path=str(tmp_path / "pulse.db"),
-        vault_path=str(tmp_path / "vault"),
-    )
-    client = TestClient(app)
-
-    response = client.post("/actions/digest", follow_redirects=False)
-
-    assert response.status_code in (302, 303)
-    assert response.headers["location"] == "/?notice=digest-complete"
-
-
 def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
     tmp_path, monkeypatch
 ) -> None:
@@ -76,32 +62,6 @@ def test_discover_action_redirect_includes_hint_when_anthropic_rate_limited(
     assert loc.startswith("/?error=discovery-failed")
     assert "hint=" in loc
     assert "429" in loc or "rate" in loc.lower()
-
-
-def test_digest_action_logs_failures_and_redirects_with_error_token(
-    tmp_path, monkeypatch, caplog
-) -> None:
-    async def fake_run_aggregation_job(*, day, database_path: str) -> None:
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(home_actions, "run_aggregation_job", fake_run_aggregation_job)
-
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        database_path=str(tmp_path / "pulse.db"),
-        vault_path=str(tmp_path / "vault"),
-    )
-    client = TestClient(app)
-
-    with caplog.at_level("ERROR"):
-        response = client.post("/actions/digest", follow_redirects=False)
-
-    assert response.status_code in (302, 303)
-    assert response.headers["location"] == "/?error=digest-failed"
-    assert any(
-        record.levelname == "ERROR" and record.message == "Digest action failed"
-        for record in caplog.records
-    )
 
 
 def test_discover_action_redirects_back_to_home_with_result_token(tmp_path) -> None:

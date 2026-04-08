@@ -68,14 +68,14 @@ def test_interpreter_returns_review_needed_action_for_invalid_json():
         interpreter = LLMCorrectionInterpreter(llm=FakeLLM("not valid json"))
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="That happened in the afternoon, not morning.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.section == ""
         assert action.content == ""
         assert action.confidence == 0.0
@@ -92,12 +92,12 @@ def test_interpreter_accepts_fenced_json():
             llm=FakeLLM(
                 """```json
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The walk happened after lunch.",
-                  "summary": "Append a correction note to the daily digest.",
+                  "summary": "Update pattern user notes.",
                   "confidence": 0.88
                 }
                 ```"""
@@ -105,17 +105,17 @@ def test_interpreter_accepts_fenced_json():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The walk happened after lunch, not before.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
-        assert action.target_type == "digest"
-        assert action.operation == "append_note"
-        assert action.target_ref == "2026-03-27"
-        assert action.section == "Corrections"
+        assert action.target_type == "pattern"
+        assert action.operation == "update_pattern_notes"
+        assert action.target_ref == "walk"
+        assert action.section == "User Notes"
         assert action.content == "The walk happened after lunch."
-        assert action.summary == "Append a correction note to the daily digest."
+        assert action.summary == "Update pattern user notes."
         assert action.confidence == 0.88
 
     asyncio.run(exercise())
@@ -144,7 +144,7 @@ def test_interpreter_rejects_unsupported_target_or_operation():
         action = await interpreter.interpret(
             context_id="ctx-unsupported",
             message_text="Delete that wrong calendar note.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
@@ -167,10 +167,10 @@ def test_interpreter_rejects_parseable_json_with_missing_required_fields():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "   ",
                   "summary": "",
                   "confidence": 0.71
@@ -180,14 +180,14 @@ def test_interpreter_rejects_parseable_json_with_missing_required_fields():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="Please fix the note.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output was missing required fields"
         assert action.confidence == 0.0
 
@@ -201,19 +201,19 @@ def test_interpreter_rejects_extra_prose_wrapped_around_json():
         interpreter = LLMCorrectionInterpreter(
             llm=FakeLLM(
                 "Here is the action you asked for:\n"
-                '{"target_type":"digest","operation":"append_note","target_ref":"2026-03-27","section":"Corrections","content":"Wrong time.","summary":"Append correction.","confidence":0.9}'
+                '{"target_type":"pattern","operation":"update_pattern_notes","target_ref":"walk","section":"User Notes","content":"Wrong time.","summary":"Append correction.","confidence":0.9}'
             )
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event was later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output could not be parsed"
 
     asyncio.run(exercise())
@@ -227,10 +227,10 @@ def test_interpreter_rejects_missing_confidence():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note."
                 }
@@ -239,14 +239,14 @@ def test_interpreter_rejects_missing_confidence():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output had invalid confidence"
 
     asyncio.run(exercise())
@@ -260,10 +260,10 @@ def test_interpreter_accepts_string_confidence_label():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note.",
                   "confidence": "high"
@@ -273,14 +273,14 @@ def test_interpreter_accepts_string_confidence_label():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
-        assert action.target_type == "digest"
-        assert action.operation == "append_note"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_type == "pattern"
+        assert action.operation == "update_pattern_notes"
+        assert action.target_ref == "walk"
         assert action.confidence == "high"
 
     asyncio.run(exercise())
@@ -294,10 +294,10 @@ def test_interpreter_rejects_empty_string_confidence_label():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note.",
                   "confidence": "   "
@@ -307,14 +307,14 @@ def test_interpreter_rejects_empty_string_confidence_label():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output had invalid confidence"
 
     asyncio.run(exercise())
@@ -328,10 +328,10 @@ def test_interpreter_rejects_boolean_confidence():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note.",
                   "confidence": true
@@ -341,14 +341,14 @@ def test_interpreter_rejects_boolean_confidence():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output had invalid confidence"
 
     asyncio.run(exercise())
@@ -362,10 +362,10 @@ def test_interpreter_rejects_out_of_range_confidence():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note.",
                   "confidence": 1.2
@@ -375,14 +375,14 @@ def test_interpreter_rejects_out_of_range_confidence():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output had invalid confidence"
 
     asyncio.run(exercise())
@@ -396,10 +396,10 @@ def test_interpreter_rejects_nan_confidence():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
-                  "target_ref": "2026-03-27",
-                  "section": "Corrections",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
+                  "target_ref": "walk",
+                  "section": "User Notes",
                   "content": "The event happened later.",
                   "summary": "Append a correction note.",
                   "confidence": NaN
@@ -409,14 +409,14 @@ def test_interpreter_rejects_nan_confidence():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output had invalid confidence"
 
     asyncio.run(exercise())
@@ -430,10 +430,10 @@ def test_interpreter_rejects_non_string_required_text_fields():
             llm=FakeLLM(
                 """
                 {
-                  "target_type": "digest",
-                  "operation": "append_note",
+                  "target_type": "pattern",
+                  "operation": "update_pattern_notes",
                   "target_ref": 20260327,
-                  "section": ["Corrections"],
+                  "section": ["User Notes"],
                   "content": {"text": "The event happened later."},
                   "summary": 42,
                   "confidence": 0.8
@@ -443,14 +443,14 @@ def test_interpreter_rejects_non_string_required_text_fields():
         )
 
         action = await interpreter.interpret(
-            context_id="2026-03-27",
+            context_id="pattern:walk",
             message_text="The event happened later.",
-            context_payload={"target_type": "digest", "file": "01-Daily/2026-03-27.md"},
+            context_payload={"target_type": "pattern", "file": "02-Insights/patterns/walk.md"},
         )
 
         assert action.target_type == "none"
         assert action.operation == "needs_review"
-        assert action.target_ref == "2026-03-27"
+        assert action.target_ref == "pattern:walk"
         assert action.summary == "LLM correction output was missing required fields"
 
     asyncio.run(exercise())

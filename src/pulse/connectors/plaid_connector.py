@@ -46,11 +46,11 @@ class PlaidConnector(Connector):
         self,
         config: PulseConfig,
         token_path: Path,
-        omit_amounts_in_digest: bool = False,
+        omit_amounts_in_summary: bool = False,
     ) -> None:
         self._config = config
         self._token_path = token_path
-        self._omit_amounts = omit_amounts_in_digest
+        self._omit_amounts = omit_amounts_in_summary
 
     def get_source_name(self) -> str:
         return "plaid"
@@ -123,7 +123,7 @@ class PlaidConnector(Connector):
                         "category": cat_s,
                         "pending": bool(row.get("pending")),
                         "account_id": str(row.get("account_id") or ""),
-                        "omit_amount_in_digest": self._omit_amounts,
+                        "omit_amount_in_summary": self._omit_amounts,
                     },
                 )
             )

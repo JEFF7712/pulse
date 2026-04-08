@@ -39,7 +39,6 @@ def test_root_route_shows_operator_console_sections() -> None:
     assert "running" not in response.text.lower()
     assert "connectors" in response.text.lower()
     assert "run pull" in response.text.lower()
-    assert "run digest" in response.text.lower()
     assert "run discovery" in response.text.lower()
     assert "test telegram" in response.text.lower()
 

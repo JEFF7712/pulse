@@ -75,9 +75,9 @@ def test_write_pattern_creates_markdown_file(tmp_path: Path) -> None:
     assert "Strengthening" in content
 
     assert "## Related days" in content
-    assert "[[01-Daily/2026-01-10]]" in content
-    assert "[[01-Daily/2026-02-14]]" in content
-    assert "[[01-Daily/2026-03-20]]" in content
+    assert "- 2026-01-10" in content
+    assert "- 2026-02-14" in content
+    assert "- 2026-03-20" in content
 
     assert "## User Notes" in content
     assert "_None yet._" in content
@@ -227,100 +227,6 @@ def test_write_life_file(tmp_path: Path) -> None:
     assert path.exists()
     assert path.read_text(encoding="utf-8") == content
     assert path.parent == tmp_path / "03-Life"
-
-
-def test_append_daily_correction_creates_reserved_section_and_preserves_digest(
-    tmp_path: Path,
-) -> None:
-    mem = _make_memory(tmp_path)
-    digest_path = tmp_path / "01-Daily" / "2026-03-27.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        "# 2026-03-27\n\n## Timeline\nWorked late.\n",
-        encoding="utf-8",
-    )
-
-    path = mem.append_daily_correction(
-        "2026-03-27", "Actually dinner was with Sam, not Alex."
-    )
-
-    assert path == digest_path
-    content = digest_path.read_text(encoding="utf-8")
-    assert "## Timeline\nWorked late." in content
-    assert "## Corrections" in content
-    assert "Actually dinner was with Sam, not Alex." in content
-
-
-def test_append_daily_correction_appends_to_existing_reserved_section(
-    tmp_path: Path,
-) -> None:
-    mem = _make_memory(tmp_path)
-    digest_path = tmp_path / "01-Daily" / "2026-03-27.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        "# 2026-03-27\n\n## Timeline\nWorked late.\n\n## Corrections\n- First correction.\n",
-        encoding="utf-8",
-    )
-
-    mem.append_daily_correction("2026-03-27", "Second correction.")
-
-    content = digest_path.read_text(encoding="utf-8")
-    assert content.count("## Corrections") == 1
-    assert "- First correction." in content
-    assert "- Second correction." in content
-
-
-def test_append_daily_correction_ignores_heading_like_text_inside_fenced_code_block(
-    tmp_path: Path,
-) -> None:
-    mem = _make_memory(tmp_path)
-    digest_path = tmp_path / "01-Daily" / "2026-03-27.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        "# 2026-03-27\n\n## Timeline\n```md\n## not-a-heading\n```\n\n## Corrections\n- First correction.\n\n## Development\nShipped parser fix.\n",
-        encoding="utf-8",
-    )
-
-    mem.append_daily_correction("2026-03-27", "Second correction.")
-
-    content = digest_path.read_text(encoding="utf-8")
-    assert "```md\n## not-a-heading\n```" in content
-    assert (
-        "## Corrections\n- First correction.\n- Second correction.\n\n## Development\nShipped parser fix."
-        in content
-    )
-
-
-def test_append_daily_correction_preserves_heading_like_text_inside_corrections_body(
-    tmp_path: Path,
-) -> None:
-    mem = _make_memory(tmp_path)
-    digest_path = tmp_path / "01-Daily" / "2026-03-27.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        "# 2026-03-27\n\n## Corrections\n```md\n## not-a-heading\n```\n- First correction.\n\n## Development\nShipped parser fix.\n",
-        encoding="utf-8",
-    )
-
-    mem.append_daily_correction("2026-03-27", "Second correction.")
-
-    content = digest_path.read_text(encoding="utf-8")
-    assert (
-        "## Corrections\n```md\n## not-a-heading\n```\n- First correction.\n- Second correction.\n\n## Development\nShipped parser fix."
-        in content
-    )
-
-
-def test_read_daily_digest_returns_content_or_empty(tmp_path: Path) -> None:
-    mem = _make_memory(tmp_path)
-
-    assert mem.read_daily_digest("2026-03-27") == ""
-
-    digest_path = tmp_path / "01-Daily" / "2026-03-27.md"
-    digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text("# 2026-03-27\n\nDigest body.\n", encoding="utf-8")
-
-    assert mem.read_daily_digest("2026-03-27") == "# 2026-03-27\n\nDigest body.\n"
 
 
 # ---------------------------------------------------------------------------
@@ -638,8 +544,6 @@ def test_update_pattern_rejects_invalid_status(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("method_name", "args"),
     [
-        ("append_daily_correction", ("../escape", "nope")),
-        ("read_daily_digest", ("../escape",)),
         ("read_pattern_by_slug", ("../escape",)),
         ("update_pattern_notes", ("../escape", "nope")),
         ("upsert_config_section", ("../profile.md", "## Learned Corrections", "nope")),

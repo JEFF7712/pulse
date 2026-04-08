@@ -10,7 +10,6 @@ from pulse.domain.pattern_statuses import (
 from pulse.domain.llm import LLM
 
 _ALLOWED_OPERATIONS: dict[str, set[str]] = {
-    "digest": {"append_note"},
     "pattern": {"update_pattern_notes", "update_pattern_status"},
     "profile": {"replace_section"},
     "routines": {"replace_section"},
@@ -18,7 +17,6 @@ _ALLOWED_OPERATIONS: dict[str, set[str]] = {
 }
 
 _REQUIRED_FIELDS: dict[tuple[str, str], tuple[str, ...]] = {
-    ("digest", "append_note"): ("target_ref", "section", "content", "summary"),
     ("pattern", "update_pattern_notes"): (
         "target_ref",
         "section",
@@ -40,9 +38,8 @@ _PATTERN_STATUS_CHOICES = " | ".join(PATTERN_STATUS_CHOICES)
 
 _SYSTEM_PROMPT = """You interpret user corrections into one bounded JSON action.
 Return JSON only. Do not include markdown fences.
-Allowed target_type values: digest, pattern, profile, routines, none.
+Allowed target_type values: pattern, profile, routines, none.
 Allowed operations by target:
-- digest: append_note
 - pattern: update_pattern_notes, update_pattern_status
 - profile: replace_section
 - routines: replace_section

@@ -218,8 +218,8 @@ def test_create_corrections_provider_no_config_returns_none():
     assert provider is None
 
 
-def test_summarization_model_for_digest_uses_summarization_role() -> None:
-    from pulse.llm.factory import summarization_model_for_digest
+def test_summarization_model_for_source_summaries_uses_summarization_role() -> None:
+    from pulse.llm.factory import summarization_model_for_source_summaries
 
     config = PulseConfig(
         llm=LLMConfig(
@@ -227,24 +227,26 @@ def test_summarization_model_for_digest_uses_summarization_role() -> None:
             discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
         )
     )
-    assert summarization_model_for_digest(config) == "gpt-5.4-mini"
+    assert summarization_model_for_source_summaries(config) == "gpt-5.4-mini"
 
 
-def test_summarization_model_for_digest_reuses_discovery_when_summarization_omitted() -> None:
-    from pulse.llm.factory import summarization_model_for_digest
+def test_summarization_model_for_source_summaries_reuses_discovery_when_summarization_omitted() -> (
+    None
+):
+    from pulse.llm.factory import summarization_model_for_source_summaries
 
     config = PulseConfig(
         llm=LLMConfig(
             discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
         )
     )
-    assert summarization_model_for_digest(config) == "claude-sonnet-4-6"
+    assert summarization_model_for_source_summaries(config) == "claude-sonnet-4-6"
 
 
-def test_summarization_model_for_digest_empty_config_returns_none() -> None:
-    from pulse.llm.factory import summarization_model_for_digest
+def test_summarization_model_for_source_summaries_empty_config_returns_none() -> None:
+    from pulse.llm.factory import summarization_model_for_source_summaries
 
-    assert summarization_model_for_digest(PulseConfig()) is None
+    assert summarization_model_for_source_summaries(PulseConfig()) is None
 
 
 def test_discovery_model_for_discovery_empty_config_returns_none() -> None:

@@ -1,4 +1,4 @@
-"""Linear assigned issues → Pulse dev.linear.issue events (shown under Development in digests)."""
+"""Linear assigned issues → Pulse dev.linear.issue events (development activity stream)."""
 from __future__ import annotations
 
 import logging

@@ -47,14 +47,26 @@ class PulseApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> getLatestDigest() async {
-    final response = await _dio.get<Map<String, dynamic>>('/api/digests/latest');
-    return response.data ?? {};
+  /// Returns insight metadata rows (same shape as the `insights` SQLite index).
+  Future<List<dynamic>> listInsights({String? status}) async {
+    final response = await _dio.get<dynamic>(
+      '/api/insights',
+      queryParameters: status != null && status.isNotEmpty
+          ? <String, dynamic>{'status': status}
+          : null,
+    );
+    final data = response.data;
+    if (data is! List) {
+      return [];
+    }
+    return List<dynamic>.from(data);
   }
 
-  Future<Map<String, dynamic>> getDigest(String dateSlug) async {
+  /// Pattern metadata plus markdown body for the vault file.
+  Future<Map<String, dynamic>> getInsight(String insightId) async {
+    final encoded = Uri.encodeComponent(insightId);
     final response =
-        await _dio.get<Map<String, dynamic>>('/api/digests/$dateSlug');
+        await _dio.get<Map<String, dynamic>>('/api/insights/$encoded');
     return response.data ?? {};
   }
 

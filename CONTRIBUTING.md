@@ -52,10 +52,11 @@ Python package source lives under `src/pulse/`. High-level areas:
 |------|------|
 | `src/pulse/app/` | FastAPI app, CLI, config |
 | `src/pulse/connectors/` | Data source integrations |
+| `src/pulse/domain/event_types.py` | Canonical `event_type` strings and preprocessor buckets — register new types when adding a connector |
 | `src/pulse/mcp/` | MCP server |
 | `src/pulse/store/` | SQLite persistence |
 | `tests/` | Pytest suite |
-| `companion_app/` | Flutter iOS companion (digests, corrections; see design in repo docs) |
+| `companion_app/` | Flutter iOS companion (insights, corrections; see design in repo docs) |
 
 ### Companion app (Flutter)
 

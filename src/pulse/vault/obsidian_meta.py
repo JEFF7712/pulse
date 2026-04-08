@@ -5,20 +5,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from pulse.vault.wikilinks import daily_note_link
-
 _ISO_DAY = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
-
-
-def format_daily_digest_frontmatter(iso_day: str) -> str:
-    return (
-        "---\n"
-        "pulse: true\n"
-        "type: daily-digest\n"
-        f"date: {iso_day}\n"
-        "tags: [pulse, pulse/digest]\n"
-        "---\n\n"
-    )
 
 
 def format_pattern_frontmatter(slug: str) -> str:
@@ -29,18 +16,6 @@ def format_pattern_frontmatter(slug: str) -> str:
         f"slug: {slug}\n"
         "tags: [pulse, pulse/pattern]\n"
         "---\n\n"
-    )
-
-
-def format_daily_pulse_links_section() -> str:
-    """Wikilinks to long-lived vault notes plus inline tags for Obsidian."""
-    return (
-        "## Pulse links\n"
-        "Core notes this digest relates to:\n"
-        "- [[04-Config/profile]]\n"
-        "- [[03-Life/routines]]\n"
-        "\n"
-        "#pulse #pulse/digest\n"
     )
 
 
@@ -82,7 +57,7 @@ def _parse_iso_day_prefix(raw: str) -> str | None:
 
 def format_pattern_related_days_section(related_days: list[str]) -> str:
     if not related_days:
-        body = "_No daily digest links yet._\n"
+        body = "_No related dates recorded yet._\n"
     else:
-        body = "".join(f"- {daily_note_link(d)}\n" for d in related_days)
+        body = "".join(f"- {d}\n" for d in related_days)
     return f"## Related days\n{body}\n"

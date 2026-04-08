@@ -6,15 +6,11 @@ from pathlib import Path
 from pulse.app.config import PulseConfig
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.notifications import Notification
-from pulse.jobs.runners import (
-    run_aggregation_job,
-    run_daily_digest_job,
-    run_discovery_job,
-)
+from pulse.jobs.runners import run_aggregation_job, run_discovery_job
 from pulse.llm.factory import (
     create_providers_from_config,
     discovery_model_for_discovery,
-    summarization_model_for_digest,
+    summarization_model_for_source_summaries,
 )
 from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 from pulse.notifications.factory import build_notification_channel
@@ -82,34 +78,7 @@ async def run_pull_action(
     return ActionResult(query_key="notice", token="pull-complete")
 
 
-async def run_digest_action(settings: PulseConfig) -> ActionResult:
-    target_day = _resolve_current_day(settings)
-    Path(settings.database_path).parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        summ_llm, _ = create_providers_from_config(settings)
-        await run_aggregation_job(day=target_day, database_path=settings.database_path)
-        await run_daily_digest_job(
-            day=target_day,
-            database_path=settings.database_path,
-            vault_path=settings.vault_path,
-            llm=summ_llm,
-            summarization_model=summarization_model_for_digest(settings) or "",
-        )
-    except Exception as e:
-        logger.exception("Digest action failed")
-        return ActionResult(
-            query_key="error",
-            token="digest-failed",
-            hint=user_message_for_anthropic_exception(e),
-        )
-
-    return ActionResult(query_key="notice", token="digest-complete")
-
-
 async def run_discovery_action(settings: PulseConfig) -> ActionResult:
-    from pulse.llm.factory import create_providers_from_config
-
     _, disc_llm = create_providers_from_config(settings)
     if disc_llm is None:
         return ActionResult(query_key="error", token="discovery-not-configured")
@@ -127,7 +96,7 @@ async def run_discovery_action(settings: PulseConfig) -> ActionResult:
             vault_path=settings.vault_path,
             llm=disc_llm,
             notification_channel=notification_channel,
-            summarization_model=summarization_model_for_digest(settings) or "",
+            summarization_model=summarization_model_for_source_summaries(settings) or "",
             discovery_model=discovery_model_for_discovery(settings) or "",
         )
     except Exception as e:

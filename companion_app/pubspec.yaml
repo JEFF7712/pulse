@@ -1,7 +1,7 @@
 name: pulse_companion
-description: Pulse companion — digests, corrections, push, and sensor samples (steps, sleep, location).
+description: Pulse companion — patterns, corrections, push, and sensor samples (steps, sleep, location).
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+1
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

@@ -177,6 +177,21 @@ class DiscoveryEngine:
         )
 
         discovery = parse_discovery_response(raw_response)
+        if (
+            not discovery.new_patterns
+            and not discovery.updated_patterns
+            and not discovery.notifications
+            and discovery.baseline_updates is None
+            and len(raw_response.strip()) > 80
+        ):
+            raw_response = await self._llm.complete(
+                "Your previous reply was not usable. Output ONLY one JSON object matching "
+                "the schema from the system prompt. No markdown fences, no commentary.\n\n"
+                f"Broken output was:\n{raw_response[:8000]}",
+                system_prompt=prompt_dict["system_prompt"],
+                model=self._discovery_model,
+            )
+            discovery = parse_discovery_response(raw_response)
 
         # Write back results
         target_str = target_date.isoformat()

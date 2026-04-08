@@ -16,7 +16,8 @@ from pulse.services.correction_interpreter import (
     LLMCorrectionInterpreter,
 )
 
-_DIGEST_CONTEXT_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# YYYY-MM-DD alone was used for removed digest-file corrections; reject without LLM/vault work.
+_LEGACY_DATE_ONLY_CONTEXT_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _PROFILE_SECTION = "## Learned Corrections"
 _ROUTINES_SECTION = "## Correction Updates"
 
@@ -206,19 +207,13 @@ class CorrectionService:
     def _resolve_context_payload(self, context_id: str) -> _ResolvedContext:
         assert self._vault_memory is not None
 
-        if _DIGEST_CONTEXT_RE.fullmatch(context_id):
-            if not self._vault_memory.daily_digest_exists(context_id):
-                return _ResolvedContext(
-                    payload=None,
-                    review_summary="Correction target file is missing",
-                )
+        if _LEGACY_DATE_ONLY_CONTEXT_RE.fullmatch(context_id):
             return _ResolvedContext(
-                payload={
-                    "target_type": "digest",
-                    "target_ref": context_id,
-                    "file": f"01-Daily/{context_id}.md",
-                    "content": self._vault_memory.read_daily_digest(context_id),
-                }
+                payload=None,
+                review_summary=(
+                    "Date-only correction contexts (YYYY-MM-DD) are no longer supported; "
+                    "use pattern:, profile, or routines context IDs."
+                ),
             )
 
         if context_id.startswith("pattern:"):
@@ -279,12 +274,6 @@ class CorrectionService:
 
     async def _apply_action(self, action: CorrectionAction) -> None:
         assert self._vault_memory is not None
-
-        if action.target_type == "digest" and action.operation == "append_note":
-            self._vault_memory.append_daily_correction(
-                action.target_ref, action.content
-            )
-            return
 
         if (
             action.target_type == "pattern"
