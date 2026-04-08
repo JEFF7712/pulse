@@ -52,6 +52,8 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 | `smtp_use_ssl` | `PULSE_SMTP_USE_SSL` | `false` | Use implicit TLS (`SMTP_SSL`, typical for port 465). |
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | OAuth secret (env or gitignored TOML). |
+
+**Google OAuth on a headless server or over SSH:** `pulse onboard` / `pulse configure` starts a small **localhost** redirect server. With no GUI, Pulse skips auto-opening a browser and prints the authorize URL. If you open that URL on your **laptop**, Google redirects to **your laptop’s** `localhost` — so you must **forward the callback port** to the server, e.g. `ssh -L 8765:localhost:8765 user@server` (use the port Pulse prints; default fallback is **8765** when no browser is found). Optional env: `PULSE_GOOGLE_OAUTH_PORT` (fixed port), `PULSE_GOOGLE_OAUTH_FALLBACK_PORT` (default `8765` when auto-detecting headless), `PULSE_OAUTH_NO_BROWSER=1` (never call `webbrowser`). If Google returns **redirect_uri_mismatch**, add the exact `http://localhost:<port>/` URI in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) for your OAuth client.
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
 | `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | OAuth secret. |
 | `microsoft_client_id` | `PULSE_MICROSOFT_CLIENT_ID` | unset | Microsoft Graph OAuth (mail/calendar). |

@@ -6,7 +6,7 @@
 
 Ships `pulse` and `pulse-mcp`.
 
-**One-liner** (installs [pipx](https://pipx.pypa.io/) if needed, then `pulse-agent`; starts `pulse onboard` when your terminal is interactive):
+**One-liner** (installs [pipx](https://pipx.pypa.io/) if needed, then `pulse-agent`; prints CLI-matched styling; runs **`pulse onboard`** at the end when a real terminal is available — including **`curl | bash`**, by attaching stdin to `/dev/tty` when needed):
 
 ```bash
 curl -fsSL https://pulseagent.dev/install.sh | bash

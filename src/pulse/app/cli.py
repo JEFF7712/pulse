@@ -127,6 +127,31 @@ def _onboard_print_prerequisites() -> None:
     )
 
 
+def _internal_install(args) -> None:
+    """Rich output for ``scripts/install.sh`` (matches normal CLI styling)."""
+    phase = args.phase
+    if phase == "ready":
+        ui.success("pulse-agent installed with pipx")
+        ui.kv_line("Command", "pulse")
+        ui.muted_line(
+            "If «pulse» is not found, open a new shell or run: "
+            "[cmd]export PATH=\"$HOME/.local/bin:$PATH\"[/]"
+        )
+        ui.rule("Setup")
+        ui.step("Interactive onboarding")
+        ui.muted_line(
+            "Configure models, connectors, OAuth, vault — then the server starts briefly."
+        )
+    elif phase == "noninteractive":
+        ui.warning(
+            "Skipping interactive onboarding — no usable terminal (stdin is not a TTY)."
+        )
+        ui.muted_line(
+            "SSH in or open a local terminal on this machine, then run: [cmd]pulse onboard[/]"
+        )
+        ui.muted_line("Then start the server with: [cmd]pulse run[/]")
+
+
 def _onboard_print_next_steps(host: str, port: int) -> None:
     ui.rule("Next steps")
     ui.muted_line("Starting the server — open the app in a browser on this machine:")
@@ -213,6 +238,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="TEXT",
         help="Same as pulse init: profile text (non-interactive)",
+    )
+
+    internal_install_parser = subparsers.add_parser(
+        "internal-install",
+        help="Rich UI for the web install script (pulseagent.dev/install.sh); not needed otherwise.",
+    )
+    internal_install_parser.add_argument(
+        "phase",
+        choices=("ready", "noninteractive"),
+        help="ready = after pipx install; noninteractive = explain manual onboard",
     )
 
     pull_parser = subparsers.add_parser(
@@ -311,6 +346,8 @@ def main() -> None:
         _run(args)
     elif args.command == "onboard":
         _onboard(args)
+    elif args.command == "internal-install":
+        _internal_install(args)
     elif args.command == "pull":
         _pull(args)
     elif args.command == "discover":
