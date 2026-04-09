@@ -56,7 +56,10 @@ export default defineConfig({
       },
       {
         text: "Operations",
-        items: [{ text: "Operations Runbook", link: "/operations/runbook" }]
+        items: [
+          { text: "Operations Runbook", link: "/operations/runbook" },
+          { text: "Releases and versioning", link: "/operations/releases" }
+        ]
       },
       {
         text: "Connectors",

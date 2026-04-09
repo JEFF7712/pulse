@@ -2,7 +2,37 @@
 
 ## What is Pulse?
 
-Self-hosted agent: connects your tools, finds patterns, stores results in infrastructure you control.
+Self-hosted **personal intelligence agent**: ingests email, calendar, purchases, health, media, and more; runs analysis and discovery; writes an **Obsidian-compatible markdown vault**; pushes insights via **notifications** (Telegram, ntfy, webhooks, email, and others). **No app to open, no daily check-ins** — your data stays on your stack.
+
+## How it works
+
+```
+Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
+        ↓
+  Event Store (SQLite)
+        ↓
+  Analysis Engine ──→ Vault (Obsidian-compatible Markdown)
+        ↓
+  Notifications (Telegram, ntfy, …)
+        ↕
+  User Corrections
+```
+
+1. **Connectors** pull from your accounts into timestamped events.
+2. **Event store** persists everything locally.
+3. **Analysis engine** runs discovery and writes patterns.
+4. **Vault** is human-readable markdown.
+5. **Notifications** deliver insights; **corrections** close the loop.
+
+**Two ways to run:** standalone service (`pulse run`, FastAPI + scheduler) or **[MCP](./self-hosting/mcp-agent-setup.md)** so coding agents use the same store and tools.
+
+## Design principles
+
+1. **Push-first** — insights come to you.
+2. **Low-friction integration** — connect sources quickly.
+3. **Transparency** — vault markdown you can read and diff.
+4. **Extensible** — connectors, LLMs, notification channels.
+5. **Self-hosted** — your hardware, your data.
 
 ## Quick Start
 
@@ -40,6 +70,13 @@ Self-hosted agent: connects your tools, finds patterns, stores results in infras
 
 ## MCP
 
-For [Model Context Protocol](https://modelcontextprotocol.io/) integration with **Claude Code**, **OpenClaw**, Cursor, and other MCP clients, run `pulse-mcp` or `python -m pulse.mcp.server`. The server requires a **`pulse.toml` on disk** at the resolved config path (same rules as the standalone app); copy-paste MCP JSON and the tool list are in the repo **README** (*Use as an MCP server*). Paths and env overrides match the app — see [Configuration Reference](./reference/configuration.md).
+For [Model Context Protocol](https://modelcontextprotocol.io/) integration with **Claude Code**, **OpenClaw**, Cursor, and other MCP clients, run `pulse-mcp` or `python -m pulse.mcp.server`. The server requires a **`pulse.toml` on disk** at the resolved config path (same rules as the standalone app). **JSON examples, tools, and resources:** [MCP agent setup](./self-hosting/mcp-agent-setup.md). **Paths and env:** [Configuration reference](./reference/configuration.md) (*App, CLI, MCP*, *Runtime notes*).
 
-To have an **AI agent install and wire MCP for you**, use the one-liner in [Self-Hosting Quickstart → Connect Pulse to your coding agent (MCP)](./self-hosting/quickstart.md#mcp-agent-paste) and the agent-facing checklist at [MCP agent setup](./self-hosting/mcp-agent-setup.md).
+To have an **AI agent install and wire MCP for you**, use the one-liner in [Self-Hosting Quickstart → Connect Pulse to your coding agent (MCP)](./self-hosting/quickstart.md#mcp-agent-paste) and follow [MCP agent setup](./self-hosting/mcp-agent-setup.md).
+
+## Contributing and releases
+
+- **[Contributing](../CONTRIBUTING.md)** — dev environment, tests, project layout.
+- **[Releases and versioning](./operations/releases.md)** — semver, tags, PyPI.
+
+**Mobile companion (optional):** Flutter app under [`companion_app/`](../companion_app/README.md); enable **`[connectors.companion]`** on the server.

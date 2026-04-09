@@ -30,9 +30,13 @@ When you are done:
 
 ### 4. Register MCP in the client
 
-Use the same JSON shapes as the repository **README** section *Use as an MCP server*.
+**Prerequisites**
 
-- **`pulse-mcp` on PATH** — minimal pattern:
+1. A real **`pulse.toml`** must exist where `load_config()` resolves (default **`~/.config/pulse/pulse.toml`**, repo-root **`pulse.toml`**, or **`PULSE_CONFIG_FILE`** / **`PULSE_CONFIG_DIR`**). MCP uses `load_config(require_files=True)` and **exits on startup** if the file is missing — env-only DB/vault paths are not enough without TOML on disk.
+2. **`database_path`** and **`vault_path`** in that file (or **`PULSE_DATABASE_PATH`** / **`PULSE_VAULT_PATH`** in the MCP `env` block) must match the standalone app / scheduler.
+3. If the client’s working directory would not find config, set **`PULSE_CONFIG_FILE`** (absolute path) or **`PULSE_CONFIG_DIR`** in `env`.
+
+**Example: `pulse-mcp` on `PATH`** (after `pipx install pulse-agent` or `uv tool install pulse-agent`):
 
 ```json
 {
@@ -47,11 +51,48 @@ Use the same JSON shapes as the repository **README** section *Use as an MCP ser
 }
 ```
 
-- Adjust **`PULSE_CONFIG_FILE`** to the actual resolved path. Omit it only when default config resolution already finds their `pulse.toml`.
-- If the client supports a working directory for the server process and the user keeps **`pulse.toml`** at a repository root, set **`cwd`** to that repo; otherwise prefer **`PULSE_CONFIG_FILE`**.
-- From a **git clone** with **uv**: `"command": "uv"`, `"args": ["run", "python", "-m", "pulse.mcp.server"]`, plus **`env`** with **`PULSE_DATABASE_PATH`** / **`PULSE_VAULT_PATH`** if not only in TOML.
+Omit **`PULSE_CONFIG_FILE`** when default resolution already finds `pulse.toml` (typical: `~/.config/pulse/pulse.toml`).
 
-Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); open the user’s MCP settings file for their product and merge this block without duplicating the `mcpServers` key.
+**Example: git clone with uv**
+
+```json
+{
+  "mcpServers": {
+    "pulse": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "pulse.mcp.server"],
+      "cwd": "/absolute/path/to/pulse/repo",
+      "env": {
+        "PULSE_DATABASE_PATH": "/absolute/path/to/pulse.db",
+        "PULSE_VAULT_PATH": "/absolute/path/to/Pulse-Vault"
+      }
+    }
+  }
+}
+```
+
+When using repo-root **`pulse.toml`**, set server **`cwd`** to that repo if the client supports it; otherwise use **`PULSE_CONFIG_FILE`**.
+
+Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge the block without duplicating the top-level `mcpServers` key.
+
+### MCP tools
+
+| Tool | Description |
+| --- | --- |
+| `pulse_events_for_day` | Query events for a specific date, optionally filtered by source |
+| `pulse_ingest_event` | Manually push an event into the store |
+| `pulse_correct` | Record a correction or feedback about an insight |
+| `pulse_discovery` | Run LLM insight discovery for a cadence and date |
+| `pulse_insights` | List discovery patterns from the database |
+| `pulse_read_pattern` | Read a pattern markdown file from the vault |
+| `pulse_connector_status` | Check sync state of all connectors |
+
+### MCP resources
+
+| Resource | URI |
+| --- | --- |
+| Today's events | `pulse://events/today` |
+| Connector status | `pulse://connectors/status` |
 
 ### 5. Verify
 
@@ -63,4 +104,3 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); open t
 
 - Human-oriented walkthrough: [Self-Hosting Quickstart](./quickstart.md).
 - Config, env, discovery/corrections behavior: [Configuration Reference](../reference/configuration.md) (see *App, CLI, MCP* and *Runtime notes*).
-- Tool and resource list: repository **README** (*Use as an MCP server*).

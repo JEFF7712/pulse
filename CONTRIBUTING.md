@@ -19,7 +19,7 @@ uv sync --group dev
 
 **Classic venv** — Create a virtualenv, then `pip install -e .` and `pip install pytest` (or install the `dev` group equivalent).
 
-More context on config paths, env vars, and running the app lives in [README.md](README.md).
+More context on config paths and env vars: [Configuration reference](docs/reference/configuration.md). Install and run: [Self-hosting quickstart](docs/self-hosting/quickstart.md).
 
 ## Run tests (match CI)
 

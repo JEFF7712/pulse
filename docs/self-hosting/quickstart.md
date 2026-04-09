@@ -47,6 +47,12 @@ The install script lives at [`scripts/install.sh` in the repository](https://git
 - **Nix:** `nix develop`, then `uv sync --group dev`
 - **venv:** `python3 -m venv .venv` → activate → `pip install -e .`
 
+### Run the FastAPI app from a clone
+
+```bash
+uv run uvicorn --app-dir src pulse.app.main:create_app --factory
+```
+
 ## 1. Configure
 
 If you use Google, Spotify, Microsoft 365, GitHub, GitLab, or Plaid, create OAuth (and Plaid) apps first so client IDs and secrets are ready. Oura: personal access token or OAuth app.
