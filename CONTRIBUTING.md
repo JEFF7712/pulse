@@ -68,4 +68,4 @@ From `companion_app/`: install the [Flutter SDK](https://docs.flutter.dev/get-st
 
 ## License
 
-By contributing, you agree your contributions are licensed under the same terms as the project ([MIT License](LICENSE)).
+By contributing, you agree your contributions are licensed under the same terms as the project ([Apache License 2.0](LICENSE)).
