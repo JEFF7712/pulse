@@ -102,5 +102,5 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 ## Reference
 
-- Human-oriented walkthrough: [Self-Hosting Quickstart](./quickstart.md).
-- Config, env, discovery/corrections behavior: [Configuration Reference](../reference/configuration.md) (see *App, CLI, MCP* and *Runtime notes*).
+- Human-oriented walkthrough: [Self-Hosting Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html).
+- Config, env, discovery/corrections behavior: [Configuration Reference](https://pulseagent.dev/docs/reference/configuration.html) (see *App, CLI, MCP* and *Runtime notes*).

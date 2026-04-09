@@ -241,7 +241,7 @@ Same **`load_config()`**: `pulse.toml` + env. Telegram, MCP **`pulse_correct`**,
 ## Runtime notes
 
 - **`/health`** — process up; not connector/LLM proof.
-- Scheduler registers aggregation and discovery jobs; discovery **skips** when no LLM role resolves (see [Runbook](../operations/runbook.md)).
+- Scheduler registers aggregation and discovery jobs; discovery **skips** when no LLM role resolves (see [Runbook](https://pulseagent.dev/docs/operations/runbook.html)).
 - Discovery: per-source summaries use the summarization role; the main insight pass uses the discovery role; either may inherit the other when one block is omitted.
 - Insight notifications: sent when discovery emits them and a notify channel is configured.
 

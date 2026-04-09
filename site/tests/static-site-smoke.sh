@@ -111,7 +111,7 @@ curl_nginx "http://127.0.0.1:$port$docs_nav_path" >/dev/null
 [[ -n "${docs_html:-}" ]]
 [[ -n "${docs_bridge_html:-}" ]]
 grep -q '<title>Pulse</title>' <<<"$html"
-grep -q 'href="/docs/"' <<<"$html"
+grep -q 'https://pulseagent.dev/docs/' <<<"$html"
 grep -q 'Personal intelligence agent' <<<"$html"
 grep -q 'Turn your life data into useful observations\.' <<<"$html"
 # Phrase is split across lines in index.html; match stable parts.

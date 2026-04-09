@@ -15,21 +15,14 @@
 <p align="center">
   <a href="https://pulseagent.dev">pulseagent.dev</a>
   ·
-  <a href="docs/index.md">Documentation</a>
+  <a href="https://pulseagent.dev/docs/">Documentation</a>
   ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">Ingest your digital life, discover patterns, write an Obsidian-style vault, get <strong>push</strong> insights — all <strong>self-hosted</strong>.</p>
 
-### Documentation
-
-Documentation lives under `docs/` in this repository. On [pulseagent.dev](https://pulseagent.dev) the deployed site serves the same guides at [Documentation site](/docs/). Start here: [docs/index.md](docs/index.md) — then [Configuration](docs/reference/configuration.md), [Operations runbook](docs/operations/runbook.md), and [Connectors](docs/connectors/index.md) (see also [Quickstart](docs/self-hosting/quickstart.md)).
-
-**Paths and environment:** Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. That variable selects the SQLite event store; use `PULSE_VAULT_PATH` for vault markdown. Override the config directory with `PULSE_CONFIG_DIR` (default finds `.config/pulse.toml` under `~/.config/pulse`). **`pulse` and `pulse-mcp`** read the same variables; discovery **day boundaries** and related scheduling semantics are documented in the runbook (`PULSE_TIMEZONE`).
-
 ---
-
 ### Install
 
 ```bash
@@ -40,11 +33,17 @@ curl -fsSL https://pulseagent.dev/install.sh | bash
 pipx install pulse-agent   # or: uv tool install pulse-agent
 ```
 
-Defaults: config under `~/.config/pulse`, data under `~/.local/share/pulse` (override with `PULSE_CONFIG_DIR`). Next: **`pulse configure`** → **`pulse init`** → **`pulse run`** — see **[Quickstart](docs/self-hosting/quickstart.md)**.
+Defaults: config under `~/.config/pulse`, data under `~/.local/share/pulse` (override with `PULSE_CONFIG_DIR`). Next: **`pulse configure`** → **`pulse init`** → **`pulse run`** — see **[Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html)**.
+
+### Documentation
+
+Documentation: **[pulseagent.dev/docs](https://pulseagent.dev/docs/)** — [Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html), [Configuration](https://pulseagent.dev/docs/reference/configuration.html), [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html), and [Connectors](https://pulseagent.dev/docs/connectors/).
+
+**Paths and environment:** Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. That variable selects the SQLite event store; use `PULSE_VAULT_PATH` for vault markdown. Override the config directory with `PULSE_CONFIG_DIR` (default finds `.config/pulse.toml` under `~/.config/pulse`). **`pulse` and `pulse-mcp`** read the same variables; discovery **day boundaries** and related scheduling semantics are documented in the [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html) (`PULSE_TIMEZONE`).
 
 ### MCP
 
-Use **`pulse-mcp`** with Claude Code, Cursor, OpenClaw, etc. Setup, client JSON, tools, and resources: **[MCP agent setup](docs/self-hosting/mcp-agent-setup.md)**.
+Use **`pulse-mcp`** with Claude Code, Cursor, OpenClaw, etc. Setup, client JSON, tools, and resources: **[MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html)**.
 
 ### Develop
 

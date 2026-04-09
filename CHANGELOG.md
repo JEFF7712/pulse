@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Google OAuth on headless / SSH:** retry without auto-opening a browser; optional ports via `PULSE_GOOGLE_OAUTH_PORT`, `PULSE_GOOGLE_OAUTH_FALLBACK_PORT`, `PULSE_OAUTH_NO_BROWSER` (see [configuration reference](docs/reference/configuration.md)).
+- **Google OAuth on headless / SSH:** retry without auto-opening a browser; optional ports via `PULSE_GOOGLE_OAUTH_PORT`, `PULSE_GOOGLE_OAUTH_FALLBACK_PORT`, `PULSE_OAUTH_NO_BROWSER` (see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html)).
 
 ### Changed
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- [PyPI trusted publishing](docs/operations/pypi-trusted-publishing.md) operator note (configure PyPI for tag-based `release-publish.yml`).
+- [PyPI trusted publishing](https://pulseagent.dev/docs/operations/pypi-trusted-publishing.html) operator note (configure PyPI for tag-based `release-publish.yml`).
 
 ## [2.0.0] - 2026-04-08
 

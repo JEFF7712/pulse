@@ -111,7 +111,7 @@ Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude C
 **Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
 
 ```text
-Read https://raw.githubusercontent.com/JEFF7712/pulse/main/docs/self-hosting/mcp-agent-setup.md and follow every step to install Pulse (pulse-agent), ensure pulse.toml exists, and register pulse-mcp in my MCP settings for this machine.
+Read https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html and follow every step to install Pulse (pulse-agent), ensure pulse.toml exists, and register pulse-mcp in my MCP settings for this machine.
 ```
 
 ## Vault (Obsidian)

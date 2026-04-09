@@ -2,7 +2,7 @@
 
 Google (Gmail, Calendar, YouTube), Microsoft 365 mail/calendar, Spotify, GitHub, Linear, GitLab, Plaid, Notion, Oura, browser history, RSS/Atom. Template: **`pulse.toml.example`**; interactive setup: **`pulse configure`** (writes **`.config/pulse.toml`** by default).
 
-Use **Configure → Connectors** for each source: credentials, enable (●), then OAuth/Plaid/Oura in the browser when prompted. Callback ports are noted per connector below. Finish OAuth-backed sources **before** [`pulse init`](../self-hosting/quickstart.md) if the first pull should use them.
+Use **Configure → Connectors** for each source: credentials, enable (●), then OAuth/Plaid/Oura in the browser when prompted. Callback ports are noted per connector below. Finish OAuth-backed sources **before** [`pulse init`](https://pulseagent.dev/docs/self-hosting/quickstart.html) if the first pull should use them.
 
 ## Google
 
