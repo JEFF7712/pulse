@@ -1,8 +1,39 @@
-# Pulse - Personal Intelligence Agent 
+```text
+░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓███████▓▒░▒▓████████▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓██████▓▒░   
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░▒▓███████▓▒░░▒▓████████▓▒░ 
+                                                                   
+                                                                   
+```
 
-A self-hosted, push-first personal intelligence agent. Pulse continuously ingests data from your digital life — email, calendar, purchases, health, media — and proactively surfaces insights through notifications. No app to open. No daily check-ins.
+# Pulse
 
-The core philosophy: big data companies already collect and exploit your personal data. Pulse reclaims it, running entirely on your own infrastructure with full transparency into what the agent knows and how it reasons.
+**Personal intelligence agent** — self-hosted, push-first, and yours.
+
+[![PyPI](https://img.shields.io/pypi/v/pulse-agent.svg?label=pulse-agent)](https://pypi.org/project/pulse-agent/) [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/license-MIT-slategray)](LICENSE) [![Model Context Protocol](https://img.shields.io/badge/MCP-compatible-steelblue)](https://modelcontextprotocol.io/)
+
+> Pulse continuously ingests data from your digital life — email, calendar, purchases, health, media — and surfaces insights through notifications. **No app to open. No daily check-ins.**
+
+Big tech already collects and exploits personal data. Pulse **reclaims** it: run everything on your own stack, with full transparency into what the agent stores and how it reasons.
+
+---
+
+### Contents
+
+| | |
+| --- | --- |
+| [How it works](#how-it-works) | [Installation](#installation) |
+| [Two ways to run](#two-ways-to-run) | [Developer setup](#developer-setup) |
+| [Documentation](#docs) | [Run tests](#run-tests) |
+| [Standalone server](#start-the-standalone-server) | [MCP server](#use-as-an-mcp-server) |
+| [Mobile companion](#mobile-companion-optional) | [Project structure](#project-structure) |
+| [Design principles](#design-principles) | [Releases](#releases-and-versioning) |
+
+---
 
 ## How it works
 
@@ -67,7 +98,7 @@ Include dev tools (pytest): `uv sync --group dev`.
 
 **Classic venv** — `python3 -m venv .venv`, activate, then `pip install -e .` (and `pip install pytest` if you run tests).
 
-**Configuration file** — keep paths, secrets, connector blocks, and `[llm]` in **`pulse.toml`**, usually at **`.config/pulse.toml`** in your project (new default). A repo-root **`pulse.toml`** is still read if present and `.config/pulse.toml` does not exist. Override with **`PULSE_CONFIG_FILE`** (path to the TOML file) or **`PULSE_CONFIG_DIR`** (directory containing `pulse.toml`). See `pulse.toml.example`. Run `pulse configure` to edit the resolved file. Environment variables override the file: any `PULSE_*` name maps to the same snake_case root key (for example `PULSE_DATABASE_PATH` → `database_path`). `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` are also applied when the corresponding field is empty. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` are also applied when the corresponding field is empty.
+**Configuration file** — keep paths, secrets, connector blocks, and `[llm]` in **`pulse.toml`**, usually at **`.config/pulse.toml`** in your project (new default). A repo-root **`pulse.toml`** is still read if present and `.config/pulse.toml` does not exist. Override with **`PULSE_CONFIG_FILE`** (path to the TOML file) or **`PULSE_CONFIG_DIR`** (directory containing `pulse.toml`). See `pulse.toml.example`. Run `pulse configure` to edit the resolved file. Environment variables override the file: any `PULSE_*` name maps to the same snake_case root key (for example `PULSE_DATABASE_PATH` → `database_path`). `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY` are also applied when the corresponding field is empty.
 
 For Docker and shell exports, the same settings are often passed as env vars:
 
