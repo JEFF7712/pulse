@@ -45,6 +45,12 @@ Documentation lives under `docs/` in this repository. The **deployed site serves
 
 Use **`pulse-mcp`** with Claude Code, Cursor, OpenClaw, etc. Setup, client JSON, tools, and resources: **[MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html)**.
 
+Send this to your agent:
+
+```
+Read https://raw.githubusercontent.com/JEFF7712/pulse/main/docs/self-hosting/mcp-agent-setup.md and follow every step to install Pulse (pulse-agent), ensure pulse.toml exists, and register pulse-mcp in my MCP settings for this machine.
+```
+
 ### Develop
 
 ```bash
