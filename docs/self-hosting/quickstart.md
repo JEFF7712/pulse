@@ -63,7 +63,7 @@ docker run -d --name pulse \
   ghcr.io/jeff7712/pulse:latest
 ```
 
-Open **http://localhost:8000**. For logs in the foreground, omit `-d` (add `--rm` if you do not need a named container).
+Open `http://localhost:8000`. For logs in the foreground, omit `-d` (add `--rm` if you do not need a named container).
 
 If you built locally with `-t pulse`, replace the image name with `pulse`.
 
@@ -111,7 +111,7 @@ From the repository root:
 docker compose up --build -d
 ```
 
-Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml); same URL **http://localhost:8000**.
+Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml); same URL `http://localhost:8000`.
 
 #### Data volumes and stopping
 

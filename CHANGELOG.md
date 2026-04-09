@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2026-04-10
+
+### Added
+
+- **Docker:** Multi-stage root `Dockerfile` — builds the `pulse_agent` wheel with **uv** inside the image (clone-only `docker build`, no local `dist/`).
+- **`compose.yaml`** at repo root for `docker compose up --build` (port 8000, named volumes for config and data).
+- **CI:** `release-publish.yml` publishes the app image to **GitHub Container Registry** (`ghcr.io/<owner>/<repo>`, lowercase) on `v*` tags, with semver and `latest` tags via `docker/metadata-action`.
+- **Docs:** Docker pull/run, first-time `pulse onboard` / `pulse configure`, Compose, GHCR auth, and volume lifecycle in [self-hosting quickstart](docs/self-hosting/quickstart.md) and **README** Install section.
+
+### Changed
+
+- **Release workflow:** `publish-docker` no longer downloads the `dist` artifact for the image build; the Docker build produces the wheel in a builder stage (PyPI publish still uses the same tested artifact as before).
+
+### Fixed
+
+- **Release workflow:** Docker job now logs in to GHCR, sets image metadata, and **pushes** the image (previously ran `build-push-action` without `push` or registry tags).
+
+### Developer
+
+- **`.gitignore`:** `build/` and `dist/` for local setuptools / `uv build` outputs.
+
 ## [2.0.2] - 2026-04-09
 
 ### Added
@@ -78,6 +99,7 @@ First stable release of **Pulse** (`pulse-agent` on PyPI).
 - Configuration lives primarily in **`pulse.toml`** (with `PULSE_*` and documented API key env overrides). See `pulse.toml.example` and the self-hosting quickstart.
 - **Breaking changes** after 1.0 will be called out in this file and reflected in semver (MAJOR for incompatible behavior or config schema changes, MINOR for backward-compatible features, PATCH for fixes).
 
+[2.0.3]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.3
 [2.0.2]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.2
 [2.0.1]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.1
 [2.0.0]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.0
