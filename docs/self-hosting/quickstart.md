@@ -31,10 +31,12 @@ pipx install pulse-agent
 
 **Docker**
 
-- **Image from this repo** — after `uv build` (wheel must be under `dist/`):  
+- **Image from this repo** — from the repository root (no local `uv build` required; the image builds the wheel inside Docker):  
   `docker build -t pulse -f Dockerfile .`  
   `docker run -p 8000:8000 -v pulse-config:/config -v pulse-data:/data pulse`  
-  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) copies `dist/` and installs the `pulse_agent-*.whl` inside the image. It uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.
+  Or: `docker compose up --build` using [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml).  
+  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) installs the `pulse_agent-*.whl` into a slim Python runtime. It uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.  
+  On tagged releases, CI publishes **`ghcr.io/<github-owner>/<repo>`** (GitHub lowercases the path; use your fork’s owner and repository name, e.g. `docker pull ghcr.io/yourname/pulse:latest`).
 - **Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host dirs to match), then `pulse run --host 0.0.0.0 --port 8000`.
 
 Check with `pulse --help` after any install path.

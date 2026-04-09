@@ -1,0 +1,12 @@
+services:
+  pulse:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - pulse-config:/config
+      - pulse-data:/data
+
+volumes:
+  pulse-config:
+  pulse-data:

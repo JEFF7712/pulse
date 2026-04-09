@@ -813,7 +813,7 @@ wheels = [
 
 [[package]]
 name = "pulse-agent"
-version = "2.0.2"
+version = "2.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
