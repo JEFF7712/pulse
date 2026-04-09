@@ -166,16 +166,44 @@ def test_api_rejects_unauthenticated_request(tmp_path):
 def test_mounted_api_accepts_bearer_token_with_settings_override(tmp_path):
     from pulse.app.api import build_api_router
     from pulse.app.auth import build_require_companion_token
-    from pulse.app.dependencies import get_settings
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
 
-    app = FastAPI()
-    auth_dep = build_require_companion_token(get_settings)
-    app.include_router(build_api_router(get_settings, auth_dep))
-    app.dependency_overrides[get_settings] = lambda: PulseConfig(
-        database_path=str(tmp_path / "test.db"),
-        vault_path=str(tmp_path / "vault"),
+    base_settings = PulseConfig(
+        database_path=str(tmp_path / "base.db"),
+        vault_path=str(tmp_path / "base-vault"),
+        companion_token="base-token",
+    )
+    override_settings = PulseConfig(
+        database_path=str(tmp_path / "override.db"),
+        vault_path=str(tmp_path / "override-vault"),
         companion_token="override-token",
     )
+
+    def get_test_settings() -> PulseConfig:
+        return base_settings
+
+    async def seed() -> None:
+        async with connect_db(base_settings.database_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            await analytics.upsert_insight(
+                id="base-only",
+                title="Base insight",
+                status="active",
+                confidence=0.7,
+                first_seen="2026-01-01",
+                last_seen="2026-01-02",
+                vault_path="02-Insights/patterns/base-only.md",
+            )
+
+    asyncio.run(seed())
+
+    app = FastAPI()
+    auth_dep = build_require_companion_token(get_test_settings)
+    app.include_router(build_api_router(get_test_settings, auth_dep))
+    app.dependency_overrides[get_test_settings] = lambda: override_settings
 
     client = TestClient(app)
     response = client.get(

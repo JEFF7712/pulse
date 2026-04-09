@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from pulse.app.config import PulseConfig
 from pulse.app.corrections_webhook import normalize_correction_payload
@@ -58,19 +58,21 @@ def build_api_router(
 
     @router.get("/insights")
     async def get_insights_list(
+        settings: PulseConfig = Depends(get_settings),
         status: str | None = Query(
             default=None, description="Filter by insight status"
         ),
     ) -> list[dict[str, Any]]:
-        settings = get_settings()
         async with connect_db(settings.database_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
             return await analytics.list_insights(status=status)
 
     @router.get("/insights/{insight_id}")
-    async def get_insight_with_body(insight_id: str) -> dict[str, Any]:
-        settings = get_settings()
+    async def get_insight_with_body(
+        insight_id: str,
+        settings: PulseConfig = Depends(get_settings),
+    ) -> dict[str, Any]:
         iid = _safe_insight_id(insight_id)
         async with connect_db(settings.database_path) as db:
             await bootstrap_schema(db)
@@ -91,8 +93,10 @@ def build_api_router(
         return {**row, "markdown": markdown}
 
     @router.post("/corrections", status_code=status.HTTP_202_ACCEPTED)
-    async def post_correction(body: dict[str, str]) -> dict[str, str]:
-        settings = get_settings()
+    async def post_correction(
+        body: dict[str, str],
+        settings: PulseConfig = Depends(get_settings),
+    ) -> dict[str, str]:
         context_id, message_text = normalize_correction_payload(body)
 
         async with connect_db(settings.database_path) as db:
@@ -108,8 +112,10 @@ def build_api_router(
         return {"status": "accepted", "correction_id": correction.id}
 
     @router.post("/device-token")
-    async def post_device_token(body: dict[str, str]) -> dict[str, str]:
-        settings = get_settings()
+    async def post_device_token(
+        body: dict[str, str],
+        settings: PulseConfig = Depends(get_settings),
+    ) -> dict[str, str]:
         token = body.get("token", "")
         platform = body.get("platform", "")
         if not token or not platform:
