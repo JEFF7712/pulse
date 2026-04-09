@@ -53,4 +53,4 @@ Disabled companion connector → `/webhooks/companion` not mounted (404).
 | Ingest OK, no discovery | No summarization/discovery LLM (or missing API key) |
 | Telegram webhook 400 | Reply missing thread/context for correction |
 | Corrections in DB, no vault edit | Status `skipped` / `needs_review` — check `correction_applications` |
-| **`publish-pypi` fails with `invalid-publisher`** | PyPI trusted publisher does not match the tag workflow — see [PyPI trusted publishing](https://pulseagent.dev/docs/operations/pypi-trusted-publishing.html). |
+| **`publish-pypi` fails with `invalid-publisher`** | PyPI trusted publisher does not match the tag workflow — see [pypi-trusted-publishing.md](./pypi-trusted-publishing.md) or the [deployed copy](https://pulseagent.dev/docs/operations/pypi-trusted-publishing.html). |

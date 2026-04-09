@@ -37,7 +37,7 @@ Defaults: config under `~/.config/pulse`, data under `~/.local/share/pulse` (ove
 
 ### Documentation
 
-Documentation: **[pulseagent.dev/docs](https://pulseagent.dev/docs/)** — [Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html), [Configuration](https://pulseagent.dev/docs/reference/configuration.html), [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html), and [Connectors](https://pulseagent.dev/docs/connectors/).
+Documentation lives under `docs/` in this repository. The **deployed site serves the same guides** at **[pulseagent.dev/docs](https://pulseagent.dev/docs/)** (site base path `(/docs/)`). Browse on the web: [Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html), [Configuration](https://pulseagent.dev/docs/reference/configuration.html), [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html), and [Connectors](https://pulseagent.dev/docs/connectors/). Canonical repo sources (edit these in PRs): [docs/index.md](docs/index.md), [Quickstart](docs/self-hosting/quickstart.md), [Configuration](docs/reference/configuration.md), [Operations runbook](docs/operations/runbook.md), and [Connectors](docs/connectors/index.md).
 
 **Paths and environment:** Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. That variable selects the SQLite event store; use `PULSE_VAULT_PATH` for vault markdown. Override the config directory with `PULSE_CONFIG_DIR` (default finds `.config/pulse.toml` under `~/.config/pulse`). **`pulse` and `pulse-mcp`** read the same variables; discovery **day boundaries** and related scheduling semantics are documented in the [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html) (`PULSE_TIMEZONE`).
 
