@@ -12,9 +12,9 @@ def test_telegram_channel_sends_title_and_body_and_returns_true():
     client = FakeClient()
     channel = TelegramChannel(bot_token="token", chat_id="chat-123", client=client)
     notification = Notification(
-        title="Daily digest",
+        title="New insight",
         body="3 new signals detected.",
-        category="digest",
+        category="insight",
     )
 
     result = channel.send(notification)
