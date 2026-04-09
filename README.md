@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/pulse-ascii-banner.svg" alt="PULSE" width="780" />
+  <img src="docs/assets/pulse-ascii-banner.png" alt="PULSE" width="780" />
 </p>
 
 <p align="center">The self-hosted personal intelligence agent.</p>
