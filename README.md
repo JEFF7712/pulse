@@ -1,4 +1,5 @@
-```text
+<div align="center">
+<pre>
 ░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓███████▓▒░▒▓████████▓▒░ 
 ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
 ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
@@ -8,61 +9,32 @@
 ░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░▒▓███████▓▒░░▒▓████████▓▒░ 
                                                                    
                                                                    
-```
+</pre>
+</div>
 
-# Pulse
+<p align="center">The self-hosted personal intelligence agent.</p>
 
-**Personal intelligence agent** — self-hosted, push-first, and yours.
+<p align="center">
+  <a href="https://pypi.org/project/pulse-agent/"><img alt="PyPI" src="https://img.shields.io/pypi/v/pulse-agent?style=flat-square&label=pypi" /></a>
+  <a href="https://www.python.org/downloads/"><img alt="Python" src="https://img.shields.io/badge/python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square" /></a>
+  <a href="https://github.com/JEFF7712/pulse/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/JEFF7712/pulse/ci.yml?style=flat-square&amp;branch=main" /></a>
+  <a href="https://modelcontextprotocol.io/"><img alt="MCP" src="https://img.shields.io/badge/MCP-compatible-808080?style=flat-square" /></a>
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/pulse-agent.svg?label=pulse-agent)](https://pypi.org/project/pulse-agent/) [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/license-MIT-slategray)](LICENSE) [![Model Context Protocol](https://img.shields.io/badge/MCP-compatible-steelblue)](https://modelcontextprotocol.io/)
+<p align="center">
+  <a href="https://pulseagent.dev">pulseagent.dev</a>
+  ·
+  <a href="docs/index.md">Documentation</a>
+  ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-> Pulse continuously ingests data from your digital life — email, calendar, purchases, health, media — and surfaces insights through notifications. **No app to open. No daily check-ins.**
-
-Big tech already collects and exploits personal data. Pulse **reclaims** it: run everything on your own stack, with full transparency into what the agent stores and how it reasons.
-
----
-
-### Contents
-
-| | |
-| --- | --- |
-| [How it works](#how-it-works) | [Installation](#installation) |
-| [Two ways to run](#two-ways-to-run) | [Developer setup](#developer-setup) |
-| [Documentation](#docs) | [Run tests](#run-tests) |
-| [Standalone server](#start-the-standalone-server) | [MCP server](#use-as-an-mcp-server) |
-| [Mobile companion](#mobile-companion-optional) | [Project structure](#project-structure) |
-| [Design principles](#design-principles) | [Releases](#releases-and-versioning) |
+Pulse ingests email, calendar, purchases, health, media, and more — then surfaces insights through notifications (**no app to open, no daily check-ins**). Your data stays on your infrastructure; the vault is human-readable markdown you can browse in Obsidian.
 
 ---
 
-## How it works
-
-```
-Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
-        ↓
-  Event Store (SQLite)
-        ↓
-  Analysis Engine ──→ Vault (Obsidian-compatible Markdown)
-        ↓
-  Notifications (Telegram)
-        ↕
-  User Corrections
-```
-
-1. **Connectors** pull data from your accounts and normalize it into timestamped events
-2. **Event Store** persists everything in a local SQLite database
-3. **Analysis Engine** runs scheduled insight discovery and writes patterns to your vault
-4. **Vault** writes human-readable markdown files you can browse in Obsidian
-5. **Notifications** push insights via Telegram, [ntfy](https://ntfy.sh), [Gotify](https://gotify.net/), email (SMTP), generic JSON webhooks, [Discord](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) / [Slack](https://api.slack.com/messaging/webhooks) incoming webhooks, [Pushover](https://pushover.net/)—configure one or more
-6. **Corrections** let you reply to fix anything the agent gets wrong
-
-## Two ways to run
-
-**Standalone** — Pulse runs as its own service with FastAPI, APScheduler, and Telegram notifications. Good for `docker run` deployments.
-
-**Agent integration** — Pulse exposes an [MCP server](https://modelcontextprotocol.io/) so any compatible agent (Claude Code, OpenClaw, etc.) can query your events, run discovery, inspect patterns, and record corrections using its own scheduling and LLM capabilities.
-
-## Installation
+### Installation
 
 Install `pulse-agent` from PyPI. The package provides `pulse` and `pulse-mcp` commands.
 
@@ -84,7 +56,34 @@ pip install pulse-agent
 
 Config defaults to `~/.config/pulse` (config files, `pulse.toml`) and `~/.local/share/pulse` (database, vault, token files). Override the config directory with `PULSE_CONFIG_DIR`.
 
-## Developer setup
+### How it works
+
+```
+Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
+        ↓
+  Event Store (SQLite)
+        ↓
+  Analysis Engine ──→ Vault (Obsidian-compatible Markdown)
+        ↓
+  Notifications (Telegram)
+        ↕
+  User Corrections
+```
+
+1. **Connectors** pull data from your accounts and normalize it into timestamped events
+2. **Event Store** persists everything in a local SQLite database
+3. **Analysis Engine** runs scheduled insight discovery and writes patterns to your vault
+4. **Vault** writes human-readable markdown files you can browse in Obsidian
+5. **Notifications** push insights via Telegram, [ntfy](https://ntfy.sh), [Gotify](https://gotify.net/), email (SMTP), generic JSON webhooks, [Discord](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) / [Slack](https://api.slack.com/messaging/webhooks) incoming webhooks, [Pushover](https://pushover.net/)—configure one or more
+6. **Corrections** let you reply to fix anything the agent gets wrong
+
+### Two ways to run
+
+**Standalone** — Pulse runs as its own service with FastAPI, APScheduler, and Telegram notifications. Good for `docker run` deployments.
+
+**Agent integration** — Pulse exposes an [MCP server](https://modelcontextprotocol.io/) so any compatible agent (Claude Code, OpenClaw, etc.) can query your events, run discovery, inspect patterns, and record corrections using its own scheduling and LLM capabilities.
+
+### Developer setup
 
 **With [uv](https://docs.astral.sh/uv/) (recommended)**
 
@@ -152,7 +151,7 @@ The full runtime config reference is in [`docs/reference/configuration.md`](docs
 
 Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. They resolve the rest of config via `load_config()` (default `.config/pulse.toml`, else repo-root `pulse.toml`, plus process environment overrides).
 
-## Docs
+### Documentation
 
 Documentation lives under [docs/index.md](docs/index.md). The deployed site serves the same guides at [`/docs/`](/docs/).
 
@@ -162,7 +161,7 @@ Documentation lives under [docs/index.md](docs/index.md). The deployed site serv
 - [Connectors index](docs/connectors/index.md)
 - [Contributing](CONTRIBUTING.md)
 
-## Run tests
+### Run tests
 
 ```bash
 uv sync --group dev
@@ -171,13 +170,13 @@ uv run pytest
 
 Continuous integration (`.github/workflows/ci.yml`) runs `uv sync --group dev --locked` and `uv run pytest` on pushes and pull requests to `main`, on Python 3.12 and 3.13.
 
-## Start the standalone server
+### Start the standalone server
 
 ```bash
 uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 ```
 
-## Use as an MCP server
+### Use as an MCP server
 
 Pulse ships an [MCP](https://modelcontextprotocol.io/) server so you can use your **existing AI agents**—**Claude Code**, **OpenClaw**, Cursor, and any other MCP-capable client—to read events, run discovery, list patterns, check connectors, and record corrections through the same SQLite store and vault as the standalone app. The agent brings scheduling and models; Pulse brings your personal data and insight pipeline.
 
@@ -226,7 +225,7 @@ Omit `PULSE_CONFIG_FILE` when default resolution already finds your `pulse.toml`
 
 When you rely on repo-root **`pulse.toml`**, set a server **`cwd`** to that repo *if your agent’s MCP config supports it*; otherwise use **`PULSE_CONFIG_FILE`** pointing at that file.
 
-### Available tools
+#### Available tools
 
 | Tool | Description |
 |------|-------------|
@@ -238,18 +237,18 @@ When you rely on repo-root **`pulse.toml`**, set a server **`cwd`** to that repo
 | `pulse_read_pattern` | Read a pattern markdown file from the vault |
 | `pulse_connector_status` | Check sync state of all connectors |
 
-### Available resources
+#### Available resources
 
 | Resource | URI |
 |----------|-----|
 | Today's events | `pulse://events/today` |
 | Connector status | `pulse://connectors/status` |
 
-## Mobile companion (optional)
+### Mobile companion (optional)
 
 The **Flutter** app under [`companion_app/`](companion_app/README.md) talks to the same server with `X-Pulse-Token` / `companion_token`. Enable **`[connectors.companion]`** to mount the webhook and API routes. Pattern content uses **`GET /api/insights`** and **`GET /api/insights/{id}`** (replacing removed digest endpoints).
 
-## Project structure
+### Project structure
 
 ```
 src/pulse/
@@ -265,7 +264,7 @@ src/pulse/
 └── vault/          # Vault onboarding and Obsidian helpers
 ```
 
-## Design principles
+### Design principles
 
 1. **Push-first** — insights come to you as notifications
 2. **Zero-effort integration** — connecting data sources takes minutes
@@ -273,8 +272,18 @@ src/pulse/
 4. **Extensible** — clean interfaces for connectors, LLM providers, and notification channels
 5. **Self-hosted** — runs on your hardware, data stays local
 
-## Releases and versioning
+### Releases and versioning
 
 - **PyPI package:** `pulse-agent` (CLI entry points `pulse` and `pulse-mcp`).
 - **Versioning:** [Semantic Versioning](https://semver.org/) — **MAJOR** for incompatible changes (including config or behavior you must act on), **MINOR** for backward-compatible features, **PATCH** for fixes. Review **`CHANGELOG.md`** before upgrading.
 - **Shipping a release:** tag `v*` (for example `v1.0.0`); CI builds, publishes to PyPI, and builds Docker as defined in `.github/workflows/release-publish.yml`. Copy **`CHANGELOG.md`** into the GitHub release notes for that tag.
+
+---
+
+<p align="center">
+  <a href="https://pulseagent.dev">pulseagent.dev</a>
+  |
+  <a href="https://pypi.org/project/pulse-agent/">PyPI</a>
+  |
+  <a href="https://github.com/JEFF7712/pulse">GitHub</a>
+</p>
