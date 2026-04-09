@@ -20,7 +20,13 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
-<p align="center">Ingest your digital life, discover patterns, write an Obsidian-style vault, get <strong>push</strong> insights — all <strong>self-hosted</strong>. Full overview, architecture, MCP JSON, env reference, and ops: <a href="docs/index.md"><strong>Documentation</strong></a>.</p>
+<p align="center">Ingest your digital life, discover patterns, write an Obsidian-style vault, get <strong>push</strong> insights — all <strong>self-hosted</strong>.</p>
+
+### Documentation
+
+Documentation lives under `docs/` in this repository. On [pulseagent.dev](https://pulseagent.dev) the deployed site serves the same guides at [Documentation site](/docs/). Start here: [docs/index.md](docs/index.md) — then [Configuration](docs/reference/configuration.md), [Operations runbook](docs/operations/runbook.md), and [Connectors](docs/connectors/index.md) (see also [Quickstart](docs/self-hosting/quickstart.md)).
+
+**Paths and environment:** Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. That variable selects the SQLite event store; use `PULSE_VAULT_PATH` for vault markdown. Override the config directory with `PULSE_CONFIG_DIR` (default finds `.config/pulse.toml` under `~/.config/pulse`). **`pulse` and `pulse-mcp`** read the same variables; discovery **day boundaries** and related scheduling semantics are documented in the runbook (`PULSE_TIMEZONE`).
 
 ---
 

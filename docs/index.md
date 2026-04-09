@@ -76,7 +76,7 @@ To have an **AI agent install and wire MCP for you**, use the one-liner in [Self
 
 ## Contributing and releases
 
-- **[Contributing](../CONTRIBUTING.md)** — dev environment, tests, project layout.
+- **[Contributing](https://github.com/JEFF7712/pulse/blob/main/CONTRIBUTING.md)** — dev environment, tests, project layout.
 - **[Releases and versioning](./operations/releases.md)** — semver, tags, PyPI.
 
-**Mobile companion (optional):** Flutter app under [`companion_app/`](../companion_app/README.md); enable **`[connectors.companion]`** on the server.
+**Mobile companion (optional):** Flutter app under [`companion_app/`](https://github.com/JEFF7712/pulse/blob/main/companion_app/README.md); enable **`[connectors.companion]`** on the server.

@@ -1,28 +1,45 @@
 <!DOCTYPE html>
-<!-- Full-bleed #050505 frame for headless screenshot (avoids Chrome letterboxing SVG on white). -->
+<!--
+  Tall viewport + padding; PNG is post-processed (crop_readme_banner.py) to tight 920×N.
+-->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>readme banner</title>
     <style>
+      * {
+        box-sizing: border-box;
+      }
       html,
       body {
         margin: 0;
-        padding: 0;
-        width: 920px;
-        height: 132px;
         background: #050505;
-        overflow: hidden;
       }
-      img {
-        display: block;
+      body {
+        padding: 48px 0 64px;
         width: 920px;
-        height: 132px;
-        vertical-align: top;
+        text-align: center;
+      }
+      pre {
+        display: inline-block;
+        margin: 0;
+        padding: 0;
+        color: #4ade80;
+        font-family: "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.35;
+        white-space: pre;
+        text-align: left;
       }
     </style>
   </head>
   <body>
-    <img src="readme-pulse-hero.svg" width="920" height="132" alt="" />
+    <pre>░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓███████▓▒░▒▓████████▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓██████▓▒░   
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░▒▓███████▓▒░░▒▓████████▓▒░ </pre>
   </body>
 </html>
