@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="docs/assets/pulse-ascii-banner.png" alt="PULSE" width="780" />
-</p>
+<div align="center">
+  <img src="docs/assets/pulse-ascii-banner.png" alt="PULSE" width="780" style="max-width: 100%;" />
+</div>
 
 <p align="center">The self-hosted personal intelligence agent.</p>
 
@@ -20,7 +20,7 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
-Ingest your digital life, discover patterns, write an Obsidian-style vault, get **push** insights — all **self-hosted**. Full overview, architecture, MCP JSON, env reference, and ops: **[Documentation](docs/index.md)**.
+<p align="center">Ingest your digital life, discover patterns, write an Obsidian-style vault, get <strong>push</strong> insights — all <strong>self-hosted</strong>. Full overview, architecture, MCP JSON, env reference, and ops: <a href="docs/index.md"><strong>Documentation</strong></a>.</p>
 
 ---
 

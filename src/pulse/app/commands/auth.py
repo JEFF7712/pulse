@@ -18,7 +18,7 @@ from pulse.connectors.google_auth import SCOPES_BY_CONNECTOR, GoogleAuthManager
 from pulse.connectors.microsoft_auth import MICROSOFT_AUTH_PORT, MicrosoftAuthManager
 from pulse.connectors.oura_auth import OURA_AUTH_PORT, OURA_SCOPES, OuraAuthManager
 from pulse.connectors.plaid_link import run_plaid_link_flow
-from pulse.connectors.spotify_auth import REDIRECT_URI, SPOTIFY_SCOPES, SpotifyAuthManager  # noqa: F401
+from pulse.connectors.spotify_auth import SPOTIFY_SCOPES, SpotifyAuthManager
 
 
 def gitlab_base_url(config: PulseConfig) -> str:
