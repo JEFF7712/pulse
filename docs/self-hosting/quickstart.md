@@ -29,15 +29,110 @@ pipx install pulse-agent
 - **uv** — `uv tool install pulse-agent`
 - **pip** — use a virtualenv; `pip install pulse-agent`
 
-**Docker**
+### Docker
 
-- **Image from this repo** — from the repository root (no local `uv build` required; the image builds the wheel inside Docker):  
-  `docker build -t pulse -f Dockerfile .`  
-  `docker run -p 8000:8000 -v pulse-config:/config -v pulse-data:/data pulse`  
-  Or: `docker compose up --build` using [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml).  
-  The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) installs the `pulse_agent-*.whl` into a slim Python runtime. It uses `PULSE_CONFIG_DIR=/config` and keeps the SQLite DB + vault under `/data`. Add `-it` for interactive `pulse configure` or `pulse onboard`.  
-  On tagged releases, CI publishes **`ghcr.io/<github-owner>/<repo>`** (GitHub lowercases the path; use your fork’s owner and repository name, e.g. `docker pull ghcr.io/yourname/pulse:latest`).
-- **Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host dirs to match), then `pulse run --host 0.0.0.0 --port 8000`.
+The image serves the app on **port 8000**, keeps config under **`/config`** (`PULSE_CONFIG_DIR`), and SQLite plus the vault under **`/data`**. The [`Dockerfile`](https://github.com/JEFF7712/pulse/blob/main/Dockerfile) builds the `pulse_agent` wheel inside the image (no local `uv build` required). On tagged releases, CI publishes to **`ghcr.io/<github-owner>/<repo>`** (GitHub lowercases the path; substitute your fork’s owner and repository name).
+
+#### Pull from GitHub Container Registry
+
+Example for this repository (adjust owner/repo for your fork):
+
+```bash
+docker pull ghcr.io/jeff7712/pulse:latest
+# optional: pin a release version
+docker pull ghcr.io/jeff7712/pulse:2.0.3
+```
+
+If the package is **private**, authenticate before `pull`:
+
+```bash
+echo YOUR_GITHUB_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+Use a personal access token with the **`read:packages`** scope (classic PAT) or fine-grained access to read GitHub Packages.
+
+#### Run the server
+
+Typical detached run:
+
+```bash
+docker run -d --name pulse \
+  -p 8000:8000 \
+  -v pulse-config:/config \
+  -v pulse-data:/data \
+  ghcr.io/jeff7712/pulse:latest
+```
+
+Open **http://localhost:8000**. For logs in the foreground, omit `-d` (add `--rm` if you do not need a named container).
+
+If you built locally with `-t pulse`, replace the image name with `pulse`.
+
+#### First-time setup (interactive)
+
+`pulse configure` and `pulse onboard` need a TTY. Full first-run wizard and then start the server in the same container:
+
+```bash
+docker run --rm -it \
+  -p 8000:8000 \
+  -v pulse-config:/config \
+  -v pulse-data:/data \
+  ghcr.io/jeff7712/pulse:latest \
+  pulse onboard
+```
+
+Configure only, then run a **separate** long-lived `docker run` (as above) for `pulse run`:
+
+```bash
+docker run --rm -it \
+  -v pulse-config:/config \
+  -v pulse-data:/data \
+  ghcr.io/jeff7712/pulse:latest \
+  pulse configure
+```
+
+#### Build and run from a clone
+
+From the repository root:
+
+```bash
+docker build -t pulse -f Dockerfile .
+docker run -d --name pulse \
+  -p 8000:8000 \
+  -v pulse-config:/config \
+  -v pulse-data:/data \
+  pulse
+```
+
+#### Docker Compose
+
+From the repository root:
+
+```bash
+docker compose up --build -d
+```
+
+Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml); same URL **http://localhost:8000**.
+
+#### Data volumes and stopping
+
+- **`pulse-data`** — database and vault (`/data` in the container).
+- **`pulse-config`** — configuration (`/config` in the container).
+
+Stop and remove the container:
+
+```bash
+docker stop pulse && docker rm pulse
+```
+
+With Compose: `docker compose down`. Named volumes **persist** until you remove them explicitly, for example:
+
+```bash
+docker volume rm pulse-config pulse-data
+```
+
+That deletes stored config and data — use only when you intend to reset.
+
+**Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host directories to match), then `pulse run --host 0.0.0.0 --port 8000`.
 
 Check with `pulse --help` after any install path.
 
