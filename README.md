@@ -40,12 +40,14 @@ pipx install pulse-agent   # or: uv tool install pulse-agent
 
 ```bash
 docker pull ghcr.io/jeff7712/pulse:latest
+
 docker run -d --name pulse -p 8000:8000 \
   -v pulse-config:/config -v pulse-data:/data \
   ghcr.io/jeff7712/pulse:latest pulse onboard
 ```
 
-From a clone: `docker build -t pulse -f Dockerfile .` (same `docker run` with image `pulse`), or `docker compose up --build -d` using [`compose.yaml`](compose.yaml). Private registry: `docker login ghcr.io` with a PAT that can read packages. More detail (pinned versions, `pulse configure`, volume cleanup): **[Quickstart — Docker](https://pulseagent.dev/docs/self-hosting/quickstart.html#docker)**.
+From a clone: `docker build -t pulse -f Dockerfile .` or `docker compose up --build -d`.
+**[Quickstart — Docker](https://pulseagent.dev/docs/self-hosting/quickstart.html#docker)** for more details.
 
 Defaults (native install): config under `~/.config/pulse`, data under `~/.local/share/pulse` (override with `PULSE_CONFIG_DIR`). Next: **`pulse configure`** → **`pulse init`** → **`pulse run`** — see **[Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html)**.
 

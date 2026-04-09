@@ -127,11 +127,10 @@ PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
     "# If omitted, corrections reuse [llm.discovery].",
 ]
 
+# README copy is allowed to use the deployed docs site instead of repo-relative
+# markdown links; keep this list aligned with env/path guidance the README should retain.
 README_REQUIRED_SNIPPETS = [
-    "(/docs/)",
-    "[docs/index.md](docs/index.md)",
     "Documentation lives under",
-    "deployed site serves the same guides",
     "`PULSE_DATABASE_PATH`",
     "Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`.",
     "`PULSE_VAULT_PATH`",
@@ -190,15 +189,18 @@ def docs_app_include_path_for(wrapper_path: Path, repo_path: Path) -> str:
 
 
 def test_readme_links_to_required_docs_pages() -> None:
+    """Ensure canonical doc sources exist and the README points readers at published docs."""
     readme = README_PATH.read_text(encoding="utf-8")
 
     missing_docs = [str(path) for path in DOC_PATHS if not (REPO_ROOT / path).exists()]
     assert not missing_docs, f"Missing docs files: {missing_docs}"
 
-    missing_links = [
-        str(path) for path in DOC_PATHS if f"({path.as_posix()})" not in readme
-    ]
-    assert not missing_links, f"README.md is missing links: {missing_links}"
+    assert "pulseagent.dev" in readme and "/docs" in readme, (
+        "README.md should link to the published documentation (pulseagent.dev/.../docs...)"
+    )
+    assert "self-hosting/quickstart" in readme, (
+        "README.md should link to the self-hosting quickstart on the docs site"
+    )
 
 
 def test_quickstart_documents_cli_happy_path() -> None:
