@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/assets/readme-pulse-hero.png" alt="PULSE" width="780" style="max-width: 100%;" />
+  <img src="docs/assets/readme-pulse-banner.png" alt="PULSE" width="780" style="max-width: 100%;" />
 </div>
 
 <p align="center">The self-hosted personal intelligence agent.</p>

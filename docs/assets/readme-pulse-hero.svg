@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Brand green on site background #050505 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 132" role="img" aria-label="PULSE">
-  <rect width="920" height="132" fill="#050505" rx="8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="132" viewBox="0 0 920 132" role="img" aria-label="PULSE">
+  <rect width="920" height="132" fill="#050505"/>
   <text
     fill="#4ade80"
     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace"

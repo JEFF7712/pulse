@@ -23,7 +23,7 @@ def test_telegram_channel_sends_title_and_body_and_returns_true():
     assert notification.context_id is None
     assert notification.priority == "normal"
     assert client.calls == [
-        ("chat-123", "Daily digest\n\n3 new signals detected."),
+        ("chat-123", "New insight\n\n3 new signals detected."),
     ]
 
 
