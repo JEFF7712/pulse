@@ -111,7 +111,11 @@ From the repository root:
 docker compose up --build -d
 ```
 
-Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml); same URL `http://localhost:8000`.
+Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.yaml); same URL `http://localhost:8000`. The service uses **`restart: unless-stopped`** so the container comes back after reboot (until you `docker compose down`).
+
+#### systemd (native `pulse` install)
+
+For a **pipx** / **`uv tool install`** layout, copy and enable the example user unit from [`deploy/systemd/pulse-user.service.example`](https://github.com/JEFF7712/pulse/blob/main/deploy/systemd/pulse-user.service.example) to `~/.config/systemd/user/pulse.service`, adjust **`ExecStart`** if your `pulse` binary lives elsewhere, then `systemctl --user daemon-reload` and `systemctl --user enable --now pulse.service`. Use **`loginctl enable-linger "$USER"`** if you want the unit to start at boot without an interactive session.
 
 #### Data volumes and stopping
 

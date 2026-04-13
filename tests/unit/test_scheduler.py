@@ -8,7 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from pulse.app.config import PulseConfig, ConnectorConfig
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.connectors import Connector
-from pulse.jobs.scheduler import parse_interval
+from pulse.jobs.intervals import parse_interval
 
 
 class FakeConnector(Connector):

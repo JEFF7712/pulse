@@ -3,6 +3,11 @@
 
 timezone = "America/Chicago"
 
+# When true, send one alert per failing scheduler job (discovery, aggregation, connector pulls)
+# at most every `job_failure_alert_cooldown` per job — requires Telegram, ntfy, Pushover, etc.
+# notify_on_job_failure = false
+# job_failure_alert_cooldown = "6h"
+
 google_client_id = ""
 google_client_secret = ""
 anthropic_api_key = ""

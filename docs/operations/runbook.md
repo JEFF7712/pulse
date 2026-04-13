@@ -38,6 +38,8 @@ Disabled companion connector → `/webhooks/companion` not mounted (404).
 
 **Skips:** discovery without a resolved LLM role. Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
 
+**Failures:** set **`notify_on_job_failure = true`** (and at least one outbound channel: Telegram, ntfy, …) to receive **rate-limited** alerts when a scheduled job throws (per-job cooldown **`job_failure_alert_cooldown`**, default `6h`). Category **`operations`** (not insight vault notifications).
+
 ## Recovery
 
 - **`pulse reset <source>`** — reset one connector cursor (full re-pull next time).

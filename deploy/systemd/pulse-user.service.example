@@ -1,0 +1,29 @@
+# Example systemd user unit for `pulse run` (pipx / uv tool default: ~/.local/bin/pulse).
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/systemd/pulse-user.service.example ~/.config/systemd/user/pulse.service
+#   # Edit ExecStart if `pulse` is not in ~/.local/bin (e.g. venv: full path to pulse).
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now pulse.service
+#
+# Optional — start at boot before graphical login:
+#   loginctl enable-linger "$USER"
+#
+# See docs/self-hosting/quickstart.md
+
+[Unit]
+Description=Pulse personal intelligence agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/pulse run
+Restart=on-failure
+RestartSec=5
+# Uncomment if config is not under the default ~/.config/pulse resolution:
+# Environment=PULSE_CONFIG_DIR=%h/.config/pulse
+
+[Install]
+WantedBy=default.target

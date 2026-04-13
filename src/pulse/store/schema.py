@@ -127,4 +127,13 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_correction_applications_correction_id_created_at_id ON correction_applications(correction_id, created_at, id)"
     )
 
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS job_failure_alert_state (
+            job_key TEXT PRIMARY KEY,
+            alerted_at TEXT NOT NULL
+        )
+        """
+    )
+
     await db.commit()

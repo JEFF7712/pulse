@@ -165,7 +165,7 @@ class SpotifyConnector(Connector, SupplementaryPullMixin):
     def get_supplementary_jobs(
         self, config: ConnectorConfig
     ) -> list[tuple[str, timedelta, Callable]]:
-        from pulse.jobs.scheduler import parse_interval
+        from pulse.jobs.intervals import parse_interval
         interval_str = getattr(config, "supplementary_interval", "6h")
         interval = parse_interval(interval_str)
         return [("supplementary", interval, self._pull_supplementary)]

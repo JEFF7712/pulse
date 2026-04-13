@@ -246,6 +246,17 @@ _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool
 
 _CONFIGURE_NOTIFICATION_FIELDS: list[tuple[str, str, bool]] = [
     fld for *_, flds in _NOTIFICATION_PROVIDER_DEFS for fld in flds
+] + [
+    (
+        "PULSE_NOTIFY_ON_JOB_FAILURE",
+        "Notify when a scheduled job fails (needs Telegram, ntfy, or another channel)",
+        False,
+    ),
+    (
+        "PULSE_JOB_FAILURE_ALERT_COOLDOWN",
+        "Minimum time between failure alerts for the same job (e.g. 6h, 30m)",
+        False,
+    ),
 ]
 
 _CONFIGURE_ENV_KEY_ORDER: list[str] = (

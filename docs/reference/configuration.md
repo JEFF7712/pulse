@@ -50,6 +50,8 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 | `smtp_to` | `PULSE_SMTP_TO` | unset | Recipient(s); comma-separated for multiple. Email channel is enabled when `smtp_host`, `smtp_from`, and `smtp_to` are all set. |
 | `smtp_use_tls` | `PULSE_SMTP_USE_TLS` | `true` | Use STARTTLS after connect (typical for submission on port 587). |
 | `smtp_use_ssl` | `PULSE_SMTP_USE_SSL` | `false` | Use implicit TLS (`SMTP_SSL`, typical for port 465). |
+| `notify_on_job_failure` | `PULSE_NOTIFY_ON_JOB_FAILURE` | `false` | When `true`, Pulse sends an **operations** notification (same channels as insight pushes) when a **scheduled** job throws: discovery (`discovery_daily` / `weekly` / `monthly`), hourly aggregation, or a connector pull. No alert is sent if no notification channel is configured. |
+| `job_failure_alert_cooldown` | `PULSE_JOB_FAILURE_ALERT_COOLDOWN` | `6h` | Minimum time between failure alerts for the **same** job key (format like connector `poll_interval`: `30m`, `2h`, `1d`). |
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | OAuth secret (env or gitignored TOML). |
 
