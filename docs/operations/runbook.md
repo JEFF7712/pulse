@@ -38,7 +38,9 @@ Disabled companion connector → `/webhooks/companion` not mounted (404).
 
 **Skips:** discovery without a resolved LLM role. Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
 
-**Failures:** set **`notify_on_job_failure = true`** (and at least one outbound channel: Telegram, ntfy, …) to receive **rate-limited** alerts when a scheduled job throws (per-job cooldown **`job_failure_alert_cooldown`**, default `6h`). Category **`operations`** (not insight vault notifications).
+**Failures:** set **`notify_on_job_failure = true`** (and at least one outbound channel: Telegram, ntfy, …) to receive **rate-limited** alerts when a scheduled job throws (per-job cooldown **`job_failure_alert_cooldown`**, default `6h`). Category **`operations`** (not insight vault notifications). Connector **401 / missing OAuth** paths that used to return empty now raise **`ConnectorAuthError`** so the same path can alert on **`pull_<source>`** failures.
+
+**Corrections backlog:** **`notify_on_corrections_backlog = true`** sends an **`operations`** alert (cooldown **`corrections_backlog_alert_cooldown`**, default `12h`) when any `correction_applications` row is **`needs_review`** or **`failed`**, checked after each successful aggregation run.
 
 ## Recovery
 

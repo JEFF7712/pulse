@@ -99,7 +99,12 @@ def _coerce_pulse_root_string(fname: str, raw: str) -> str | int | bool:
     raw = raw.strip()
     if fname == "smtp_port":
         return int(raw)
-    if fname in ("smtp_use_tls", "smtp_use_ssl", "notify_on_job_failure"):
+    if fname in (
+        "smtp_use_tls",
+        "smtp_use_ssl",
+        "notify_on_job_failure",
+        "notify_on_corrections_backlog",
+    ):
         return raw.lower() in ("1", "true", "yes", "on")
     return raw
 

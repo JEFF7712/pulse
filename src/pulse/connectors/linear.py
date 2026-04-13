@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from pulse.domain.connectors import Connector
+from pulse.domain.connectors import Connector, ConnectorAuthError
 from pulse.domain.events import Event
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,9 @@ class LinearConnector(Connector):
                     logger.warning(
                         "Linear API unauthorized — check PULSE_LINEAR_API_KEY"
                     )
-                    return []
+                    raise ConnectorAuthError(
+                        "Linear API unauthorized — check PULSE_LINEAR_API_KEY"
+                    ) from None
                 resp.raise_for_status()
                 body = resp.json()
                 errs = body.get("errors")
@@ -129,6 +131,8 @@ class LinearConnector(Connector):
                 cursor = page.get("endCursor")
                 if not cursor:
                     break
+        except ConnectorAuthError:
+            raise
         except httpx.HTTPStatusError as e:
             logger.warning("Linear HTTP error: %s", e)
             return []

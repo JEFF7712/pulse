@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 from pulse.connectors.oauth import OAuthManager
+from pulse.domain.connectors import ConnectorAuthError
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class GoogleAuthManager(OAuthManager):
     def get_credentials(self) -> Credentials:
         creds = self._load_credentials()
         if creds is None:
-            raise RuntimeError(
+            raise ConnectorAuthError(
                 "Not authorized. Run `pulse configure` → Connectors and open a Google-backed source (Gmail, Calendar, YouTube)."
             )
         if creds.expired and creds.refresh_token:

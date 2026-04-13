@@ -52,6 +52,8 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 | `smtp_use_ssl` | `PULSE_SMTP_USE_SSL` | `false` | Use implicit TLS (`SMTP_SSL`, typical for port 465). |
 | `notify_on_job_failure` | `PULSE_NOTIFY_ON_JOB_FAILURE` | `false` | When `true`, Pulse sends an **operations** notification (same channels as insight pushes) when a **scheduled** job throws: discovery (`discovery_daily` / `weekly` / `monthly`), hourly aggregation, or a connector pull. No alert is sent if no notification channel is configured. |
 | `job_failure_alert_cooldown` | `PULSE_JOB_FAILURE_ALERT_COOLDOWN` | `6h` | Minimum time between failure alerts for the **same** job key (format like connector `poll_interval`: `30m`, `2h`, `1d`). |
+| `notify_on_corrections_backlog` | `PULSE_NOTIFY_ON_CORRECTIONS_BACKLOG` | `false` | When `true`, after each **successful** hourly aggregation Pulse checks `correction_applications` for rows with status **`needs_review`** or **`failed`** and sends at most one **operations** notification per cooldown (requires a configured outbound channel). |
+| `corrections_backlog_alert_cooldown` | `PULSE_CORRECTIONS_BACKLOG_ALERT_COOLDOWN` | `12h` | Minimum time between corrections backlog alerts (same interval syntax as `job_failure_alert_cooldown`). |
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | OAuth secret (env or gitignored TOML). |
 

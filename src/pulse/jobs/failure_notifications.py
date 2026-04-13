@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from pulse.domain.notifications import Notification
+from pulse.jobs.alert_cooldown import is_past_cooldown, record_cooldown_fire
 from pulse.jobs.intervals import parse_interval
 from pulse.notifications.factory import build_notification_channel
 from pulse.store.db import connect_db
@@ -19,7 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 def _job_failure_body(exc: Exception) -> str:
+    from pulse.domain.connectors import ConnectorAuthError
     from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
+
+    if isinstance(exc, ConnectorAuthError):
+        msg = str(exc).strip() or "Connector authentication failed"
+        prefix = "Connector authentication failed — re-authorize in `pulse configure` → Connectors.\n\n"
+        body = prefix + msg
+        if len(body) > 1200:
+            body = body[:1197] + "..."
+        return body
 
     hint = user_message_for_anthropic_exception(exc)
     if hint:
@@ -30,7 +40,7 @@ def _job_failure_body(exc: Exception) -> str:
     return msg
 
 
-def _cooldown_delta(config: PulseConfig) -> timedelta:
+def _cooldown_delta(config: PulseConfig):
     raw = (config.job_failure_alert_cooldown or "6h").strip()
     try:
         return parse_interval(raw)
@@ -65,29 +75,15 @@ async def notify_scheduled_job_failure(
 
     async with connect_db(config.database_path) as db:
         await bootstrap_schema(db)
-        cur = await db.execute(
-            "SELECT alerted_at FROM job_failure_alert_state WHERE job_key = ?",
-            (job_key,),
-        )
-        row = await cur.fetchone()
-        if row and row[0]:
-            try:
-                last = datetime.fromisoformat(row[0])
-                if last.tzinfo is None:
-                    last = last.replace(tzinfo=timezone.utc)
-                if now - last < cooldown:
-                    logger.debug(
-                        "Skipping job failure alert for %s (cooldown until %s)",
-                        job_key,
-                        last + cooldown,
-                    )
-                    return
-            except (TypeError, ValueError):
-                logger.warning(
-                    "Bad alerted_at for job_key=%s; sending alert anyway", job_key
-                )
+        if not await is_past_cooldown(db, job_key, cooldown, now):
+            return
+
+        from pulse.domain.connectors import ConnectorAuthError
 
         title = f"Pulse: {job_key} failed"
+        if isinstance(exc, ConnectorAuthError):
+            title = f"Pulse: {job_key} auth failed"
+
         body = _job_failure_body(exc)
         notification = Notification(
             title=title,
@@ -101,12 +97,4 @@ async def notify_scheduled_job_failure(
             logger.exception("Failed to send job failure notification for %s", job_key)
             return
 
-        await db.execute(
-            """
-            INSERT INTO job_failure_alert_state (job_key, alerted_at)
-            VALUES (?, ?)
-            ON CONFLICT(job_key) DO UPDATE SET alerted_at = excluded.alerted_at
-            """,
-            (job_key, now.isoformat()),
-        )
-        await db.commit()
+        await record_cooldown_fire(db, job_key, now)

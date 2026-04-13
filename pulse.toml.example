@@ -7,6 +7,8 @@ timezone = "America/Chicago"
 # at most every `job_failure_alert_cooldown` per job — requires Telegram, ntfy, Pushover, etc.
 # notify_on_job_failure = false
 # job_failure_alert_cooldown = "6h"
+# notify_on_corrections_backlog = false
+# corrections_backlog_alert_cooldown = "12h"
 
 google_client_id = ""
 google_client_secret = ""

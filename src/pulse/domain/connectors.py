@@ -4,6 +4,10 @@ from datetime import datetime, timedelta
 from pulse.domain.events import Event
 
 
+class ConnectorAuthError(RuntimeError):
+    """Raised when a connector cannot authenticate (expired token, revoked key, etc.)."""
+
+
 class Connector(ABC):
     @abstractmethod
     async def pull(self, since: datetime | None = None) -> list[Event]:

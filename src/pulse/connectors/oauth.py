@@ -2,6 +2,8 @@ import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from pulse.domain.connectors import ConnectorAuthError
+
 
 class OAuthManager(ABC):
     def __init__(self, token_path: Path) -> None:
@@ -41,7 +43,7 @@ class OAuthManager(ABC):
     def get_valid_token(self) -> str:
         token_data = self.load_tokens()
         if token_data is None:
-            raise RuntimeError("Not authorized.")
+            raise ConnectorAuthError("Not authorized.")
         if self._is_token_expired(token_data):
             token_data = self._refresh_access_token(token_data)
             self.save_tokens(token_data)

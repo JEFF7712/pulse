@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from pulse.domain.connectors import Connector
+from pulse.domain.connectors import Connector, ConnectorAuthError
 from pulse.domain.events import Event
 
 logger = logging.getLogger(__name__)
@@ -140,8 +140,10 @@ class NotionConnector(Connector):
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:
                 logger.warning("Notion API unauthorized — check PULSE_NOTION_TOKEN")
-            else:
-                logger.warning("Notion API error: %s", e)
+                raise ConnectorAuthError(
+                    "Notion API unauthorized — check PULSE_NOTION_TOKEN"
+                ) from e
+            logger.warning("Notion API error: %s", e)
             return []
         except Exception:
             logger.exception("Notion pull failed")

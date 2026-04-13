@@ -88,6 +88,66 @@ def test_correction_application_repository_round_trips_records(tmp_path) -> None
     asyncio.run(exercise())
 
 
+def test_correction_application_repository_counts_by_status(tmp_path) -> None:
+    async def exercise() -> None:
+        from pulse.domain.correction_applications import CorrectionApplication
+        from pulse.domain.corrections import Correction
+        from pulse.store.correction_applications import CorrectionApplicationRepository
+        from pulse.store.corrections import CorrectionRepository
+        from pulse.store.db import connect_db
+        from pulse.store.schema import bootstrap_schema
+
+        now = datetime(2026, 3, 27, 12, 0, tzinfo=UTC)
+        db_path = tmp_path / "count.db"
+        async with connect_db(db_path) as db:
+            await db.execute("PRAGMA foreign_keys = ON")
+            await bootstrap_schema(db)
+            corrections = CorrectionRepository(db)
+            repository = CorrectionApplicationRepository(db)
+
+            await corrections.add(
+                Correction(
+                    id="c1",
+                    context_id="x",
+                    message_text="m",
+                    created_at=now,
+                )
+            )
+            await repository.add(
+                CorrectionApplication(
+                    id="a1",
+                    correction_id="c1",
+                    status="needs_review",
+                    target_type="none",
+                    target_ref="",
+                    operation="needs_review",
+                    summary="s",
+                    error_message=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await repository.add(
+                CorrectionApplication(
+                    id="a2",
+                    correction_id="c1",
+                    status="failed",
+                    target_type="file",
+                    target_ref="f",
+                    operation="replace",
+                    summary="s2",
+                    error_message="e",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            assert await repository.count_with_status_in(("needs_review",)) == 1
+            assert await repository.count_with_status_in(("needs_review", "failed")) == 2
+            assert await repository.count_with_status_in(("applied",)) == 0
+
+    asyncio.run(exercise())
+
+
 def test_open_pulse_context_exposes_correction_application_repository(tmp_path) -> None:
     async def exercise() -> None:
         from pulse.mcp.context import open_pulse_context

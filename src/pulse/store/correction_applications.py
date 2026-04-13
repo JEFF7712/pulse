@@ -41,6 +41,21 @@ class CorrectionApplicationRepository:
         )
         await self._db.commit()
 
+    async def count_with_status_in(self, statuses: tuple[str, ...]) -> int:
+        if not statuses:
+            return 0
+        placeholders = ",".join("?" * len(statuses))
+        cursor = await self._db.execute(
+            f"""
+            SELECT COUNT(*) FROM correction_applications
+            WHERE status IN ({placeholders})
+            """,
+            tuple(statuses),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return int(row[0]) if row and row[0] is not None else 0
+
     async def list_for_correction(
         self, correction_id: str
     ) -> list[CorrectionApplication]:

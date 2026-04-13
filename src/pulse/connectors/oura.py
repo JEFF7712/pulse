@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from pulse.connectors.oura_auth import OuraAuthManager
-from pulse.domain.connectors import Connector
+from pulse.domain.connectors import Connector, ConnectorAuthError
 from pulse.domain.events import Event
 
 logger = logging.getLogger(__name__)
@@ -129,8 +129,11 @@ class OuraConnector(Connector):
                     "Oura API unauthorized — run `pulse configure` → Connectors → Oura, "
                     "or set PULSE_OURA_PERSONAL_ACCESS_TOKEN"
                 )
-            else:
-                logger.warning("Oura API error: %s", e)
+                raise ConnectorAuthError(
+                    "Oura API unauthorized — run `pulse configure` → Connectors → Oura, "
+                    "or set PULSE_OURA_PERSONAL_ACCESS_TOKEN"
+                ) from e
+            logger.warning("Oura API error: %s", e)
             return []
         except Exception:
             logger.exception("Oura pull failed")

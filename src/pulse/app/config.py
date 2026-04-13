@@ -51,6 +51,8 @@ class PulseConfig(BaseModel):
     smtp_use_ssl: bool = False
     notify_on_job_failure: bool = False
     job_failure_alert_cooldown: str = "6h"
+    notify_on_corrections_backlog: bool = False
+    corrections_backlog_alert_cooldown: str = "12h"
     google_client_id: str | None = None
     google_client_secret: str | None = None
     spotify_client_id: str | None = None

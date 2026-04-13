@@ -257,6 +257,16 @@ _CONFIGURE_NOTIFICATION_FIELDS: list[tuple[str, str, bool]] = [
         "Minimum time between failure alerts for the same job (e.g. 6h, 30m)",
         False,
     ),
+    (
+        "PULSE_NOTIFY_ON_CORRECTIONS_BACKLOG",
+        "Notify when correction_applications rows are needs_review or failed (after each aggregation)",
+        False,
+    ),
+    (
+        "PULSE_CORRECTIONS_BACKLOG_ALERT_COOLDOWN",
+        "Minimum time between corrections backlog alerts (e.g. 12h, 1d)",
+        False,
+    ),
 ]
 
 _CONFIGURE_ENV_KEY_ORDER: list[str] = (

@@ -7,6 +7,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.connectors.registry import ConnectorRegistry
+from pulse.jobs.corrections_notifications import notify_corrections_backlog_if_needed
 from pulse.jobs.failure_notifications import notify_scheduled_job_failure
 from pulse.jobs.intervals import parse_interval
 from pulse.jobs.runners import JobResult
@@ -166,11 +167,13 @@ def _make_aggregation_job(config):
 
         try:
             day = _resolve_current_day(config)
-            return await run_aggregation_job(
+            result = await run_aggregation_job(
                 day=day,
                 database_path=config.database_path,
                 timezone=config.timezone,
             )
+            await notify_corrections_backlog_if_needed(config)
+            return result
         except Exception as e:
             await notify_scheduled_job_failure(config, "aggregation", e)
             logger.exception("Aggregation job failed")
