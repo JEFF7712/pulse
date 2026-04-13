@@ -22,6 +22,8 @@
 
 <p align="center">Ingest your digital life, discover patterns, write an Obsidian-style vault, get <strong>push</strong> insights — all <strong>self-hosted</strong>.</p>
 
+<p align="center">Pulse is still experimental and in active testing, so expect some rough edges and occasional changes. It is best suited for early adopters who are comfortable self-hosting.</p>
+
 ---
 ### Install
 
