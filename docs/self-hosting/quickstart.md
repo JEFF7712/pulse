@@ -38,8 +38,6 @@ The image serves the app on **port 8000**, keeps config under **`/config`** (`PU
 Example for this repository (adjust owner/repo for your fork):
 
 ```bash
-docker pull ghcr.io/jeff7712/pulse:latest
-# optional: pin a release version
 docker pull ghcr.io/jeff7712/pulse:2.0.3
 ```
 
@@ -60,7 +58,7 @@ docker run -d --name pulse \
   -p 8000:8000 \
   -v pulse-config:/config \
   -v pulse-data:/data \
-  ghcr.io/jeff7712/pulse:latest
+  ghcr.io/jeff7712/pulse:2.0.3
 ```
 
 Open `http://localhost:8000`. For logs in the foreground, omit `-d` (add `--rm` if you do not need a named container).
@@ -76,7 +74,7 @@ docker run --rm -it \
   -p 8000:8000 \
   -v pulse-config:/config \
   -v pulse-data:/data \
-  ghcr.io/jeff7712/pulse:latest \
+  ghcr.io/jeff7712/pulse:2.0.3 \
   pulse onboard
 ```
 
@@ -86,7 +84,7 @@ Configure only, then run a **separate** long-lived `docker run` (as above) for `
 docker run --rm -it \
   -v pulse-config:/config \
   -v pulse-data:/data \
-  ghcr.io/jeff7712/pulse:latest \
+  ghcr.io/jeff7712/pulse:2.0.3 \
   pulse configure
 ```
 

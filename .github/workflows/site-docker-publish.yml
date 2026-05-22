@@ -2,12 +2,6 @@ name: Site Docker Publish
 on:
   push:
     branches: [main]
-    paths:
-      - 'site/**'
-      - 'docs/**'
-      - 'scripts/install.sh'
-      - '.dockerignore'
-      - '.github/workflows/site-docker-publish.yml'
   pull_request:
     paths:
       - 'site/**'
@@ -48,8 +42,7 @@ jobs:
         with:
           images: ${{ format('{0}/pulse-site', secrets.DOCKERHUB_USERNAME) }}
           tags: |
-            type=raw,value=latest
-            type=sha,prefix=sha-
+            type=raw,value=0.0.${{ github.run_number }}
       - name: Build and push site image
         uses: docker/build-push-action@v6
         with:

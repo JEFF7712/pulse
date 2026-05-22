@@ -41,11 +41,11 @@ pipx install pulse-agent   # or: uv tool install pulse-agent
 **Docker**
 
 ```bash
-docker pull ghcr.io/jeff7712/pulse:latest
+docker pull ghcr.io/jeff7712/pulse:2.0.3
 
 docker run -d --name pulse -p 8000:8000 \
   -v pulse-config:/config -v pulse-data:/data \
-  ghcr.io/jeff7712/pulse:latest pulse onboard
+  ghcr.io/jeff7712/pulse:2.0.3 pulse onboard
 ```
 
 From a clone: `docker build -t pulse -f Dockerfile .` or `docker compose up --build -d`.
