@@ -11,6 +11,8 @@ on:
       - '.github/workflows/site-docker-publish.yml'
 permissions:
   contents: read
+env:
+  DOCKER_IMAGE: jeff7712/pulse-site
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -34,13 +36,13 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME || 'jeff7712' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
       - name: Generate Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ format('{0}/pulse-site', secrets.DOCKERHUB_USERNAME) }}
+          images: ${{ env.DOCKER_IMAGE }}
           tags: |
             type=raw,value=0.0.${{ github.run_number }}
       - name: Build and push site image
