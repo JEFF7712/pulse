@@ -5,7 +5,7 @@ COPY pyproject.toml README.md LICENSE uv.lock ./
 COPY src ./src
 RUN uv build --wheel -o dist
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV PULSE_CONFIG_DIR=/config \
     PULSE_DATABASE_PATH=/data/pulse.db \
