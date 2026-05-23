@@ -1,4 +1,4 @@
-FROM node:20-alpine AS docs-builder
+FROM node:24-alpine AS docs-builder
 
 WORKDIR /app/site/docs-app
 
