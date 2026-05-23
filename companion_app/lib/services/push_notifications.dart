@@ -139,7 +139,7 @@ class PushNotificationsCoordinator {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings();
     await _local.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: androidInit,
         iOS: darwinInit,
         macOS: darwinInit,
@@ -183,10 +183,10 @@ class PushNotificationsCoordinator {
     final contextId = message.data['context_id'] as String?;
 
     await _local.show(
-      message.hashCode,
-      title,
-      body,
-      const NotificationDetails(
+      id: message.hashCode,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannelId,
           _androidChannelName,
