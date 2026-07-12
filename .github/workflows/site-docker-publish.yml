@@ -11,8 +11,9 @@ on:
       - '.github/workflows/site-docker-publish.yml'
 permissions:
   contents: read
+  packages: write
 env:
-  DOCKER_IMAGE: jeff7712/pulse-site
+  DOCKER_IMAGE: ghcr.io/jeff7712/pulse-site
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -22,11 +23,12 @@ jobs:
         uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME || 'jeff7712' }}
-          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate Docker metadata
         id: meta
         uses: docker/metadata-action@v6
