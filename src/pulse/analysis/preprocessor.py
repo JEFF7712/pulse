@@ -453,7 +453,7 @@ class EventPreprocessor:
         omit_amounts = any(
             bool(
                 e.data.get("omit_amount_in_summary")
-                or e.data.get("omit_amount_in_digest")  # legacy Plaid event field
+                or e.data.get("omit_amount_in_digest")  # legacy Plaid field name
             )
             for e in events
         )

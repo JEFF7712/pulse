@@ -217,4 +217,4 @@ Read https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html and follow ev
 
 Output lives under **`vault_path`** / **`PULSE_VAULT_PATH`**. Common patterns: dedicated folder as its own vault; subfolder inside an existing vault; or symlink (mobile/sync may not handle symlinks well). First vault use may create **`README.md`** (structure + reserved headings) and **`Meta/AGENTS.md`**.
 
-Discovery writes **patterns** under `02-Insights/patterns/`; older installs may still have legacy `01-Daily/` files from removed daily digests.
+Discovery writes **patterns** under `02-Insights/patterns/`.

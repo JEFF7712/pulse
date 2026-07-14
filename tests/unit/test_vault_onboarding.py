@@ -10,7 +10,7 @@ def test_ensure_vault_onboarding_creates_readme_and_agents(tmp_path: Path) -> No
     agents = tmp_path / "Meta" / "AGENTS.md"
     assert readme.is_file()
     assert agents.is_file()
-    assert "01-Daily" in readme.read_text(encoding="utf-8")
+    assert "02-Insights" in readme.read_text(encoding="utf-8")
     assert "Reserved sections" in readme.read_text(encoding="utf-8")
     assert "Meta/AGENTS.md" in readme.read_text(encoding="utf-8")
     assert "reserved" in agents.read_text(encoding="utf-8").lower()

@@ -16,7 +16,7 @@ from pulse.services.correction_interpreter import (
     LLMCorrectionInterpreter,
 )
 
-# YYYY-MM-DD alone was used for removed digest-file corrections; reject without LLM/vault work.
+# YYYY-MM-DD alone was used for removed per-day file corrections; reject without LLM/vault work.
 _LEGACY_DATE_ONLY_CONTEXT_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _PROFILE_SECTION = "## Learned Corrections"
 _ROUTINES_SECTION = "## Correction Updates"

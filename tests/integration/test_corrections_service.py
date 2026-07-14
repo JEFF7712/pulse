@@ -67,7 +67,7 @@ class RaisingLLM:
 
 
 def test_correction_service_iso_date_context_records_needs_review(tmp_path):
-    """YYYY-MM-DD contexts were for legacy daily digests; they are no longer supported."""
+    """YYYY-MM-DD-only contexts were legacy; they are no longer supported."""
 
     async def exercise() -> None:
         from pulse.analysis.vault_memory import VaultMemory

@@ -57,9 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed (breaking)
 
-- Daily digest pipeline (scheduled job, CLI `digest`, MCP digest tools, vault `01-Daily` output, digest-only modules).
+- Scheduled per-day vault markdown pipeline (job, CLI subcommand, MCP tools, vault day-folder output, related-only modules).
 - Morning briefing scheduled job.
-- Companion HTTP routes `GET /api/digests/latest` and `GET /api/digests/{date}`.
+- Companion HTTP routes for latest and date-keyed per-day vault markdown.
 - Correction targets that are only a calendar date (`YYYY-MM-DD`); use `pattern:slug`, `profile`, or `routines`.
 
 ### Added
@@ -71,12 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- E2E operator-flow test targets `/actions/discover` when no LLM is configured (digest route removed).
+- E2E operator-flow test targets `/actions/discover` when no LLM is configured (legacy per-day route removed).
 
 ### Changed
 
-- Config key `summarization_model_for_digest` renamed to `summarization_model_for_source_summaries`.
-- Plaid and event payloads prefer `omit_amounts_in_summary` / `omit_amount_in_summary` (legacy digest-era keys still accepted).
+- Source summarization model setting renamed to `summarization_model_for_source_summaries` (legacy key no longer read).
+- Plaid and event payloads prefer `omit_amounts_in_summary` / `omit_amount_in_summary` (legacy alternate keys still accepted).
 - Flutter companion app loads patterns via the new insights API and sends corrections with `pattern:{id}` contexts.
 
 ## [1.0.0] - 2026-04-08

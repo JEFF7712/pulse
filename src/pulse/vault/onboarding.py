@@ -19,8 +19,6 @@ Configure the path with `vault_path` in `pulse.toml` or the **`PULSE_VAULT_PATH`
 | `04-Config/` | `profile.md` and other operator-facing notes |
 | `Meta/` | This README’s companion: **`AGENTS.md`** (rules for AI tools) |
 
-Older installs may still have an `01-Daily/` folder from legacy daily digests; Pulse no longer writes there.
-
 Some folders appear only after Pulse has generated content (for example patterns after discovery).
 
 ## What Pulse updates automatically
