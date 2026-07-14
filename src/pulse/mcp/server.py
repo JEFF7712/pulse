@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from mcp.server.fastmcp import Context, FastMCP
 
+from pulse.analysis.vault_memory import VaultMemory
 from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
 from pulse.mcp.context import PulseContext, open_pulse_context
@@ -235,6 +236,49 @@ async def pulse_connector_status(ctx: Context = None) -> str:
                 }
 
     return json.dumps(statuses, indent=2)
+
+
+def _vault(pulse_ctx: PulseContext) -> VaultMemory:
+    return VaultMemory(pulse_ctx.vault_path)
+
+
+@mcp.tool()
+async def pulse_vault_read(path: str, ctx: Context = None) -> str:
+    """Read a markdown note from the vault (returns '' if absent)."""
+    try:
+        return (
+            _vault(_get_pulse_ctx(ctx)).read_note(path) or f"(empty or missing: {path})"
+        )
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool()
+async def pulse_vault_list(ctx: Context = None) -> str:
+    """List all markdown notes in the vault (relative paths)."""
+    return json.dumps(_vault(_get_pulse_ctx(ctx)).list_notes(), indent=2)
+
+
+@mcp.tool()
+async def pulse_vault_write(path: str, content: str, ctx: Context = None) -> str:
+    """Create or overwrite a markdown note in the vault."""
+    try:
+        p = _vault(_get_pulse_ctx(ctx)).write_note(path, content)
+        return f"Wrote {p}."
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool()
+async def pulse_vault_append_section(
+    path: str, heading: str, body: str, ctx: Context = None
+) -> str:
+    """Upsert a '## heading' section with the given body in a vault note."""
+    try:
+        p = _vault(_get_pulse_ctx(ctx)).append_section(path, heading, body)
+        return f"Updated section {heading!r} in {p}."
+    except ValueError as exc:
+        return f"Error: {exc}"
 
 
 # --- Resources ---

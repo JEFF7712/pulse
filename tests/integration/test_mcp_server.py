@@ -209,3 +209,51 @@ def test_pulse_query_events_trims_by_default_and_supports_full(tmp_path: Path) -
             assert {e["source"] for e in filtered["events"]} == {"gmail", "github"}
 
     asyncio.run(_run())
+
+
+def test_pulse_vault_tools_round_trip_list_append_and_reject_unsafe(
+    tmp_path: Path,
+) -> None:
+    """Vault tools write/read round-trip, list, append section, and reject unsafe paths."""
+    from pulse.mcp import server as server_module
+
+    async def _run() -> None:
+        async with open_pulse_context(
+            db_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+        ) as pulse_ctx:
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            wrote = await server_module.pulse_vault_write(
+                path="notes/today.md",
+                content="# Today\n\nIntro.\n",
+                ctx=ctx,
+            )
+            assert "Wrote" in wrote
+
+            content = await server_module.pulse_vault_read(
+                path="notes/today.md", ctx=ctx
+            )
+            assert content == "# Today\n\nIntro.\n"
+
+            listed = json.loads(await server_module.pulse_vault_list(ctx=ctx))
+            assert "notes/today.md" in listed
+
+            updated = await server_module.pulse_vault_append_section(
+                path="notes/today.md",
+                heading="## Log",
+                body="- did a thing",
+                ctx=ctx,
+            )
+            assert "Updated section" in updated
+            after = await server_module.pulse_vault_read(path="notes/today.md", ctx=ctx)
+            assert "## Log" in after
+            assert "- did a thing" in after
+
+            unsafe = await server_module.pulse_vault_read(path="../escape.md", ctx=ctx)
+            assert unsafe.startswith("Error:")
+            assert "Unsafe vault path" in unsafe
+
+    asyncio.run(_run())
