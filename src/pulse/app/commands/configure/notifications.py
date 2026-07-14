@@ -1,4 +1,4 @@
-"""``pulse configure → Notifications`` hub (Telegram, SMTP, webhooks, FCM, …)."""
+"""``pulse configure → Notifications`` hub (Telegram, SMTP, webhooks, …)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .toml_io import _save_pulse_settings
 
 
 def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
-    """● row hint: outbound channel ready, corrections secret set, or FCM partially configured."""
+    """● row hint: outbound channel ready or corrections secret set."""
 
     def g(key: str) -> str:
         return (env.get(key) or "").strip()
@@ -39,8 +39,6 @@ def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
         return bool(to_list)
     if provider_id == "corrections":
         return bool(g("PULSE_CORRECTIONS_WEBHOOK_SECRET"))
-    if provider_id == "fcm":
-        return bool(g("PULSE_FCM_SERVICE_ACCOUNT_PATH"))
     return False
 
 

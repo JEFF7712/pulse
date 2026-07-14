@@ -229,18 +229,6 @@ _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool
             ),
         ],
     ),
-    (
-        "fcm",
-        "FCM",
-        "🤝",
-        [
-            (
-                "PULSE_FCM_SERVICE_ACCOUNT_PATH",
-                "Path to Firebase service account JSON (FCM push)",
-                False,
-            ),
-        ],
-    ),
 ]
 
 _CONFIGURE_NOTIFICATION_FIELDS: list[tuple[str, str, bool]] = [
@@ -401,7 +389,7 @@ _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
     ),
     (
         "notifications",
-        "🔔 Notifications (Telegram, SMTP, webhooks, FCM, …)",
+        "🔔 Notifications (Telegram, SMTP, webhooks, …)",
     ),
     (
         "model",

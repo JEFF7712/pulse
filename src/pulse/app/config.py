@@ -73,7 +73,6 @@ class PulseConfig(BaseModel):
     oura_personal_access_token: str | None = None
     notion_token: str | None = None
     linear_api_key: str | None = None
-    fcm_service_account_path: str | None = None
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None

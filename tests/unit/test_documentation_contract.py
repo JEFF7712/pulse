@@ -82,7 +82,6 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "share the corrections pipeline",
     "Same **`load_config()`**",
     "One configured role can cover both summarization and discovery if the other is omitted.",
-    "PULSE_FCM_SERVICE_ACCOUNT_PATH",
     "preferred `message_text`",
     "`message` is accepted as a compatibility alias when `message_text` is absent",
 ]
