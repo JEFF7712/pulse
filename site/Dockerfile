@@ -14,7 +14,7 @@ FROM nginx:alpine
 COPY site/nginx.conf /etc/nginx/nginx.conf
 COPY site/index.html /usr/share/nginx/html/index.html
 COPY scripts/install.sh /usr/share/nginx/html/install.sh
-COPY --from=docs-builder /app/site/docs-app/docs/.vitepress/dist/pulse-mark.svg /usr/share/nginx/html/pulse-mark.svg
+COPY site/pulse-mark.svg /usr/share/nginx/html/pulse-mark.svg
 COPY --from=docs-builder /app/site/docs-app/docs/.vitepress/dist/favicon.ico /usr/share/nginx/html/favicon.ico
 COPY --from=docs-builder /app/site/docs-app/docs/.vitepress/dist/ /usr/share/nginx/html/docs/
 

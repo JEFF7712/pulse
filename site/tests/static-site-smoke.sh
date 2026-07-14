@@ -62,7 +62,10 @@ grep -q '^FROM nginx:alpine$' Dockerfile
 grep -q '^COPY site/nginx.conf /etc/nginx/nginx.conf$' Dockerfile
 grep -q '^COPY site/index.html /usr/share/nginx/html/index.html$' Dockerfile
 grep -q '^COPY scripts/install.sh /usr/share/nginx/html/install.sh$' Dockerfile
-grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/pulse-mark\.svg /usr/share/nginx/html/pulse-mark\.svg$' Dockerfile
+grep -q '^COPY site/pulse-mark\.svg /usr/share/nginx/html/pulse-mark\.svg$' Dockerfile
+[[ -f pulse-mark.svg ]]
+grep -q 'src="pulse-mark\.svg"' index.html
+grep -q 'href="pulse-mark\.svg"' index.html
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/favicon\.ico /usr/share/nginx/html/favicon\.ico$' Dockerfile
 grep -q '^COPY --from=docs-builder /app/site/docs-app/docs/\.vitepress/dist/ /usr/share/nginx/html/docs/$' Dockerfile
 grep -q '^EXPOSE 8080$' Dockerfile
