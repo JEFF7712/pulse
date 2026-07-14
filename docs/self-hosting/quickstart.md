@@ -154,19 +154,19 @@ uv run uvicorn --app-dir src pulse.app.main:create_app --factory
 
 ## 1. Configure
 
-If you use Google, Spotify, Microsoft 365, GitHub, GitLab, or Plaid, create OAuth (and Plaid) apps first so client IDs and secrets are ready. Oura: personal access token or OAuth app.
+If you use Google, Spotify, GitHub, or Plaid, create OAuth (and Plaid) apps first so client IDs and secrets are ready. Oura: personal access token or OAuth app.
 
 ```bash
 pulse configure
 ```
 
-**Menu:** Core (database, vault, timezone), **Connectors** (per-source creds + OAuth/Plaid/Oura when ●), Notifications, **Model** (provider API keys + LLM roles in TOML), Full wizard. TTY: arrows + Enter; else digits `0`–`5` (`0` = Done). **`PULSE_*`** overrides top-level TOML when set in the environment.
+**Menu:** Core (database, vault, timezone), **Connectors** (per-source creds + OAuth/Plaid/Oura when ●), Notifications, Full wizard. TTY: arrows + Enter; else digits. **`PULSE_*`** overrides top-level TOML when set in the environment.
 
 **Config file:** Prefer **`.config/pulse.toml`** or repo-root **`pulse.toml`**. Override with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`**. Start from `pulse.toml.example`; connectors default to disabled until you enable them.
 
-There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (localhost callbacks on `8888`, `8890`–`8894` as applicable). Complete this **before** `pulse init` if the first pull should hit those APIs. Notion, Linear (API key), browser, and feeds skip browser OAuth here.
+There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (localhost callbacks on `8888`, `8891`, `8893`, `8894` as applicable). Complete this **before** `pulse init` if the first pull should hit those APIs. Browser history skips browser OAuth here.
 
-**Shortcut:** `pulse onboard` walks through the same configure areas as [cmd]pulse configure[/] (core → connectors → notifications → model), then runs connector OAuth / Plaid / Oura when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
+**Shortcut:** `pulse onboard` walks through the same configure areas as [cmd]pulse configure[/] (core → connectors → notifications), then runs connector OAuth / Plaid / Oura when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
 
 ## 2. `pulse init`
 
@@ -174,7 +174,7 @@ There is no separate `pulse auth` command. In **Configure → Connectors**, open
 pulse init
 ```
 
-Ensures vault **`README.md`** and **`Meta/AGENTS.md`** exist (created once if missing), writes **`04-Config/profile.md`**, runs initial pulls, optional discovery when LLM + notification config allows.
+Ensures vault **`README.md`** and **`Meta/AGENTS.md`** exist (created once if missing), writes **`04-Config/profile.md`**, runs initial pulls and day aggregation.
 
 Interactive **TTY** profile step: copy the plain-text export prompt (between rules, no box borders), paste the assistant’s reply, then type **`---END---`** on its own line and press Enter (or finish with **Ctrl-D** / **Ctrl-Z**+Enter). Use **`-f`** / **`--profile-text`** to skip prompts.
 
@@ -184,28 +184,27 @@ Interactive **TTY** profile step: copy the plain-text export prompt (between rul
 pulse run
 ```
 
-Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull, Discover, Test Telegram (same pipelines as CLI where noted).
+Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull and Test Telegram (same pipelines as CLI where noted).
 
 ## 4. Inspect
 
 ```bash
 pulse status
-pulse insights
 ```
 
-`status` — DB path, event counts, cursors. `insights` — discovery output; prompts you to run discovery first if empty.
+`status` — DB path, event counts, cursors.
 
 | Command | Purpose |
 | --- | --- |
 | `pulse pull [sources…]` | Immediate connector pulls |
-| `pulse discover [--cadence …]` | Manual discovery pass |
+| `pulse discover [--date …]` | Manual day aggregation |
 | `pulse test-telegram` | One-off Telegram test |
 
 Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
-Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_discovery`, `pulse_insights`, `pulse_correct`, …) against the same database and vault as this install.
+Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_ingest_event`, `pulse_connector_status`, …) against the same database and vault as this install.
 
 **Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
 
@@ -216,5 +215,3 @@ Read https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html and follow ev
 ## Vault (Obsidian)
 
 Output lives under **`vault_path`** / **`PULSE_VAULT_PATH`**. Common patterns: dedicated folder as its own vault; subfolder inside an existing vault; or symlink (mobile/sync may not handle symlinks well). First vault use may create **`README.md`** (structure + reserved headings) and **`Meta/AGENTS.md`**.
-
-Discovery writes **patterns** under `02-Insights/patterns/`.

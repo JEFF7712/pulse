@@ -2,36 +2,33 @@
 
 ## What is Pulse?
 
-Self-hosted **personal intelligence agent**: ingests email, calendar, purchases, health, media, and more; runs analysis and discovery; writes an **Obsidian-compatible markdown vault**; pushes insights via **notifications** (Telegram, ntfy, webhooks, email, and others). **No app to open, no daily check-ins** — your data stays on your stack.
+Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, purchases, health, media, and more) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others) cover operational alerts. **No app to open, no daily check-ins** — your data stays on your stack.
 
 ## How it works
 
 ```
-Data Sources (Gmail, Calendar, Notion, Linear, Oura, …)
+Data Sources (Gmail, Calendar, GitHub, Oura, …)
         ↓
   Event Store (SQLite)
         ↓
-  Analysis Engine ──→ Vault (Obsidian-compatible Markdown)
+  Vault (Obsidian-compatible Markdown)
         ↓
-  Notifications (Telegram, ntfy, …)
-        ↕
-  User Corrections
+  Your agent via MCP (Claude Code, Cursor, …)
 ```
 
 1. **Connectors** pull from your accounts into timestamped events.
 2. **Event store** persists everything locally.
-3. **Analysis engine** runs discovery and writes patterns.
-4. **Vault** is human-readable markdown.
-5. **Notifications** deliver insights; **corrections** close the loop.
+3. **Vault** is human-readable markdown.
+4. **MCP** exposes the same store to your coding agent for reasoning.
 
 **Two ways to run:** standalone service (`pulse run`, FastAPI + scheduler) or **[MCP](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html)** so coding agents use the same store and tools.
 
 ## Design principles
 
-1. **Push-first** — insights come to you.
+1. **MCP-first** — your agent reasons; Pulse holds the context.
 2. **Low-friction integration** — connect sources quickly.
 3. **Transparency** — vault markdown you can read and diff.
-4. **Extensible** — connectors, LLMs, notification channels.
+4. **Extensible** — connectors and notification channels.
 5. **Self-hosted** — your hardware, your data.
 
 ## Quick Start
@@ -78,5 +75,3 @@ To have an **AI agent install and wire MCP for you**, use the one-liner in [Self
 
 - **[Contributing](https://github.com/JEFF7712/pulse/blob/main/CONTRIBUTING.md)** — dev environment, tests, project layout.
 - **[Releases and versioning](https://pulseagent.dev/docs/operations/releases.html)** — semver, tags, PyPI.
-
-**Mobile companion (optional):** Flutter app under [`companion_app/`](https://github.com/JEFF7712/pulse/blob/main/companion_app/README.md); enable **`[connectors.companion]`** on the server.

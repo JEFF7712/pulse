@@ -81,10 +81,6 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 | --- | --- |
 | `pulse_events_for_day` | Query events for a specific date, optionally filtered by source |
 | `pulse_ingest_event` | Manually push an event into the store |
-| `pulse_correct` | Record a correction or feedback about an insight |
-| `pulse_discovery` | Run LLM insight discovery for a cadence and date |
-| `pulse_insights` | List discovery patterns from the database |
-| `pulse_read_pattern` | Read a pattern markdown file from the vault |
 | `pulse_connector_status` | Check sync state of all connectors |
 
 ### MCP resources
@@ -103,4 +99,4 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 ## Reference
 
 - Human-oriented walkthrough: [Self-Hosting Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html).
-- Config, env, discovery/corrections behavior: [Configuration Reference](https://pulseagent.dev/docs/reference/configuration.html) (see *App, CLI, MCP* and *Runtime notes*).
+- Config and env: [Configuration Reference](https://pulseagent.dev/docs/reference/configuration.html) (see *App, CLI, MCP* and *Runtime notes*).
