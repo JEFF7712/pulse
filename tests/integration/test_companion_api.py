@@ -92,6 +92,38 @@ def test_get_insight_unknown_returns_404(tmp_path):
     assert response.status_code == 404
 
 
+def test_get_insights_omits_rows_with_missing_pattern_files(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    async def seed():
+        async with connect_db(tmp_path / "test.db") as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            await analytics.upsert_insight(
+                id="missing-file",
+                title="Missing file",
+                status="active",
+                confidence=0.9,
+                first_seen="2026-01-01",
+                last_seen="2026-01-02",
+                vault_path="02-Insights/patterns/missing-file.md",
+            )
+
+    asyncio.run(seed())
+
+    app = _build_test_app(tmp_path)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/insights",
+        headers={"X-Pulse-Token": "test-token"},
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_post_correction_records_and_returns_id(tmp_path):
     app = _build_test_app(tmp_path)
     client = TestClient(app)

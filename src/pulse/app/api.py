@@ -50,6 +50,20 @@ def _safe_insight_id(insight_id: str) -> str:
     return cleaned
 
 
+def _filter_rows_with_existing_vault_files(
+    vault_root: Path, rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            path = _safe_vault_file(vault_root, str(row["vault_path"]))
+        except HTTPException:
+            continue
+        if path.is_file():
+            filtered.append(row)
+    return filtered
+
+
 def build_api_router(
     get_settings: Callable[[], PulseConfig],
     auth_dependency: Any,
@@ -66,7 +80,8 @@ def build_api_router(
         async with connect_db(settings.database_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
-            return await analytics.list_insights(status=status)
+            rows = await analytics.list_insights(status=status)
+        return _filter_rows_with_existing_vault_files(Path(settings.vault_path), rows)
 
     @router.get("/insights/{insight_id}")
     async def get_insight_with_body(

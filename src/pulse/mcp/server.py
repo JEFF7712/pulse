@@ -60,6 +60,19 @@ def _today_for_timezone(timezone: str) -> str:
     return datetime.now(ZoneInfo(timezone)).date().isoformat()
 
 
+def _vault_file_exists(vault_root: str, vault_rel: str) -> bool:
+    rel = Path(vault_rel)
+    if rel.is_absolute() or ".." in rel.parts:
+        return False
+    root = Path(vault_root).resolve()
+    full = (root / rel).resolve()
+    try:
+        full.relative_to(root)
+    except ValueError:
+        return False
+    return full.is_file()
+
+
 @mcp.tool()
 async def pulse_events_for_day(
     day: str | None = None, source: str | None = None, ctx: Context = None
@@ -221,7 +234,11 @@ async def pulse_insights(
     pulse_ctx = _get_pulse_ctx(ctx)
     await bootstrap_schema(pulse_ctx._db)
     analytics = AnalyticsRepository(pulse_ctx._db)
-    rows = await analytics.list_insights(status=status)
+    rows = [
+        row
+        for row in await analytics.list_insights(status=status)
+        if _vault_file_exists(pulse_ctx.vault_path, str(row["vault_path"]))
+    ]
     if not rows:
         return (
             "No insights found."
