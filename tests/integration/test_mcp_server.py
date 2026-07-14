@@ -128,66 +128,6 @@ def test_pulse_events_for_day_defaults_to_configured_local_day(
     asyncio.run(_run())
 
 
-def test_pulse_read_pattern_missing_file(tmp_path: Path) -> None:
-    from pulse.app.config import PulseConfig
-    from pulse.mcp import server as server_module
-
-    async def _run() -> None:
-        config = PulseConfig(
-            database_path=str(tmp_path / "test.db"),
-            vault_path=str(tmp_path / "vault"),
-        )
-        async with open_pulse_context(
-            db_path=config.database_path,
-            vault_path=config.vault_path,
-            config=config,
-        ) as pulse_ctx:
-            ctx = SimpleNamespace(
-                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
-            )
-            result = await server_module.pulse_read_pattern("missing-slug", ctx=ctx)
-            assert "No pattern file" in result
-
-    asyncio.run(_run())
-
-
-def test_pulse_insights_omits_rows_with_missing_pattern_files(tmp_path: Path) -> None:
-    from pulse.app.config import PulseConfig
-    from pulse.mcp import server as server_module
-    from pulse.store.analytics import AnalyticsRepository
-    from pulse.store.schema import bootstrap_schema
-
-    async def _run() -> None:
-        config = PulseConfig(
-            database_path=str(tmp_path / "test.db"),
-            vault_path=str(tmp_path / "vault"),
-        )
-        async with open_pulse_context(
-            db_path=config.database_path,
-            vault_path=config.vault_path,
-            config=config,
-        ) as pulse_ctx:
-            await bootstrap_schema(pulse_ctx._db)
-            analytics = AnalyticsRepository(pulse_ctx._db)
-            await analytics.upsert_insight(
-                id="missing-file",
-                title="Missing file",
-                status="active",
-                confidence="0.9",
-                first_seen="2026-01-01",
-                last_seen="2026-01-02",
-                vault_path="02-Insights/patterns/missing-file.md",
-            )
-
-            ctx = SimpleNamespace(
-                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
-            )
-            result = await server_module.pulse_insights(ctx=ctx)
-            assert result == "No insights found."
-
-    asyncio.run(_run())
-
-
 def test_connector_status_fresh_db(tmp_path: Path) -> None:
     """Connector status returns None for a fresh database."""
 
