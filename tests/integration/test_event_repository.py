@@ -167,3 +167,98 @@ def test_event_repository_includes_preexisting_offset_rows_in_local_day_window(
             assert [event.id for event in events] == ["legacy-offset"]
 
     asyncio.run(exercise())
+
+
+def _ev(id_, ts, source, etype, data):
+    from pulse.domain.events import Event
+
+    return Event(id=id_, timestamp=ts, source=source, event_type=etype, data=data)
+
+
+def test_query_events_filters_by_range_source_text_and_paginates(tmp_path):
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    async def exercise() -> None:
+        async with connect_db(tmp_path / "events.db") as db:
+            await bootstrap_schema(db)
+            repo = EventRepository(db)
+
+            await repo.upsert_events(
+                [
+                    _ev(
+                        "a",
+                        datetime(2026, 7, 1, 9, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                        {"subject": "invoice due"},
+                    ),
+                    _ev(
+                        "b",
+                        datetime(2026, 7, 1, 10, tzinfo=UTC),
+                        "github",
+                        "commit",
+                        {"message": "fix bug"},
+                    ),
+                    _ev(
+                        "c",
+                        datetime(2026, 7, 2, 9, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                        {"subject": "lunch"},
+                    ),
+                ]
+            )
+            # range excludes Jul 2
+            got = await repo.query_events(
+                start="2026-07-01T00:00:00+00:00",
+                end="2026-07-02T00:00:00+00:00",
+            )
+            assert [e.id for e in got] == ["b", "a"]  # newest-first
+            # source filter
+            got = await repo.query_events(sources=["gmail"])
+            assert {e.id for e in got} == {"a", "c"}
+            # text filter (case-insensitive substring over serialized data)
+            got = await repo.query_events(text="invoice")
+            assert [e.id for e in got] == ["a"]
+            # pagination
+            page1 = await repo.query_events(limit=1, offset=0)
+            page2 = await repo.query_events(limit=1, offset=1)
+            assert page1[0].id != page2[0].id
+
+    asyncio.run(exercise())
+
+
+def test_count_events_matches_filters(tmp_path):
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    async def exercise() -> None:
+        async with connect_db(tmp_path / "events.db") as db:
+            await bootstrap_schema(db)
+            repo = EventRepository(db)
+
+            await repo.upsert_events(
+                [
+                    _ev(
+                        "a",
+                        datetime(2026, 7, 1, 9, tzinfo=UTC),
+                        "gmail",
+                        "email",
+                        {"x": 1},
+                    ),
+                    _ev(
+                        "b",
+                        datetime(2026, 7, 1, 10, tzinfo=UTC),
+                        "github",
+                        "commit",
+                        {"x": 2},
+                    ),
+                ]
+            )
+            assert await repo.count_events(sources=["gmail"]) == 1
+            assert await repo.count_events() == 2
+
+    asyncio.run(exercise())

@@ -23,6 +23,17 @@ def _normalize_timestamp(timestamp: datetime) -> datetime:
     return timestamp.astimezone(UTC)
 
 
+def _row_to_event(row) -> Event:
+    return Event(
+        id=row[0],
+        timestamp=datetime.fromisoformat(row[1]),
+        source=row[2],
+        event_type=row[3],
+        data=json.loads(row[4]),
+        metadata=json.loads(row[5]),
+    )
+
+
 class EventRepository:
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
@@ -88,14 +99,59 @@ class EventRepository:
         rows = await cursor.fetchall()
         await cursor.close()
 
-        return [
-            Event(
-                id=row[0],
-                timestamp=datetime.fromisoformat(row[1]),
-                source=row[2],
-                event_type=row[3],
-                data=json.loads(row[4]),
-                metadata=json.loads(row[5]),
-            )
-            for row in rows
-        ]
+        return [_row_to_event(row) for row in rows]
+
+    def _build_filters(self, start, end, sources, text):
+        clauses: list[str] = []
+        params: list = []
+        if start is not None:
+            clauses.append("unixepoch(timestamp) >= unixepoch(?)")
+            params.append(start)
+        if end is not None:
+            clauses.append("unixepoch(timestamp) < unixepoch(?)")
+            params.append(end)
+        if sources:
+            placeholders = ",".join("?" for _ in sources)
+            clauses.append(f"source IN ({placeholders})")
+            params.extend(sources)
+        if text:
+            clauses.append("(lower(data) LIKE ? OR lower(event_type) LIKE ?)")
+            like = f"%{text.lower()}%"
+            params.extend([like, like])
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        return where, params
+
+    async def query_events(
+        self,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        sources: list[str] | None = None,
+        text: str | None = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> list[Event]:
+        where, params = self._build_filters(start, end, sources, text)
+        cursor = await self._db.execute(
+            "SELECT id, timestamp, source, event_type, data, metadata FROM events"
+            + where
+            + " ORDER BY unixepoch(timestamp) DESC, id ASC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [_row_to_event(row) for row in rows]
+
+    async def count_events(
+        self,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        sources: list[str] | None = None,
+        text: str | None = None,
+    ) -> int:
+        where, params = self._build_filters(start, end, sources, text)
+        cursor = await self._db.execute("SELECT COUNT(*) FROM events" + where, params)
+        row = await cursor.fetchone()
+        await cursor.close()
+        return int(row[0])
