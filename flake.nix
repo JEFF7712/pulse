@@ -6,8 +6,14 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         # pyproject requires >=3.12; match nixpkgs’ 3.12 or 3.13 as you prefer
@@ -23,22 +29,56 @@
           pkgs.gtk3
           pkgs.glib
         ];
+        # Flutter/JDK are multi-GB; keep them out of the default shell.
+        companionShell = pkgs.mkShell {
+          packages = [
+            python
+            pkgs.uv
+            pythonPkgs.venvShellHook
+            pkgs.flutter
+            jdk
+          ]
+          ++ linuxFlutterNative;
+
+          venvDir = ".venv";
+          JAVA_HOME = "${jdk}";
+
+          postVenvCreation = ''
+            export UV_PYTHON="${python}/bin/python"
+            uv sync --group dev
+          '';
+
+          postShellHook = ''
+            export UV_PYTHON="${python}/bin/python"
+            uv sync --group dev --quiet
+          '';
+
+          buildInputs = with pkgs; [
+            sqlite
+          ];
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
+            [
+              pkgs.stdenv.cc.cc.lib
+              pkgs.sqlite
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+              pkgs.gtk3
+              pkgs.glib
+            ]
+          );
+        };
       in
       {
+        # Default: Python agent only (no Flutter / Android toolchain)
         devShells.default = pkgs.mkShell {
           packages = [
             python
             pkgs.uv
             pythonPkgs.venvShellHook
-            # companion_app/ — dart, flutter, pub, flutter test / run
-            pkgs.flutter
-            jdk
-          ] ++ linuxFlutterNative;
+          ];
 
           venvDir = ".venv";
-
-          # Gradle (Android) uses this; flutter doctor expects a modern JDK
-          JAVA_HOME = "${jdk}";
 
           # Install from uv.lock + pyproject (includes dependency-groups.dev → pytest)
           postVenvCreation = ''
@@ -56,17 +96,15 @@
             sqlite
           ];
 
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
-            [
-              pkgs.stdenv.cc.cc.lib
-              pkgs.sqlite
-            ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
-              pkgs.gtk3
-              pkgs.glib
-            ]
-          );
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.sqlite
+          ];
         };
+
+        # companion_app/ — dart, flutter, pub, flutter test / run, JDK for Android Gradle
+        # Usage: nix develop .#companion
+        devShells.companion = companionShell;
 
         packages.default = pythonPkgs.buildPythonApplication {
           pname = "pulse-agent";
@@ -75,9 +113,20 @@
           src = ./.;
           nativeBuildInputs = [ pythonPkgs.setuptools ];
           propagatedBuildInputs = with pythonPkgs; [
-            rich rich-argparse fastapi pydantic aiosqlite apscheduler httpx
-            feedparser mcp google-auth-oauthlib google-api-python-client anthropic
-            uvicorn plaid-python
+            rich
+            rich-argparse
+            fastapi
+            pydantic
+            aiosqlite
+            apscheduler
+            httpx
+            feedparser
+            mcp
+            google-auth-oauthlib
+            google-api-python-client
+            anthropic
+            uvicorn
+            plaid-python
           ];
         };
 
