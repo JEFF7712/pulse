@@ -126,6 +126,10 @@ grep -q 'most focused' <<<"$html"
 grep -q 'Every observation lands as readable notes' <<<"$html"
 grep -q 'Obsidian' <<<"$html"
 grep -q 'Together they turn scattered signals into unique and actionable insights' <<<"$html"
+# Connectors perf: no multi-layer SVG drop-shadow on push glow; pause wiring present
+! grep -q 'drop-shadow(0 0 48px rgba(74, 222, 128' index.html
+grep -q 'is-flow-paused' index.html
+grep -q 'animation-play-state: paused' index.html
 grep -q 'Self-hosted, readable, and under your control\.' <<<"$html"
 [[ "$(grep -o '<h3>' <<<"$html" | wc -l | tr -d ' ')" -eq 4 ]]
 grep -q '<h3>The Problem</h3>' <<<"$html"
