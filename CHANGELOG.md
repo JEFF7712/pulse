@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Pulse is being refocused as an **MCP-first personal-data context layer**: it ingests a curated
+set of high-signal sources and exposes them to your own agent, which does the reasoning. Pulse no
+longer calls an LLM and needs no LLM API key. This release is the first phase (subtractive).
+
+### Removed
+
+- **Mobile companion app:** the Flutter `companion_app/`, its connector, REST API, token auth, and the FCM push / device-token store (all mobile-only).
+- **Low-yield connectors:** Microsoft mail & calendar, GitLab, RSS feeds, Linear, Notion (duplicates of, or lower-signal than, the retained sources).
+- **Bespoke analysis/discovery engine:** the LLM discovery pipeline, prompts, and source/event summarizers.
+- **LLM-powered corrections subsystem:** the corrections service, interpreter, webhook, and stores (a feedback loop for the removed discovery engine).
+- **LLM provider layer:** the entire `pulse/llm/` (Anthropic/OpenAI/Gemini) surface, the `[llm]` config roles, LLM API-key settings, and the `anthropic` / `feedparser` dependencies.
+- **Reasoning-era MCP tools:** `pulse_discovery`, `pulse_insights`, `pulse_read_pattern`, `pulse_correct`.
+
+### Changed
+
+- **Connectors** curated to a core spine (Gmail, Calendar, GitHub, Browser) enabled by default, with Spotify, YouTube, Plaid, and Oura available but off by default.
+- **`pulse discover`** is now aggregation-only (deterministic daily stats), with no LLM step.
+- **Nix flake** drops the Flutter/JDK companion devShell.
+
 ## [2.0.3] - 2026-04-10
 
 ### Added

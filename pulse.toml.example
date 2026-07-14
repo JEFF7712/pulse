@@ -1,18 +1,25 @@
 # Pulse configuration — run `pulse configure` for interactive setup.
 # See docs/reference/configuration.md for all options.
+#
+# Pulse is MCP-first: it ingests your data and exposes it to your own agent
+# (Claude Code, Cursor, etc.) over the `pulse-mcp` server. Pulse does not call
+# an LLM itself, so no LLM API key is needed here.
 
 timezone = "America/Chicago"
 
-# When true, send one alert per failing scheduler job (discovery, aggregation, connector pulls)
-# at most every `job_failure_alert_cooldown` per job — requires Telegram, ntfy, Pushover, etc.
+# Send one alert per failing scheduler job (aggregation, connector pulls) at most
+# every `job_failure_alert_cooldown` per job — requires Telegram, ntfy, Pushover, etc.
 # notify_on_job_failure = false
 # job_failure_alert_cooldown = "6h"
-# notify_on_corrections_backlog = false
-# corrections_backlog_alert_cooldown = "12h"
 
+# OAuth credentials for the Google connectors (gmail, calendar).
 google_client_id = ""
 google_client_secret = ""
-anthropic_api_key = ""
+# OAuth credentials for the GitHub connector.
+github_client_id = ""
+github_client_secret = ""
+
+# --- Core spine (enabled by default) ---
 
 [connectors.gmail]
 enabled = true
@@ -22,16 +29,32 @@ poll_interval = "15m"
 enabled = true
 poll_interval = "30m"
 
-# LLM roles — provider defaults to "anthropic" when anthropic_api_key is set.
-# If omitted, corrections reuse [llm.discovery].
-# [llm]
-# provider = "anthropic"
-#
-# [llm.summarization]
-# model = "claude-haiku-4-5-20251001"
-#
-# [llm.discovery]
-# model = "claude-sonnet-4-6"
-#
-# [llm.corrections]
-# model = "claude-sonnet-4-6"
+[connectors.github]
+enabled = true
+poll_interval = "30m"
+
+[connectors.browser]
+enabled = true
+poll_interval = "15m"
+browser = "firefox"   # or "chrome"
+
+# --- Optional sources (off by default; enable the ones you use) ---
+
+[connectors.youtube]
+enabled = false
+poll_interval = "1h"
+
+[connectors.spotify]
+enabled = false
+poll_interval = "30m"
+supplementary_interval = "6h"
+
+[connectors.plaid]
+enabled = false
+poll_interval = "6h"
+omit_amounts_in_digest = false
+
+# Health/sleep. Ready for when you add a wearable.
+[connectors.oura]
+enabled = false
+poll_interval = "6h"
