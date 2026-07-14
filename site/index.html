@@ -906,26 +906,26 @@
         z-index: 0;
         background: radial-gradient(
           circle at 50% 50%,
-          rgba(74, 222, 128, 0.22) 0%,
-          rgba(74, 222, 128, 0.07) 38%,
-          transparent 62%
+          rgba(74, 222, 128, 0.18) 0%,
+          rgba(74, 222, 128, 0.05) 42%,
+          transparent 68%
         );
-        transform: scale(2.15);
+        transform: scale(1.15);
         opacity: 0;
         pointer-events: none;
       }
 
       .source-item:hover::before {
-        animation: connectorPulseIn 0.78s var(--ease-out-expo) forwards;
+        animation: connectorPulseIn 0.45s var(--ease-out-expo) forwards;
       }
 
       @keyframes connectorPulseIn {
         0% {
-          transform: scale(2.15);
-          opacity: 0.42;
+          transform: scale(1.15);
+          opacity: 0.35;
         }
         100% {
-          transform: scale(0.2);
+          transform: scale(0.85);
           opacity: 0;
         }
       }
@@ -963,9 +963,7 @@
         width: 1.5rem;
         height: 1.5rem;
         flex-shrink: 0;
-        transition:
-          filter var(--t-hover) var(--ease-out-expo),
-          transform var(--t-hover) var(--ease-out-expo);
+        transition: transform var(--t-hover) var(--ease-out-expo);
       }
 
       .source-item:hover .source-icon {
@@ -973,11 +971,7 @@
         opacity: 1;
         transform: scale(1.08);
         background: rgba(74, 222, 128, 0.06);
-        box-shadow: 0 0 24px rgba(74, 222, 128, 0.08);
-      }
-
-      .source-item:hover .source-icon svg {
-        filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.35));
+        box-shadow: 0 0 18px rgba(74, 222, 128, 0.12);
       }
 
       .source-item:hover .source-name {
@@ -1006,10 +1000,6 @@
         transform: scale(1.04);
         background: rgba(196, 191, 184, 0.04);
         box-shadow: none;
-      }
-
-      .source-item.coming-soon:hover .source-icon svg {
-        filter: none;
       }
 
       .source-item.coming-soon:hover .source-name {
