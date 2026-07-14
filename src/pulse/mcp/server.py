@@ -238,8 +238,8 @@ async def pulse_ingest_event(
 
 
 @mcp.tool()
-async def pulse_connector_status(ctx: Context = None) -> str:
-    """Check the sync state of all configured connectors."""
+async def pulse_coverage(ctx: Context = None) -> str:
+    """Per-source coverage: last sync, event count, and freshness."""
     pulse_ctx = _get_pulse_ctx(ctx)
 
     # Get all sources that have ever synced
@@ -257,13 +257,30 @@ async def pulse_connector_status(ctx: Context = None) -> str:
     await count_cursor.close()
     event_counts = dict(count_rows)
 
-    statuses = {}
-    for source, cursor, updated_at in rows:
-        statuses[source] = {
-            "last_sync": cursor,
+    # Freshness: most-recent event timestamp per source
+    fresh_cursor = await pulse_ctx._db.execute(
+        "SELECT source, MAX(timestamp) FROM events GROUP BY source"
+    )
+    fresh_rows = await fresh_cursor.fetchall()
+    await fresh_cursor.close()
+    last_events = dict(fresh_rows)
+
+    def _entry(source: str, *, last_sync, updated_at) -> dict:
+        return {
+            "last_sync": last_sync,
             "updated_at": updated_at,
             "event_count": event_counts.get(source, 0),
+            "last_event": last_events.get(source),
         }
+
+    statuses = {}
+    for source, cursor, updated_at in rows:
+        statuses[source] = _entry(source, last_sync=cursor, updated_at=updated_at)
+
+    # Include sources that have events but no sync state
+    for source in event_counts:
+        if source not in statuses:
+            statuses[source] = _entry(source, last_sync=None, updated_at=None)
 
     # Include enabled pull connectors that have not synced yet
     cfg = pulse_ctx.config
@@ -272,11 +289,7 @@ async def pulse_connector_status(ctx: Context = None) -> str:
             if not cc.enabled:
                 continue
             if name not in statuses:
-                statuses[name] = {
-                    "last_sync": "never",
-                    "updated_at": None,
-                    "event_count": event_counts.get(name, 0),
-                }
+                statuses[name] = _entry(name, last_sync="never", updated_at=None)
 
     return json.dumps(statuses, indent=2)
 
@@ -338,7 +351,7 @@ async def today_events_resource() -> str:
 async def connectors_status_resource() -> str:
     """Current sync state of all connectors."""
     ctx = mcp.get_context()
-    return await pulse_connector_status(ctx=ctx)
+    return await pulse_coverage(ctx=ctx)
 
 
 def main() -> None:

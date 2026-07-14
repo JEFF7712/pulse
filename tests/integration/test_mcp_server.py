@@ -128,16 +128,54 @@ def test_pulse_events_for_day_defaults_to_configured_local_day(
     asyncio.run(_run())
 
 
-def test_connector_status_fresh_db(tmp_path: Path) -> None:
-    """Connector status returns None for a fresh database."""
+def test_pulse_coverage_returns_per_source_counts_and_freshness(
+    tmp_path: Path,
+) -> None:
+    """pulse_coverage returns JSON keyed by source with event_count and last_event."""
+    from pulse.mcp import server as server_module
 
     async def _run() -> None:
         async with open_pulse_context(
             db_path=str(tmp_path / "test.db"),
             vault_path=str(tmp_path / "vault"),
-        ) as ctx:
-            cursor = await ctx.sync_state.load("gmail")
-            assert cursor is None
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="gmail:c1",
+                        timestamp=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "hi"},
+                        metadata={},
+                    ),
+                    Event(
+                        id="gmail:c2",
+                        timestamp=datetime(2026, 7, 1, 11, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "later"},
+                        metadata={},
+                    ),
+                ]
+            )
+            await pulse_ctx.sync_state.save("github", "cursor-abc")
+
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            result = await server_module.pulse_coverage(ctx=ctx)
+            parsed = json.loads(result)
+
+            assert "gmail" in parsed
+            assert parsed["gmail"]["event_count"] == 2
+            assert parsed["gmail"]["last_event"] == "2026-07-01T11:00:00+00:00"
+
+            assert "github" in parsed
+            assert parsed["github"]["last_sync"] == "cursor-abc"
+            assert parsed["github"]["event_count"] == 0
+            assert parsed["github"]["last_event"] is None
 
     asyncio.run(_run())
 
