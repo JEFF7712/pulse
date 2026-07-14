@@ -11,7 +11,6 @@ from mcp.server.fastmcp import Context, FastMCP
 from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
 from pulse.mcp.context import PulseContext, open_pulse_context
-from pulse.services.corrections import build_correction_service
 from pulse.store.analytics import AnalyticsRepository
 from pulse.store.schema import bootstrap_schema
 
@@ -144,26 +143,6 @@ async def pulse_ingest_event(
     await pulse_ctx.events.upsert_events([event])
 
     return f"Event {eid} ingested successfully."
-
-
-@mcp.tool()
-async def pulse_correct(context_id: str, message_text: str, ctx: Context = None) -> str:
-    """Record a correction or feedback about a Pulse insight or vault note.
-
-    Args:
-        context_id: Context ID (e.g. pattern:slug, profile, routines).
-        message_text: The correction text.
-    """
-    pulse_ctx = _get_pulse_ctx(ctx)
-    service = build_correction_service(
-        pulse_ctx.corrections,
-        config=pulse_ctx.config,
-        correction_applications=pulse_ctx.correction_applications,
-        vault_path=pulse_ctx.vault_path,
-    )
-    correction = await service.record_correction(context_id, message_text)
-
-    return f"Correction {correction.id} recorded."
 
 
 @mcp.tool()

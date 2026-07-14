@@ -25,24 +25,21 @@ Some folders appear only after Pulse has generated content (for example patterns
 
 - **Pattern files** — created and updated by discovery; observations and evidence accumulate over time.
 - **`03-Life/routines.md`** — may be rewritten when discovery proposes baseline updates.
-- **Corrections** — when you send a correction (Telegram reply, webhook, or MCP), Pulse may append or patch **only the sections listed below**.
 
 ## Reserved sections (machine edits)
 
-Do not rename these headings if you want corrections and automation to keep working:
+Do not rename these headings if you want automation to keep working:
 
 | File | Heading / field | Used for |
 | --- | --- | --- |
-| `02-Insights/patterns/*.md` | `## User Notes` | Correction text may replace this section |
-| `02-Insights/patterns/*.md` | `**Status:**` line | Status may be updated by corrections |
-| `04-Config/profile.md` | `## Learned Corrections` | Bounded correction summaries |
-| `03-Life/routines.md` | `## Correction Updates` | Bounded correction summaries |
+| `02-Insights/patterns/*.md` | `## User Notes` | Operator commentary Pulse preserves when refreshing patterns |
+| `02-Insights/patterns/*.md` | `**Status:**` line | Pattern status metadata |
 
 Everything else in those files is yours to edit freely; Pulse tries to preserve user-authored body text when it refreshes patterns.
 
 ## Safe to edit
 
-- **`04-Config/profile.md`** — your goals, context, and preferences (keep the reserved heading above if you use corrections).
+- **`04-Config/profile.md`** — your goals, context, and preferences.
 - **Pattern `## User Notes`** — your commentary on each pattern.
 - **Any new notes** you add in this vault — Pulse ignores files and folders it does not manage.
 
@@ -79,7 +76,7 @@ This directory is a **Pulse** knowledge vault (plain Markdown on disk). The huma
 
 ## Operator config
 
-Vault path is set by the operator (`vault_path` / `PULSE_VAULT_PATH`). Pulse MCP and CLI expose events, discovery, patterns, and corrections against this tree.
+Vault path is set by the operator (`vault_path` / `PULSE_VAULT_PATH`). Pulse MCP and CLI expose events, discovery, and patterns against this tree.
 
 ---
 

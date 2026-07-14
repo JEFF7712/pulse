@@ -5,8 +5,6 @@ from dataclasses import dataclass
 import aiosqlite
 
 from pulse.app.config import PulseConfig
-from pulse.store.correction_applications import CorrectionApplicationRepository
-from pulse.store.corrections import CorrectionRepository
 from pulse.store.db import enable_foreign_keys
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
@@ -17,13 +15,11 @@ from pulse.vault.onboarding import ensure_vault_onboarding
 @dataclass
 class PulseContext:
     events: EventRepository
-    corrections: CorrectionRepository
     sync_state: SyncStateRepository
     vault_path: str
     database_path: str
     _db: aiosqlite.Connection
     config: PulseConfig | None = None
-    correction_applications: CorrectionApplicationRepository | None = None
 
     async def close(self) -> None:
         await self._db.close()
@@ -40,8 +36,6 @@ async def open_pulse_context(
     try:
         yield PulseContext(
             events=EventRepository(db),
-            corrections=CorrectionRepository(db),
-            correction_applications=CorrectionApplicationRepository(db),
             sync_state=SyncStateRepository(db),
             vault_path=vault_path,
             database_path=db_path,

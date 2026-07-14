@@ -14,6 +14,7 @@ _OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
 _WIZARD_DEFAULT_ANTHROPIC_SUMM = "claude-haiku-4-5-20251001"
 _WIZARD_DEFAULT_ANTHROPIC_DISC = "claude-sonnet-4-6"
 
+
 def _configure_llm_roles_wizard(
     toml_path: Path,
     *,
@@ -46,7 +47,7 @@ def _configure_llm_roles_wizard(
     ui.step("LLM roles in pulse.toml")
     ui.muted_line(
         "Sets [llm] provider plus [llm.summarization] and [llm.discovery] model ids. "
-        "API keys live in pulse.toml (Model → Provider API keys). Existing [llm.corrections] is kept."
+        "API keys live in pulse.toml (Model → Provider API keys)."
     )
 
     if not sys.stdin.isatty():
@@ -170,15 +171,12 @@ def _configure_llm_roles_wizard(
             return
         disc = d_in.strip() or disc_def
 
-    managed = {"provider", "base_url", "summarization", "discovery", "corrections"}
+    managed = {"provider", "base_url", "summarization", "discovery"}
     new_llm: dict = {}
     for k, v in cur.items():
         if k in managed:
             continue
         new_llm[k] = v
-    corr = cur.get("corrections")
-    if isinstance(corr, dict) and corr:
-        new_llm["corrections"] = dict(corr)
 
     new_summ = dict(summ_blk)
     new_summ["model"] = summ
@@ -199,4 +197,3 @@ def _configure_llm_roles_wizard(
     toml_path.parent.mkdir(parents=True, exist_ok=True)
     toml_path.write_text(_serialize_pulse_toml_document(full))
     ui.success(f"Saved {toml_path}")
-

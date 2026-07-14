@@ -24,7 +24,9 @@ _CONFIG_API_KEY_FIELD = {
 }
 
 
-def _api_key_from_pulse_config(provider: str, pulse_config: PulseConfig | None) -> str | None:
+def _api_key_from_pulse_config(
+    provider: str, pulse_config: PulseConfig | None
+) -> str | None:
     if pulse_config is None:
         return None
     field = _CONFIG_API_KEY_FIELD.get(provider)
@@ -45,7 +47,7 @@ def _resolve_role(llm: LLMConfig, role: LLMRoleConfig | None) -> LLMRoleConfig |
     if not provider:
         raise ValueError(
             "LLM role is missing provider: set [llm] provider in pulse.toml or "
-            "provider on [llm.summarization] / [llm.discovery] / [llm.corrections]."
+            "provider on [llm.summarization] / [llm.discovery]."
         )
     if role.base_url is not None:
         base_url = role.base_url
@@ -106,22 +108,6 @@ def create_llm_provider(
     from pulse.llm.gemini import GeminiProvider
 
     return GeminiProvider(api_key=api_key, model=role_config.model)
-
-
-def create_corrections_provider_from_config(config: PulseConfig) -> LLM | None:
-    """Return the corrections LLM from config using corrections-specific fallback."""
-    if config.llm is not None:
-        llm = config.llm
-        if llm.corrections is not None:
-            resolved = _resolve_role(llm, llm.corrections)
-            if resolved is not None:
-                return create_llm_provider(resolved, pulse_config=config)
-
-        _, disc_resolved = effective_llm_role_configs(config)
-        if disc_resolved is not None:
-            return create_llm_provider(disc_resolved, pulse_config=config)
-
-    return None
 
 
 def effective_llm_role_configs(

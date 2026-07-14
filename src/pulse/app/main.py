@@ -11,17 +11,9 @@ from pulse.app.home_actions import (
     run_pull_action,
     run_test_telegram_action,
 )
-from pulse.app.corrections_webhook import (
-    parse_corrections_webhook_payload,
-    verify_corrections_webhook,
-)
 from pulse.app.homepage import HomepageNotice, HomepageStatus, render_homepage
 from pulse.connectors.registry import ConnectorRegistry
-from pulse.domain.notifications import extract_reply_context
 from pulse.jobs.scheduler import build_scheduler
-from pulse.services.corrections import build_correction_service
-from pulse.store.correction_applications import CorrectionApplicationRepository
-from pulse.store.corrections import CorrectionRepository
 from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
@@ -40,14 +32,6 @@ _ERROR_MESSAGES = {
     "telegram-not-configured": "telegram not configured",
     "telegram-test-failed": "telegram test failed",
 }
-
-
-def _extract_context_id(reply_to_message: dict[str, Any]) -> str | None:
-    reply_text = reply_to_message.get("text")
-    if not isinstance(reply_text, str):
-        return None
-
-    return extract_reply_context(reply_text)
 
 
 def create_app(
@@ -108,56 +92,10 @@ def create_app(
         if not isinstance(message, dict):
             raise HTTPException(status_code=400, detail="Missing message payload.")
 
-        reply_text = message.get("text")
-        if not isinstance(reply_text, str) or not reply_text.strip():
-            raise HTTPException(status_code=400, detail="Missing reply text.")
+        text = message.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise HTTPException(status_code=400, detail="Missing message text.")
 
-        reply_to_message = message.get("reply_to_message")
-        if not isinstance(reply_to_message, dict):
-            raise HTTPException(status_code=400, detail="Missing reply target.")
-
-        context_id = _extract_context_id(reply_to_message)
-        if context_id is None:
-            raise HTTPException(status_code=400, detail="Missing reply context.")
-
-        async with connect_db(s.database_path) as db:
-            await bootstrap_schema(db)
-            repository = CorrectionRepository(db)
-            correction_applications = CorrectionApplicationRepository(db)
-            service = build_correction_service(
-                repository,
-                config=s,
-                correction_applications=correction_applications,
-                vault_path=s.vault_path,
-            )
-            await service.record_reply(
-                context_id=context_id, message_text=reply_text.strip()
-            )
-
-        return {"status": "accepted"}
-
-    @app.post("/webhooks/corrections", status_code=status.HTTP_202_ACCEPTED)
-    async def corrections_webhook(
-        request: Request,
-        s: Annotated[PulseConfig, Depends(settings_dependency)],
-    ) -> dict[str, str]:
-        body = await request.body()
-        secret = (s.corrections_webhook_secret or "").strip()
-        if not secret:
-            raise HTTPException(status_code=404, detail="Not found")
-        verify_corrections_webhook(request, body, secret)
-        context_id, message_text = parse_corrections_webhook_payload(body)
-        async with connect_db(s.database_path) as db:
-            await bootstrap_schema(db)
-            repository = CorrectionRepository(db)
-            correction_applications = CorrectionApplicationRepository(db)
-            service = build_correction_service(
-                repository,
-                config=s,
-                correction_applications=correction_applications,
-                vault_path=s.vault_path,
-            )
-            await service.record_correction(context_id, message_text)
         return {"status": "accepted"}
 
     # Wire push connector webhook routes

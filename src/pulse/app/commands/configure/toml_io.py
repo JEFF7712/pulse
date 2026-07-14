@@ -104,7 +104,6 @@ def _coerce_pulse_root_string(fname: str, raw: str) -> str | int | bool:
         "smtp_use_tls",
         "smtp_use_ssl",
         "notify_on_job_failure",
-        "notify_on_corrections_backlog",
     ):
         return raw.lower() in ("1", "true", "yes", "on")
     return raw
@@ -229,7 +228,7 @@ def _emit_llm_sections(llm: dict) -> list[str]:
         for k in sorted(scalars):
             lines.append(f"{k} = {_toml_inline_value(scalars[k])}")
         lines.append("")
-    for sub in ("summarization", "discovery", "corrections"):
+    for sub in ("summarization", "discovery"):
         if sub not in nested:
             continue
         blk = nested[sub]
@@ -240,7 +239,7 @@ def _emit_llm_sections(llm: dict) -> list[str]:
             lines.append(f"{k} = {_toml_inline_value(blk[k])}")
         lines.append("")
     for sub, blk in sorted(nested.items()):
-        if sub in ("summarization", "discovery", "corrections"):
+        if sub in ("summarization", "discovery"):
             continue
         if not isinstance(blk, dict) or not blk:
             continue
@@ -278,7 +277,7 @@ def _serialize_pulse_toml_document(full: dict) -> str:
             lines.extend(_emit_generic_connectors_table(name, sec))
     llm = full.get("llm")
     if isinstance(llm, dict) and llm:
-        lines.append("# --- LLM (source summarization, discovery, corrections) ---")
+        lines.append("# --- LLM (source summarization, discovery) ---")
         lines.append("")
         lines.extend(_emit_llm_sections(llm))
     skip_top = frozenset(("connectors", "llm")) | _PULSE_ROOT_FIELD_NAMES

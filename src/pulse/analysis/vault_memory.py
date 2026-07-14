@@ -115,7 +115,7 @@ class VaultMemory:
         return path.read_text(encoding="utf-8")
 
     def read_pattern_snapshot(self, slug: str) -> dict | None:
-        """Return parsed pattern helpers needed by discovery and corrections."""
+        """Return parsed pattern helpers needed by discovery."""
         content = self.read_pattern_by_slug(slug)
         if not content:
             return None

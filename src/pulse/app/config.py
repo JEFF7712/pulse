@@ -38,7 +38,6 @@ class PulseConfig(BaseModel):
     slack_webhook_url: str | None = None
     pushover_user_key: str | None = None
     pushover_api_token: str | None = None
-    corrections_webhook_secret: str | None = None
     gotify_url: str | None = None
     gotify_app_token: str | None = None
     smtp_host: str | None = None
@@ -51,8 +50,6 @@ class PulseConfig(BaseModel):
     smtp_use_ssl: bool = False
     notify_on_job_failure: bool = False
     job_failure_alert_cooldown: str = "6h"
-    notify_on_corrections_backlog: bool = False
-    corrections_backlog_alert_cooldown: str = "12h"
     google_client_id: str | None = None
     google_client_secret: str | None = None
     spotify_client_id: str | None = None

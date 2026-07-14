@@ -49,8 +49,6 @@ QUICKSTART_ONBOARD_SNIPPETS = [
 ]
 
 CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
-    "PULSE_CORRECTIONS_WEBHOOK_SECRET",
-    "/webhooks/corrections",
     "PULSE_NTFY_TOPIC",
     "PULSE_GOTIFY_URL",
     "PULSE_SMTP_HOST",
@@ -69,19 +67,11 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "google_tokens.json",
     "spotify_tokens.json",
     "plaid_tokens.json",
-    "llm.corrections",
-    "corrections are stored but vault application is skipped",
-    "`correction_applications`",
-    "share the corrections pipeline",
     "Same **`load_config()`**",
     "One configured role can cover both summarization and discovery if the other is omitted.",
-    "preferred `message_text`",
-    "`message` is accepted as a compatibility alias when `message_text` is absent",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [
-    "/webhooks/corrections",
-    "PULSE_CORRECTIONS_WEBHOOK_SECRET",
     "/health",
     "/webhooks/telegram",
     "pulse status",
@@ -91,21 +81,12 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "discovery_daily",
     "**host** timezone",
     "PULSE_TIMEZONE",
-    "correction_applications",
-    "pulse_correct",
-    'Body: `{"context_id","message_text"}` preferred',
-    "corrections prefer `message_text`",
     "invalid-publisher",
     "pypi-trusted-publishing.md",
 ]
 
 QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
     "optional discovery when LLM",
-]
-
-PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS = [
-    "[llm.corrections]",
-    "# If omitted, corrections reuse [llm.discovery].",
 ]
 
 # README copy is allowed to use the deployed docs site instead of repo-relative
@@ -330,20 +311,6 @@ def test_operations_runbook_covers_runtime_health_and_recovery() -> None:
 
     assert "legacy `PULSE_ANTHROPIC_API_KEY`" not in runbook, (
         "runbook.md should not describe removed API-key-only LLM fallback"
-    )
-
-
-def test_pulse_toml_example_covers_corrections_role() -> None:
-    pulse_toml_example = (REPO_ROOT / "pulse.toml.example").read_text(encoding="utf-8")
-
-    missing_snippets = [
-        snippet
-        for snippet in PULSE_TOML_EXAMPLE_REQUIRED_SNIPPETS
-        if snippet not in pulse_toml_example
-    ]
-
-    assert not missing_snippets, (
-        f"pulse.toml.example is missing corrections-role guidance: {missing_snippets}"
     )
 
 

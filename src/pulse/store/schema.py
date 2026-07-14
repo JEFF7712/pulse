@@ -24,33 +24,6 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
-    await db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS corrections (
-            id TEXT PRIMARY KEY,
-            context_id TEXT NOT NULL,
-            message_text TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    await db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS correction_applications (
-            id TEXT PRIMARY KEY,
-            correction_id TEXT NOT NULL,
-            status TEXT NOT NULL,
-            target_type TEXT NOT NULL,
-            target_ref TEXT NOT NULL,
-            operation TEXT NOT NULL,
-            summary TEXT NOT NULL,
-            error_message TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (correction_id) REFERENCES corrections(id)
-        )
-        """
-    )
     # Analytics tables
     await db.execute(
         """
@@ -109,12 +82,6 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
     )
     await db.execute("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)")
     await db.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)")
-    await db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_correction_applications_correction_id ON correction_applications(correction_id)"
-    )
-    await db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_correction_applications_correction_id_created_at_id ON correction_applications(correction_id, created_at, id)"
-    )
 
     await db.execute(
         """

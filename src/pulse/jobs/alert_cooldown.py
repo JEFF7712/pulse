@@ -1,4 +1,4 @@
-"""Shared SQLite state for rate-limited operations alerts (job failures, corrections backlog)."""
+"""Shared SQLite state for rate-limited operations alerts (job failures)."""
 
 from __future__ import annotations
 

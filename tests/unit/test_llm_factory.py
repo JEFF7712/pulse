@@ -106,9 +106,7 @@ def test_create_providers_from_config_new_style(monkeypatch, stub_openai_module)
     config = PulseConfig(
         llm=LLMConfig(
             summarization=LLMRoleConfig(provider="openai", model="gpt-5.4-mini"),
-            discovery=LLMRoleConfig(
-                provider="anthropic", model="claude-sonnet-4-6"
-            ),
+            discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
         )
     )
     summ_llm, disc_llm = create_providers_from_config(config)
@@ -157,65 +155,6 @@ def test_create_providers_from_config_no_config():
     summ_llm, disc_llm = create_providers_from_config(config)
     assert summ_llm is None
     assert disc_llm is None
-
-
-def test_create_corrections_provider_prefers_dedicated_role(
-    monkeypatch, stub_openai_module
-):
-    from pulse.llm.factory import create_corrections_provider_from_config
-
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-
-    config = PulseConfig(
-        llm=LLMConfig(
-            corrections=LLMRoleConfig(provider="openai", model="gpt-5.4-mini"),
-            discovery=LLMRoleConfig(
-                provider="anthropic", model="claude-sonnet-4-6"
-            ),
-        )
-    )
-
-    provider = create_corrections_provider_from_config(config)
-
-    from pulse.llm.openai_compat import OpenAICompatibleProvider
-
-    assert isinstance(provider, OpenAICompatibleProvider)
-
-
-def test_create_corrections_provider_falls_back_to_discovery(monkeypatch):
-    from pulse.llm.factory import create_corrections_provider_from_config
-
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-
-    config = PulseConfig(
-        llm=LLMConfig(
-            discovery=LLMRoleConfig(
-                provider="anthropic", model="claude-sonnet-4-6"
-            ),
-        )
-    )
-
-    provider = create_corrections_provider_from_config(config)
-
-    from pulse.llm.anthropic import AnthropicProvider
-
-    assert isinstance(provider, AnthropicProvider)
-
-
-def test_create_corrections_provider_anthropic_key_only_returns_none():
-    from pulse.llm.factory import create_corrections_provider_from_config
-
-    config = PulseConfig(anthropic_api_key="test-key")
-    assert create_corrections_provider_from_config(config) is None
-
-
-def test_create_corrections_provider_no_config_returns_none():
-    from pulse.llm.factory import create_corrections_provider_from_config
-
-    provider = create_corrections_provider_from_config(PulseConfig())
-
-    assert provider is None
 
 
 def test_summarization_model_for_source_summaries_uses_summarization_role() -> None:
@@ -269,9 +208,7 @@ def test_discovery_model_for_discovery_uses_role() -> None:
 def test_effective_llm_role_configs_requires_provider() -> None:
     from pulse.llm.factory import effective_llm_role_configs
 
-    config = PulseConfig(
-        llm=LLMConfig(summarization=LLMRoleConfig(model="some-model"))
-    )
+    config = PulseConfig(llm=LLMConfig(summarization=LLMRoleConfig(model="some-model")))
     with pytest.raises(ValueError, match="missing provider"):
         effective_llm_role_configs(config)
 

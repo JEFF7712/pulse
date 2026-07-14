@@ -13,7 +13,7 @@ from .toml_io import _save_pulse_settings
 
 
 def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
-    """● row hint: outbound channel ready or corrections secret set."""
+    """● row hint: outbound channel ready."""
 
     def g(key: str) -> str:
         return (env.get(key) or "").strip()
@@ -37,8 +37,6 @@ def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
             return False
         to_list = [x.strip() for x in g("PULSE_SMTP_TO").split(",") if x.strip()]
         return bool(to_list)
-    if provider_id == "corrections":
-        return bool(g("PULSE_CORRECTIONS_WEBHOOK_SECRET"))
     return False
 
 
