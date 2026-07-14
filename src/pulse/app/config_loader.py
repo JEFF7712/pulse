@@ -5,13 +5,6 @@ from pathlib import Path
 from pulse.app.config import PulseConfig
 from pulse.app.paths import resolve_pulse_paths
 
-# Vendor env names (no PULSE_ prefix) used by many tools; fill config when unset in file / PULSE_*.
-_VENDOR_API_KEY_ENV = (
-    ("ANTHROPIC_API_KEY", "anthropic_api_key"),
-    ("OPENAI_API_KEY", "openai_api_key"),
-    ("GEMINI_API_KEY", "gemini_api_key"),
-)
-
 
 def default_pulse_config_path(*, cwd: Path | None = None) -> Path:
     """Path to the main Pulse config file (TOML).
@@ -58,16 +51,6 @@ def _env_vars_for_config(environ: dict[str, str]) -> dict:
     return result
 
 
-def _apply_vendor_env(merged: dict) -> None:
-    """Fill vendor API key fields from bare env var names when still empty."""
-    for env_name, field_name in _VENDOR_API_KEY_ENV:
-        current = merged.get(field_name)
-        if current is not None and str(current).strip():
-            continue
-        if (v := os.environ.get(env_name)) is not None and str(v).strip():
-            merged[field_name] = v
-
-
 def _resolve_relative_storage_paths(merged: dict, *, base_dir: Path) -> None:
     for field_name in ("database_path", "vault_path"):
         raw_value = merged.get(field_name)
@@ -95,7 +78,6 @@ def load_config(
 
         env_values = _env_vars_for_config(os.environ)
         merged = {**file_values, **env_values}
-        _apply_vendor_env(merged)
         return PulseConfig(**merged)
 
     # Install-safe path: resolve config directory, read pulse.toml, overlay env vars.
@@ -119,7 +101,6 @@ def load_config(
         "timezone": "UTC",
     }
     merged = {**defaults, **file_values, **env_values}
-    _apply_vendor_env(merged)
     _resolve_relative_storage_paths(merged, base_dir=paths.config_dir)
 
     return PulseConfig(**merged)

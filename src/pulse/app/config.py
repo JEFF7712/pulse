@@ -7,24 +7,6 @@ class ConnectorConfig(BaseModel):
     poll_interval: str = "15m"
 
 
-class LLMRoleConfig(BaseModel):
-    """Per-role LLM settings. Omit `provider` to inherit `[llm] provider` in pulse.toml."""
-
-    provider: str | None = None  # "anthropic" | "openai" | "gemini" | "ollama"
-    model: str
-    base_url: str | None = None
-
-
-class LLMConfig(BaseModel):
-    """Optional defaults for all roles: set `provider` once, then only `model` per role."""
-
-    provider: str | None = None
-    base_url: str | None = None
-    summarization: LLMRoleConfig | None = None
-    discovery: LLMRoleConfig | None = None
-    corrections: LLMRoleConfig | None = None
-
-
 class PulseConfig(BaseModel):
     database_path: str = "data/pulse.db"
     vault_path: str = "Pulse-Vault"
@@ -62,10 +44,6 @@ class PulseConfig(BaseModel):
     oura_client_id: str | None = None
     oura_client_secret: str | None = None
     oura_personal_access_token: str | None = None
-    anthropic_api_key: str | None = None
-    openai_api_key: str | None = None
-    gemini_api_key: str | None = None
-    llm: LLMConfig | None = None
     connectors: dict[str, ConnectorConfig] = {}
 
 

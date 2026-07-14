@@ -3,18 +3,18 @@ import os
 import pytest
 
 from pulse.app.config import PulseConfig, ConnectorConfig
-from pulse.app.config_loader import default_pulse_config_path, load_config, PulseConfigNotFoundError
+from pulse.app.config_loader import (
+    default_pulse_config_path,
+    load_config,
+    PulseConfigNotFoundError,
+)
 
 
 @pytest.fixture(autouse=True)
 def _clear_pulse_related_env(monkeypatch):
     """Strip Pulse-related env vars so host exports do not affect load_config tests."""
     for k in list(os.environ.keys()):
-        if k.startswith("PULSE_") or k in (
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "GEMINI_API_KEY",
-        ):
+        if k.startswith("PULSE_"):
             monkeypatch.delenv(k, raising=False)
 
 
@@ -63,7 +63,9 @@ def test_load_config_returns_defaults_when_no_toml(tmp_path):
     assert config.connectors == {}
 
 
-def test_load_config_uses_data_dir_defaults_when_paths_are_not_set(tmp_path, monkeypatch):
+def test_load_config_uses_data_dir_defaults_when_paths_are_not_set(
+    tmp_path, monkeypatch
+):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "pulse.toml").write_text("")
@@ -72,8 +74,12 @@ def test_load_config_uses_data_dir_defaults_when_paths_are_not_set(tmp_path, mon
 
     config = load_config()
 
-    assert config.database_path == str((tmp_path / "xdg-data" / "pulse" / "pulse.db").resolve())
-    assert config.vault_path == str((tmp_path / "xdg-data" / "pulse" / "Pulse-Vault").resolve())
+    assert config.database_path == str(
+        (tmp_path / "xdg-data" / "pulse" / "pulse.db").resolve()
+    )
+    assert config.vault_path == str(
+        (tmp_path / "xdg-data" / "pulse" / "Pulse-Vault").resolve()
+    )
 
 
 def test_load_config_can_require_existing_config_files(tmp_path):
@@ -121,27 +127,17 @@ vault_path = "Pulse-Vault"
     assert config.vault_path == str((config_dir / "Pulse-Vault").resolve())
 
 
-def test_load_config_vendor_env_fills_when_key_absent(monkeypatch, tmp_path):
-    toml_file = tmp_path / "pulse.toml"
-    toml_file.write_text("# empty\n")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-from-env")
-    config = load_config(config_path=toml_file)
-    assert config.openai_api_key == "sk-from-env"
-
-
-def test_load_config_toml_overrides_vendor_env(monkeypatch, tmp_path):
-    toml_file = tmp_path / "pulse.toml"
-    toml_file.write_text('anthropic_api_key = "sk-toml"\n')
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
-    config = load_config(config_path=toml_file)
-    assert config.anthropic_api_key == "sk-toml"
-
-
 def test_default_pulse_config_path_prefers_dot_config(tmp_path):
     (tmp_path / ".config").mkdir()
-    (tmp_path / ".config" / "pulse.toml").write_text('timezone = "UTC"\n', encoding="utf-8")
-    (tmp_path / "pulse.toml").write_text('timezone = "Europe/London"\n', encoding="utf-8")
-    assert default_pulse_config_path(cwd=tmp_path) == tmp_path / ".config" / "pulse.toml"
+    (tmp_path / ".config" / "pulse.toml").write_text(
+        'timezone = "UTC"\n', encoding="utf-8"
+    )
+    (tmp_path / "pulse.toml").write_text(
+        'timezone = "Europe/London"\n', encoding="utf-8"
+    )
+    assert (
+        default_pulse_config_path(cwd=tmp_path) == tmp_path / ".config" / "pulse.toml"
+    )
 
 
 def test_default_pulse_config_path_repo_root_pulse_toml(tmp_path):
@@ -150,13 +146,15 @@ def test_default_pulse_config_path_repo_root_pulse_toml(tmp_path):
 
 
 def test_default_pulse_config_path_new_install_target(tmp_path):
-    assert default_pulse_config_path(cwd=tmp_path) == tmp_path / ".config" / "pulse.toml"
+    assert (
+        default_pulse_config_path(cwd=tmp_path) == tmp_path / ".config" / "pulse.toml"
+    )
 
 
 def test_default_pulse_config_path_pulse_config_file(monkeypatch, tmp_path):
     custom = tmp_path / "my" / "pulse.toml"
     custom.parent.mkdir(parents=True)
-    custom.write_text("timezone = \"UTC\"\n", encoding="utf-8")
+    custom.write_text('timezone = "UTC"\n', encoding="utf-8")
     monkeypatch.setenv("PULSE_CONFIG_FILE", str(custom))
     assert default_pulse_config_path(cwd=tmp_path) == custom
 
@@ -165,6 +163,6 @@ def test_default_pulse_config_path_pulse_config_dir(monkeypatch, tmp_path):
     d = tmp_path / "cfg"
     d.mkdir()
     f = d / "pulse.toml"
-    f.write_text("timezone = \"UTC\"\n", encoding="utf-8")
+    f.write_text('timezone = "UTC"\n', encoding="utf-8")
     monkeypatch.setenv("PULSE_CONFIG_DIR", str(d))
     assert default_pulse_config_path(cwd=tmp_path) == f

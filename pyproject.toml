@@ -25,12 +25,10 @@ dependencies = [
     "aiosqlite",
     "apscheduler",
     "httpx",
-    "feedparser>=6.0.11",
     "mcp[cli]",
     "google-auth-oauthlib",
     "google-api-python-client",
     "plaid-python>=24",
-    "anthropic",
     "uvicorn[standard]",
     "questionary>=2.1.1",
 ]
@@ -38,11 +36,6 @@ dependencies = [
 [project.scripts]
 pulse-mcp = "pulse.mcp.server:main"
 pulse = "pulse.app.cli:main"
-
-[project.optional-dependencies]
-openai = ["openai>=1.0"]
-gemini = ["google-genai>=1.0"]
-all-llm = ["openai>=1.0", "google-genai>=1.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

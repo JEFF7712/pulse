@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 def _job_failure_body(exc: Exception) -> str:
     from pulse.domain.connectors import ConnectorAuthError
-    from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 
     if isinstance(exc, ConnectorAuthError):
         msg = str(exc).strip() or "Connector authentication failed"
@@ -31,9 +30,6 @@ def _job_failure_body(exc: Exception) -> str:
             body = body[:1197] + "..."
         return body
 
-    hint = user_message_for_anthropic_exception(exc)
-    if hint:
-        return hint
     msg = str(exc).strip() or type(exc).__name__
     if len(msg) > 1200:
         msg = msg[:1197] + "..."

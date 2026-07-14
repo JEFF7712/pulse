@@ -1,4 +1,4 @@
-"""`pulse init`: structure vault profile (optional LLM) + run initial connector pulls."""
+"""`pulse init`: write vault profile + run initial connector pulls."""
 
 from __future__ import annotations
 
@@ -16,34 +16,6 @@ except ImportError:  # pragma: no cover
 from pulse.app import cli_ui as ui
 from pulse.app.commands.serve import quiet_noisy_loggers
 from pulse.app.config_loader import load_config
-from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
-
-
-_PROFILE_STRUCTURE_MODEL = "claude-haiku-4-5-20251001"
-
-_PROFILE_STRUCTURE_SYSTEM = """You format free-form text into a concise Obsidian markdown profile for Pulse, an app that analyzes the user's email, calendar, music, and browsing history.
-
-Output ONLY the markdown document. No surrounding code fences, no preamble or explanation.
-
-Use this shape when the user's text supports it (omit a **field** line or entire section if unknown):
-
-# User Profile
-
-**Name:** ...
-**Occupation:** ...
-**Interests:** ...
-
-## Discovery goals
-
-What patterns or themes they want Pulse to surface.
-
-## Additional context
-
-Other facts useful for personalization.
-
-Rules:
-- Preserve specifics from the user's text; do not invent biographical facts they did not imply.
-- If the input is sparse, keep the file short rather than padding with guesses."""
 
 
 # Shown during interactive `pulse init` so users can copy it into another chat product.
@@ -146,11 +118,6 @@ def _read_profile_raw_text(
     return _read_multiline_profile_from_tty()
 
 
-def _profile_markdown_without_llm(raw: str) -> str:
-    """Wrap raw text when no LLM is configured."""
-    return f"# User Profile\n\n## Self description\n\n{raw.strip()}\n"
-
-
 def _strip_markdown_fences(text: str) -> str:
     t = text.strip()
     if t.startswith("```"):
@@ -161,15 +128,6 @@ def _strip_markdown_fences(text: str) -> str:
             lines = lines[:-1]
         t = "\n".join(lines).strip()
     return t
-
-
-async def _structure_profile_markdown(raw, llm) -> str:
-    structured = await llm.complete(
-        f"The user wrote the following about themselves. Turn it into the vault profile markdown.\n\n---\n{raw}\n---",
-        system_prompt=_PROFILE_STRUCTURE_SYSTEM,
-        model=_PROFILE_STRUCTURE_MODEL,
-    )
-    return _strip_markdown_fences(structured)
 
 
 def init_profile(
@@ -295,12 +253,10 @@ def _collect_profile(
     profile_file: Path | None = None,
     profile_text: str | None = None,
 ) -> None:
-    from pulse.llm.factory import create_providers_from_config
-
     ui.step("User profile")
     ui.muted_line(
         "Describe yourself in free form, or paste a factual export from another chat; "
-        "Pulse will structure it for your vault when an Anthropic model is configured."
+        "Pulse saves the text to your vault profile as-is."
     )
 
     raw = _read_profile_raw_text(profile_file=profile_file, profile_text=profile_text)
@@ -309,33 +265,5 @@ def _collect_profile(
         ui.warning("No profile text provided; skipping profile write.")
         return
 
-    from pulse.llm.anthropic import AnthropicProvider
-
-    summ_llm, disc_llm = create_providers_from_config(config)
-    anthropic_llm = next(
-        (x for x in (summ_llm, disc_llm) if isinstance(x, AnthropicProvider)), None
-    )
-    if anthropic_llm is not None:
-        ui.say("[accent]Structuring profile[/] with Anthropic…")
-        try:
-            profile_content = asyncio.run(
-                _structure_profile_markdown(raw, anthropic_llm)
-            )
-        except Exception as e:
-            um = user_message_for_anthropic_exception(e)
-            if um:
-                ui.warning(f"{um} Saving raw text under a single section instead.")
-            else:
-                ui.warning(
-                    f"LLM error ({e}); saving raw text under a single section instead."
-                )
-            profile_content = _profile_markdown_without_llm(raw)
-    else:
-        ui.muted_line(
-            "No Anthropic LLM in [llm.summarization] / [llm.discovery]; "
-            "saving your text under “Self description” (no LLM pass)."
-        )
-        profile_content = _profile_markdown_without_llm(raw)
-
-    vault.write_config_file("profile.md", profile_content)
+    vault.write_config_file("profile.md", raw)
     ui.success("Profile saved.")

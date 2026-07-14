@@ -49,14 +49,6 @@ def _pulse_config_to_working_env(cfg: PulseConfig) -> dict[str, str]:
             out[env_k] = "true" if val else "false"
         else:
             out[env_k] = str(val)
-    if cfg.anthropic_api_key:
-        ak = cfg.anthropic_api_key
-        out["ANTHROPIC_API_KEY"] = ak
-        out["PULSE_ANTHROPIC_API_KEY"] = ak
-    if cfg.openai_api_key:
-        out["OPENAI_API_KEY"] = cfg.openai_api_key
-    if cfg.gemini_api_key:
-        out["GEMINI_API_KEY"] = cfg.gemini_api_key
     return out
 
 
@@ -214,52 +206,16 @@ def _emit_generic_connectors_table(name: str, sec: dict) -> list[str]:
     return lines
 
 
-def _emit_llm_sections(llm: dict) -> list[str]:
-    lines: list[str] = []
-    scalars: dict[str, object] = {}
-    nested: dict[str, dict] = {}
-    for k, v in llm.items():
-        if isinstance(v, dict):
-            nested[k] = v
-        else:
-            scalars[k] = v
-    if scalars:
-        lines.append("[llm]")
-        for k in sorted(scalars):
-            lines.append(f"{k} = {_toml_inline_value(scalars[k])}")
-        lines.append("")
-    for sub in ("summarization", "discovery"):
-        if sub not in nested:
-            continue
-        blk = nested[sub]
-        if not isinstance(blk, dict) or not blk:
-            continue
-        lines.append(f"[llm.{sub}]")
-        for k in sorted(blk):
-            lines.append(f"{k} = {_toml_inline_value(blk[k])}")
-        lines.append("")
-    for sub, blk in sorted(nested.items()):
-        if sub in ("summarization", "discovery"):
-            continue
-        if not isinstance(blk, dict) or not blk:
-            continue
-        lines.append(f"[llm.{sub}]")
-        for k in sorted(blk):
-            lines.append(f"{k} = {_toml_inline_value(blk[k])}")
-        lines.append("")
-    return lines
-
-
 def _serialize_pulse_toml_document(full: dict) -> str:
-    """Emit pulse.toml: app scalars, connectors, ``[llm]``, then other top-level tables."""
+    """Emit pulse.toml: app scalars, connectors, then other top-level tables."""
     lines = [
-        "# Pulse configuration (single file: paths, secrets, connectors, LLM roles).",
-        "# ``PULSE_*`` and vendor API env vars override values from this file when set.",
+        "# Pulse configuration (single file: paths, secrets, connectors).",
+        "# ``PULSE_*`` env vars override values from this file when set.",
         "",
     ]
     root_lines = _emit_pulse_root_scalar_lines(full)
     if root_lines:
-        lines.append("# --- App (paths, integrations, notifications, API keys) ---")
+        lines.append("# --- App (paths, integrations, notifications) ---")
         lines.extend(root_lines)
         lines.append("")
     connectors = full.get("connectors")
@@ -275,11 +231,6 @@ def _serialize_pulse_toml_document(full: dict) -> str:
         sec = connectors.get(name)
         if isinstance(sec, dict) and sec:
             lines.extend(_emit_generic_connectors_table(name, sec))
-    llm = full.get("llm")
-    if isinstance(llm, dict) and llm:
-        lines.append("# --- LLM (source summarization, discovery) ---")
-        lines.append("")
-        lines.extend(_emit_llm_sections(llm))
     skip_top = frozenset(("connectors", "llm")) | _PULSE_ROOT_FIELD_NAMES
     for top_key in sorted(k for k in full if k not in skip_top):
         # Forward-compat: extra top-level sections as [key] with flat scalars only.

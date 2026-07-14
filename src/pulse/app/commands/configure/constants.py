@@ -57,57 +57,6 @@ _CONFIGURE_INTEGRATION_FIELDS: list[tuple[str, str, bool]] = [
     ),
 ]
 
-# LLM vendor API keys (see pulse.llm.factory — also ``anthropic_api_key`` / ``PULSE_ANTHROPIC_API_KEY`` in TOML or env).
-_MODEL_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
-    (
-        "anthropic",
-        "Anthropic",
-        "🅰️",
-        [
-            (
-                "ANTHROPIC_API_KEY",
-                "Anthropic API key ([llm.*] provider = anthropic; or pulse.toml anthropic_api_key)",
-                True,
-            ),
-            (
-                "PULSE_ANTHROPIC_API_KEY",
-                "Same key as ANTHROPIC_API_KEY (TOML / env alias)",
-                True,
-            ),
-        ],
-    ),
-    (
-        "openai",
-        "OpenAI / compatible",
-        "🧠",
-        [
-            (
-                "OPENAI_API_KEY",
-                "OpenAI API key (OpenAI, Azure OpenAI-compatible, or optional for Ollama)",
-                True,
-            ),
-        ],
-    ),
-    (
-        "gemini",
-        "Google Gemini",
-        "✨",
-        [
-            ("GEMINI_API_KEY", "Gemini API key ([llm.*] provider = gemini)", True),
-        ],
-    ),
-    (
-        "ollama",
-        "Ollama (local)",
-        "🦙",
-        [],
-    ),
-]
-
-_CONFIGURE_MODEL_PROVIDER_FIELDS: list[tuple[str, str, bool]] = [
-    fld for *_, flds in _MODEL_PROVIDER_DEFS for fld in flds
-]
-
 # Per-provider notification / webhook keys (order preserved for full wizard + pulse.toml key order).
 _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool]]]] = [
     (
@@ -229,20 +178,14 @@ _CONFIGURE_NOTIFICATION_FIELDS: list[tuple[str, str, bool]] = [
 _CONFIGURE_ENV_KEY_ORDER: list[str] = (
     [t[0] for t in _CONFIGURE_CORE_FIELDS]
     + [t[0] for t in _CONFIGURE_INTEGRATION_FIELDS]
-    + [t[0] for t in _CONFIGURE_MODEL_PROVIDER_FIELDS]
     + [t[0] for t in _CONFIGURE_NOTIFICATION_FIELDS]
 )
 
-# Map configure / model-provider env keys to ``PulseConfig`` root field names (pulse.toml).
-_ENV_KEY_TO_CONFIG_FIELD: dict[str, str] = {
-    "ANTHROPIC_API_KEY": "anthropic_api_key",
-    "PULSE_ANTHROPIC_API_KEY": "anthropic_api_key",
-    "OPENAI_API_KEY": "openai_api_key",
-    "GEMINI_API_KEY": "gemini_api_key",
-}
+# Map non-PULSE_ configure env keys to ``PulseConfig`` root field names (pulse.toml).
+_ENV_KEY_TO_CONFIG_FIELD: dict[str, str] = {}
 
 _PULSE_ROOT_FIELD_NAMES: frozenset[str] = frozenset(
-    k for k in PulseConfig.model_fields if k not in ("connectors", "llm")
+    k for k in PulseConfig.model_fields if k != "connectors"
 )
 
 _CONNECTOR_DEFS: list[tuple[str, str, str]] = [
@@ -321,21 +264,8 @@ _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
         "notifications",
         "🔔 Notifications (Telegram, SMTP, webhooks, …)",
     ),
-    (
-        "model",
-        "🧠 Model (provider API keys + [llm] provider & summarization / discovery models)",
-    ),
     ("full", "✨ Full wizard (all of the above)"),
     ("done", "✅ Done"),
-]
-
-# Submenu under `pulse configure` → Model (API keys vs [llm] roles).
-_MODEL_HUB_ITEMS: list[tuple[str, str]] = [
-    ("api_keys", "🔑 Provider API keys (Anthropic, OpenAI, Gemini, Ollama …)"),
-    (
-        "llm_roles",
-        "💬 LLM in pulse.toml (provider + summarization & discovery models)",
-    ),
 ]
 
 # Main configure areas in walkthrough order (excludes Full wizard & Done) — e.g. `pulse onboard`.
@@ -343,12 +273,10 @@ _CONFIGURE_SEQUENTIAL_ORDER: tuple[str, ...] = (
     "core",
     "connectors",
     "notifications",
-    "model",
 )
 
 _CONFIGURE_SECTION_BANNER: dict[str, str] = {
     "core": "Core settings",
     "connectors": "Connectors",
     "notifications": "Notifications",
-    "model": "Model",
 }

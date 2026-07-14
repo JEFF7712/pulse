@@ -9,7 +9,11 @@ from pulse.app import cli_ui as ui
 from pulse.app.config_loader import load_config
 from pulse.app.paths import PulsePaths, resolve_pulse_paths
 
-from .connectors import _configure_connectors_hub, _configure_connectors_toml, _configure_oauth_prompts
+from .connectors import (
+    _configure_connectors_hub,
+    _configure_connectors_toml,
+    _configure_oauth_prompts,
+)
 from .constants import (
     _CONFIGURE_INTEGRATION_FIELDS,
     _CONFIGURE_MENU_ITEMS,
@@ -18,10 +22,9 @@ from .constants import (
 )
 from .core import _configure_core_hub, _configure_core_only
 from .env_prompts import _prompt_env_field_list
-from .llm_roles import _configure_llm_roles_wizard
-from .models import _configure_model_hub, _configure_model_providers_only
 from .notifications import _configure_notifications_hub, _configure_notifications_only
 from .toml_io import _pulse_config_to_working_env, _save_pulse_settings
+
 
 def _pick_configure_menu_action() -> str:
     """Return menu action key, or ``__invalid__`` for bad numeric fallback input."""
@@ -32,9 +35,7 @@ def _pick_configure_menu_action() -> str:
         for i, (_, label) in enumerate(non_done, start=1):
             ui.muted_line(f"  {i}) {label}")
         ui.muted_line("  0) Done")
-        raw = input(
-            f"Choose an option [0-{len(non_done)}]: "
-        ).strip()
+        raw = input(f"Choose an option [0-{len(non_done)}]: ").strip()
         if raw == "0":
             return "done"
         idx_map = {str(i): non_done[i - 1][0] for i in range(1, len(non_done) + 1)}
@@ -85,13 +86,6 @@ def _run_configure_full_wizard(
 ) -> None:
     _configure_core_only(working_env)
     _configure_integrations_only(working_env, toml_path)
-    _configure_model_providers_only(working_env, toml_path)
-    if sys.stdin.isatty():
-        llm_ans = input(
-            "  Configure [llm] provider and model roles in pulse.toml now? [y/N] "
-        ).strip().lower()
-        if llm_ans in ("y", "yes"):
-            _configure_llm_roles_wizard(toml_path)
     _configure_notifications_only(working_env, toml_path)
     _save_pulse_settings(toml_path, working_env)
     ui.success(f"Saved {toml_path}")
@@ -144,11 +138,6 @@ def _execute_configure_menu_choice(
     elif choice == "notifications":
         ui.step("Notifications")
         _configure_notifications_hub(
-            working_env, toml_path, submenu_exit_label=submenu_exit_label
-        )
-    elif choice == "model":
-        ui.step("Model")
-        _configure_model_hub(
             working_env, toml_path, submenu_exit_label=submenu_exit_label
         )
     else:
@@ -212,9 +201,7 @@ def configure(
         return
 
     if not interactive_menu:
-        _run_configure_full_wizard(
-            working_env, toml_path, offer_oauth=offer_oauth
-        )
+        _run_configure_full_wizard(working_env, toml_path, offer_oauth=offer_oauth)
         return
 
     while True:
@@ -226,9 +213,7 @@ def configure(
             ui.rule("Done")
             break
         if choice == "full":
-            _run_configure_full_wizard(
-                working_env, toml_path, offer_oauth=offer_oauth
-            )
+            _run_configure_full_wizard(working_env, toml_path, offer_oauth=offer_oauth)
             break
         _execute_configure_menu_choice(
             choice,
@@ -237,4 +222,3 @@ def configure(
             offer_oauth=offer_oauth,
             submenu_exit_label=submenu_exit_label,
         )
-

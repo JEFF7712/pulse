@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pulse.app.paths import PulsePaths
 from pulse.app import cli
-from pulse.app.config import LLMConfig, LLMRoleConfig, Settings
+from pulse.app.config import Settings
 from pulse.app.commands import configure as configure_cmd
 from pulse.app.commands import init_cmd, ops
 
@@ -73,9 +73,6 @@ def test_discover_uses_config_timezone_when_date_omitted(monkeypatch, tmp_path) 
         database_path=str(tmp_path / "pulse.db"),
         vault_path=str(tmp_path / "vault"),
         timezone="America/Los_Angeles",
-        llm=LLMConfig(
-            discovery=LLMRoleConfig(provider="anthropic", model="claude-sonnet-4-6"),
-        ),
     )
     args = type("Args", (), {"date": None, "cadence": "daily"})()
 

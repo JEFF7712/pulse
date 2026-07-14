@@ -120,11 +120,9 @@
             aiosqlite
             apscheduler
             httpx
-            feedparser
             mcp
             google-auth-oauthlib
             google-api-python-client
-            anthropic
             uvicorn
             plaid-python
           ];
