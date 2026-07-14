@@ -1081,15 +1081,12 @@
       .sources-flow-glow--push {
         fill: none;
         stroke: var(--accent);
-        stroke-width: 3;
+        stroke-width: 3.25;
         stroke-linecap: round;
         stroke-linejoin: round;
         stroke-dasharray: 3 72;
+        stroke-opacity: 0.95;
         animation: sourcesFlowDashPush 22s linear infinite;
-        filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.95))
-          drop-shadow(0 0 14px rgba(74, 222, 128, 0.65))
-          drop-shadow(0 0 28px rgba(74, 222, 128, 0.4))
-          drop-shadow(0 0 48px rgba(74, 222, 128, 0.22));
       }
 
       @keyframes sourcesFlowDash {
@@ -1114,9 +1111,7 @@
         .sources-flow-glow--push {
           animation: none !important;
           stroke-dasharray: none;
-          stroke-opacity: 0.88;
-          filter: drop-shadow(0 0 10px rgba(74, 222, 128, 0.5))
-            drop-shadow(0 0 24px rgba(74, 222, 128, 0.3));
+          stroke-opacity: 0.9;
         }
       }
 
