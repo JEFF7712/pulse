@@ -102,6 +102,25 @@ poll_interval = "15m"
     assert config.connectors["gmail"].enabled is False
 
 
+def test_load_config_resolves_relative_storage_paths_against_config_dir(
+    tmp_path, monkeypatch
+):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "pulse.toml").write_text(
+        """
+database_path = "data/pulse.db"
+vault_path = "Pulse-Vault"
+"""
+    )
+    monkeypatch.setenv("PULSE_CONFIG_DIR", str(config_dir))
+
+    config = load_config()
+
+    assert config.database_path == str((config_dir / "data" / "pulse.db").resolve())
+    assert config.vault_path == str((config_dir / "Pulse-Vault").resolve())
+
+
 def test_load_config_vendor_env_fills_when_key_absent(monkeypatch, tmp_path):
     toml_file = tmp_path / "pulse.toml"
     toml_file.write_text("# empty\n")

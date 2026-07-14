@@ -68,6 +68,18 @@ def _apply_vendor_env(merged: dict) -> None:
             merged[field_name] = v
 
 
+def _resolve_relative_storage_paths(merged: dict, *, base_dir: Path) -> None:
+    for field_name in ("database_path", "vault_path"):
+        raw_value = merged.get(field_name)
+        if raw_value is None:
+            continue
+        path = Path(raw_value).expanduser()
+        if path.is_absolute():
+            merged[field_name] = str(path.resolve())
+            continue
+        merged[field_name] = str((base_dir / path).resolve())
+
+
 def load_config(
     config_path: Path | None = None,
     config_dir: Path | None = None,
@@ -108,5 +120,6 @@ def load_config(
     }
     merged = {**defaults, **file_values, **env_values}
     _apply_vendor_env(merged)
+    _resolve_relative_storage_paths(merged, base_dir=paths.config_dir)
 
     return PulseConfig(**merged)
