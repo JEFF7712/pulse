@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import errno
+import re
+import time
 from pathlib import Path
 
 from pulse.domain.pattern_statuses import normalize_pattern_status
@@ -12,6 +15,9 @@ from pulse.vault.obsidian_meta import (
 )
 
 _DEFAULT_NOTES = "_None yet._"
+_PATTERN_FOOTER = "#pulse #pulse/pattern"
+_ARCHIVE_SUBDIR = "_archive"
+ARCHIVE_RETENTION_DAYS = 30
 _RESERVED_CONFIG_SECTIONS = {
     "profile.md": {"## Learned Corrections"},
 }
@@ -83,9 +89,12 @@ class VaultMemory:
 
         content = f"{content.rstrip()}\n\n#pulse #pulse/pattern\n"
 
-        path = self._pattern_path(slug)
+        path = self._active_pattern_path(slug)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+        if normalized_status == "inactive":
+            self.move_pattern_from_active_to_archive(slug)
+            return self._archived_pattern_path(slug)
         return path
 
     def read_patterns(self) -> list[dict]:
@@ -100,14 +109,31 @@ class VaultMemory:
 
     def read_pattern_by_slug(self, slug: str) -> str:
         """Return a pattern file by slug, or ``""`` if not found."""
-        path = self._pattern_path(slug)
-        if not path.exists():
+        path = self._pattern_read_path(slug)
+        if path is None:
             return ""
         return path.read_text(encoding="utf-8")
 
+    def read_pattern_snapshot(self, slug: str) -> dict | None:
+        """Return parsed pattern helpers needed by discovery and corrections."""
+        content = self.read_pattern_by_slug(slug)
+        if not content:
+            return None
+        return {
+            "content": content,
+            "evidence": self._extract_evidence(content),
+            "has_user_notes": self._extract_user_notes(content) is not None,
+        }
+
     def pattern_exists(self, slug: str) -> bool:
-        """Return True when the pattern file exists."""
-        return self._pattern_path(slug).exists()
+        """Return True when the pattern file exists (active vault dir or archive)."""
+        return self._pattern_read_path(slug) is not None
+
+    def delete_pattern(self, slug: str) -> None:
+        """Delete a pattern file from the active folder and/or archive if present."""
+        for path in (self._active_pattern_path(slug), self._archived_pattern_path(slug)):
+            if path.exists():
+                path.unlink()
 
     def update_pattern(
         self,
@@ -122,7 +148,7 @@ class VaultMemory:
         trend: str,
     ) -> Path:
         """Re-write a pattern file, preserving existing observation, evidence, and user notes."""
-        path = self._pattern_path(slug)
+        read_path = self._pattern_read_path(slug)
         normalized_status = normalize_pattern_status(status)
         existing_notes: str | None = None
         existing_observation: str | None = None
@@ -130,21 +156,24 @@ class VaultMemory:
         existing_first_seen: str | None = None
         extra_sections = ""
 
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
+        if read_path is not None:
+            content = read_path.read_text(encoding="utf-8")
             existing_notes = self._extract_user_notes(content)
             existing_observation = self._extract_section(content, "## Observation")
             existing_evidence = self._extract_evidence(content)
             existing_first_seen = self._extract_field(content, "First seen")
+            existing_last_updated = self._extract_field(content, "Last updated")
             extra_sections = self._extract_extra_sections(content)
-
-        # Append new observation as an update entry, keep original
-        if existing_observation:
-            combined_observation = (
-                f"{existing_observation}\n\n**Update ({last_updated}):** {observation}"
-            )
         else:
-            combined_observation = observation
+            existing_last_updated = None
+
+        combined_observation = self._merge_observation(
+            existing_observation=existing_observation,
+            existing_first_seen=existing_first_seen,
+            existing_last_updated=existing_last_updated,
+            last_updated=last_updated,
+            observation=observation,
+        )
 
         # Append new evidence to existing, dedup
         existing_set = set(existing_evidence)
@@ -153,7 +182,7 @@ class VaultMemory:
             if item not in existing_set:
                 combined_evidence.append(item)
 
-        return self.write_pattern(
+        written = self.write_pattern(
             slug=slug,
             title=title,
             status=normalized_status,
@@ -166,10 +195,55 @@ class VaultMemory:
             user_notes=existing_notes,
             extra_sections=extra_sections,
         )
+        if normalized_status == "inactive":
+            return written
+        archive_path = self._archived_pattern_path(slug)
+        if archive_path.exists():
+            archive_path.unlink()
+        return written
+
+    @staticmethod
+    def _merge_observation(
+        *,
+        existing_observation: str | None,
+        existing_first_seen: str | None,
+        existing_last_updated: str | None,
+        last_updated: str,
+        observation: str,
+    ) -> str:
+        if not existing_observation:
+            return observation
+
+        if existing_last_updated != last_updated:
+            return (
+                f"{existing_observation}\n\n"
+                f"{VaultMemory._format_update_block(last_updated, observation)}"
+            )
+
+        cleaned = VaultMemory._strip_update_blocks_for_day(
+            existing_observation, last_updated
+        )
+
+        # Patterns founded today should keep a single observation block on same-day reruns.
+        if existing_first_seen == last_updated:
+            return observation
+
+        if not cleaned:
+            return VaultMemory._format_update_block(last_updated, observation)
+
+        return (
+            f"{cleaned}\n\n{VaultMemory._format_update_block(last_updated, observation)}"
+        )
 
     def update_pattern_notes(self, slug: str, note: str) -> Path:
         """Replace the reserved notes section for a pattern without rewriting other sections."""
-        path = self._pattern_path(slug)
+        path = self._pattern_read_path(slug)
+        if path is None:
+            raise FileNotFoundError(
+                errno.ENOENT,
+                "Pattern file is missing",
+                str(self._active_pattern_path(slug)),
+            )
         content = path.read_text(encoding="utf-8")
         updated = self._upsert_section(content, "## User Notes", note)
         path.write_text(updated, encoding="utf-8")
@@ -177,7 +251,13 @@ class VaultMemory:
 
     def update_pattern_status(self, slug: str, status: str) -> Path:
         """Replace the pattern status field without rewriting other content."""
-        path = self._pattern_path(slug)
+        path = self._pattern_read_path(slug)
+        if path is None:
+            raise FileNotFoundError(
+                errno.ENOENT,
+                "Pattern file is missing",
+                str(self._active_pattern_path(slug)),
+            )
         content = path.read_text(encoding="utf-8")
         normalized_status = normalize_pattern_status(status)
         marker = "**Status:** "
@@ -190,7 +270,67 @@ class VaultMemory:
             end = len(content)
         updated = f"{content[:start]}{normalized_status}{content[end:]}"
         path.write_text(updated, encoding="utf-8")
+        if self._is_archived_path(path):
+            if normalized_status == "inactive":
+                path.touch()
+                return path
+            active = self._active_pattern_path(slug)
+            active.write_text(updated, encoding="utf-8")
+            path.unlink()
+            return active
+        if normalized_status == "inactive":
+            self.move_pattern_from_active_to_archive(slug)
+            return self._archived_pattern_path(slug)
         return path
+
+    def move_pattern_from_active_to_archive(self, slug: str) -> bool:
+        """Move ``patterns/{slug}.md`` into ``patterns/_archive/`` if it exists."""
+        src = self._active_pattern_path(slug)
+        if not src.exists():
+            return False
+        self._archive_dir().mkdir(parents=True, exist_ok=True)
+        dst = self._archived_pattern_path(slug)
+        if dst.exists():
+            dst.unlink()
+        src.replace(dst)
+        dst.touch()
+        return True
+
+    def purge_archived_patterns(self, *, max_age_days: int = ARCHIVE_RETENTION_DAYS) -> list[str]:
+        """Delete archived pattern files older than ``max_age_days`` (by filesystem mtime).
+
+        The archive file is touched when moved so mtime approximates archival time.
+        """
+        archive_dir = self._archive_dir()
+        if not archive_dir.exists():
+            return []
+        cutoff = time.time() - max_age_days * 86400
+        removed: list[str] = []
+        for path in sorted(archive_dir.glob("*.md")):
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed.append(path.stem)
+        return removed
+
+    def archived_pattern_exists(self, slug: str) -> bool:
+        """Return True when ``patterns/_archive/{slug}.md`` exists."""
+        return self._archived_pattern_path(slug).exists()
+
+    def inactive_pattern_in_active_folder(self, slug: str) -> bool:
+        """True when an inactive pattern markdown still lives in the main patterns folder."""
+        path = self._active_pattern_path(slug)
+        if not path.exists():
+            return False
+        content = path.read_text(encoding="utf-8")
+        marker = "**Status:** "
+        idx = content.find(marker)
+        if idx == -1:
+            return False
+        start = idx + len(marker)
+        end = content.find("\n", start)
+        if end == -1:
+            end = len(content)
+        return content[start:end].strip().lower() == "inactive"
 
     # ------------------------------------------------------------------
     # Life files (03-Life/)
@@ -289,7 +429,7 @@ class VaultMemory:
         if bounds is None:
             return None
         _, start, end = bounds
-        return content[start:end].strip()
+        return VaultMemory._strip_pattern_footer(content[start:end].strip())
 
     @staticmethod
     def _extract_evidence(content: str) -> list[str]:
@@ -314,9 +454,32 @@ class VaultMemory:
         end = content.find("\n", start)
         return content[start:end].strip() if end != -1 else content[start:].strip()
 
-    def _pattern_path(self, slug: str) -> Path:
+    def _active_pattern_path(self, slug: str) -> Path:
         slug = self._validate_vault_name(slug)
         return self._root / "02-Insights" / "patterns" / f"{slug}.md"
+
+    def _archived_pattern_path(self, slug: str) -> Path:
+        slug = self._validate_vault_name(slug)
+        return self._root / "02-Insights" / "patterns" / _ARCHIVE_SUBDIR / f"{slug}.md"
+
+    def _archive_dir(self) -> Path:
+        return self._root / "02-Insights" / "patterns" / _ARCHIVE_SUBDIR
+
+    def _pattern_read_path(self, slug: str) -> Path | None:
+        active = self._active_pattern_path(slug)
+        if active.exists():
+            return active
+        archived = self._archived_pattern_path(slug)
+        if archived.exists():
+            return archived
+        return None
+
+    @staticmethod
+    def _is_archived_path(path: Path) -> bool:
+        return path.parent.name == _ARCHIVE_SUBDIR
+
+    def _pattern_path(self, slug: str) -> Path:
+        return self._active_pattern_path(slug)
 
     @staticmethod
     def _validate_vault_name(name: str) -> str:
@@ -329,6 +492,27 @@ class VaultMemory:
         ):
             raise ValueError(f"{name!r} is not a safe vault-relative name")
         return name
+
+    @staticmethod
+    def _strip_pattern_footer(content: str) -> str:
+        trimmed = content.rstrip()
+        while trimmed.endswith(_PATTERN_FOOTER):
+            trimmed = trimmed[: -len(_PATTERN_FOOTER)].rstrip()
+        return trimmed
+
+    @staticmethod
+    def _format_update_block(day: str, observation: str) -> str:
+        return f"**Update ({day}):** {observation}"
+
+    @staticmethod
+    def _strip_update_blocks_for_day(content: str, day: str) -> str:
+        pattern = re.compile(
+            r"(?:\n\n)?\*\*Update \("
+            + re.escape(day)
+            + r"\):\*\* .*?(?=(?:\n\n\*\*Update \(\d{4}-\d{2}-\d{2}\):\*\* )|\Z)",
+            re.S,
+        )
+        return pattern.sub("", content).strip()
 
     @staticmethod
     def _extract_extra_sections(content: str) -> str:

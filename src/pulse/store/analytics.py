@@ -306,6 +306,16 @@ class AnalyticsRepository:
             "vault_path": row[6],
         }
 
+    async def delete_insights(self, ids: list[str]) -> None:
+        if not ids:
+            return
+        placeholders = ", ".join("?" for _ in ids)
+        await self._db.execute(
+            f"DELETE FROM insights WHERE id IN ({placeholders})",
+            tuple(ids),
+        )
+        await self._db.commit()
+
     async def list_insights(self, status: str | None = None) -> list[dict]:
         if status is not None:
             cursor = await self._db.execute(

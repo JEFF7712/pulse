@@ -516,3 +516,42 @@ def test_upsert_and_list_insights(tmp_path):
     assert len(archived) == 1
     assert archived[0]["status"] == "archived"
     assert archived[0]["last_seen"] == "2026-03-12"
+
+
+def test_delete_insights_removes_requested_rows(tmp_path):
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics_repo = AnalyticsRepository(db)
+            await analytics_repo.upsert_insight(
+                id="ins-1",
+                title="One",
+                status="active",
+                confidence="0.7",
+                first_seen="2026-03-10",
+                last_seen="2026-03-10",
+                vault_path="02-Insights/patterns/one.md",
+            )
+            await analytics_repo.upsert_insight(
+                id="ins-2",
+                title="Two",
+                status="active",
+                confidence="0.8",
+                first_seen="2026-03-11",
+                last_seen="2026-03-11",
+                vault_path="02-Insights/patterns/two.md",
+            )
+
+            await analytics_repo.delete_insights(["ins-1"])
+            return await analytics_repo.list_insights()
+
+    rows = asyncio.run(exercise())
+
+    assert len(rows) == 1
+    assert rows[0]["id"] == "ins-2"

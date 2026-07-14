@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import time
 from datetime import UTC, date, datetime
 
 import pytest
@@ -217,6 +219,79 @@ def test_discovery_engine_works_without_notification_channel(tmp_path):
 
     assert result.notifications_sent == 0
     assert result.new_patterns == 1
+
+
+def test_discovery_counts_existing_pattern_returned_as_new_as_update(tmp_path):
+    """Discovery result counts should reflect pre-run existence, not only LLM bucket choice."""
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.analysis.vault_memory import VaultMemory
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+
+    response = json.dumps(
+        {
+            "new_patterns": [
+                {
+                    "title": "Late Night Focus Sessions",
+                    "observation": "Refreshed observation.",
+                    "confidence": 0.9,
+                    "evidence": ["2026-03-20: writing 23:00-00:30"],
+                    "trend": "increasing",
+                }
+            ],
+            "updated_patterns": [],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+    fake_llm = FakeLLM(response)
+
+    async def exercise():
+        vault = VaultMemory(vault_root)
+        vault.write_pattern(
+            slug="late-night-focus-sessions",
+            title="Late Night Focus Sessions",
+            status="active",
+            confidence=0.8,
+            first_seen="2026-03-01",
+            last_updated="2026-03-10",
+            observation="Original observation.",
+            evidence_log=["2026-03-10: late work block"],
+            trend="stable",
+        )
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            event_repo = EventRepository(db)
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 22, 30, tzinfo=UTC),
+                        "github",
+                        "commit.pushed",
+                        {"message": "feat: add new endpoint"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=fake_llm,
+            notification_channel=None,
+        )
+        return await engine.run_discovery("daily", target_date)
+
+    result = asyncio.run(exercise())
+
+    assert result.new_patterns == 0
+    assert result.updated_patterns == 1
 
 
 def test_discovery_notifications_include_pattern_context_id(tmp_path):
@@ -787,6 +862,244 @@ def test_discovery_skips_updated_pattern_when_pattern_is_unknown(tmp_path):
     assert patterns == []
 
 
+def test_discovery_prunes_stale_insights_without_pattern_files(tmp_path):
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+
+    response = json.dumps(
+        {
+            "new_patterns": [],
+            "updated_patterns": [],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+    fake_llm = FakeLLM(response)
+
+    async def exercise():
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            event_repo = EventRepository(db)
+
+            await analytics.upsert_insight(
+                id="stale-pattern",
+                title="Stale Pattern",
+                status="active",
+                confidence="0.6",
+                first_seen="2026-03-01",
+                last_seen="2026-03-10",
+                vault_path="02-Insights/patterns/stale-pattern.md",
+            )
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 22, 30, tzinfo=UTC),
+                        "github",
+                        "commit.pushed",
+                        {"message": "feat: add new endpoint"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=fake_llm,
+            notification_channel=None,
+        )
+        await engine.run_discovery("daily", target_date)
+
+        async with connect_db(db_path) as db:
+            analytics = AnalyticsRepository(db)
+            return await analytics.list_insights()
+
+    insights = asyncio.run(exercise())
+
+    assert insights == []
+
+
+def test_discovery_prunes_low_signal_single_day_pattern(tmp_path):
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.analysis.vault_memory import VaultMemory
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+
+    response = json.dumps(
+        {
+            "new_patterns": [],
+            "updated_patterns": [],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+    fake_llm = FakeLLM(response)
+
+    async def exercise():
+        vault = VaultMemory(vault_root)
+        vault.write_pattern(
+            slug="thin-pattern",
+            title="Thin Pattern",
+            status="active",
+            confidence=0.58,
+            first_seen="2026-03-20",
+            last_updated="2026-03-20",
+            observation="A one-day curiosity.",
+            evidence_log=[
+                "2026-03-20: one domain appeared once",
+                "2026-03-20: contextual speculation",
+            ],
+            trend="new",
+        )
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            event_repo = EventRepository(db)
+            await analytics.upsert_insight(
+                id="thin-pattern",
+                title="Thin Pattern",
+                status="active",
+                confidence="0.58",
+                first_seen="2026-03-20",
+                last_seen="2026-03-20",
+                vault_path="02-Insights/patterns/thin-pattern.md",
+            )
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 22, 30, tzinfo=UTC),
+                        "github",
+                        "commit.pushed",
+                        {"message": "feat: add new endpoint"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=fake_llm,
+            notification_channel=None,
+        )
+        await engine.run_discovery("daily", target_date)
+
+        async with connect_db(db_path) as db:
+            analytics = AnalyticsRepository(db)
+            insights = await analytics.list_insights()
+
+        return insights, vault.pattern_exists("thin-pattern")
+
+    insights, exists = asyncio.run(exercise())
+
+    assert insights == []
+    assert exists is False
+
+
+def test_discovery_keeps_low_signal_single_day_pattern_with_user_notes(tmp_path):
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.analysis.vault_memory import VaultMemory
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+
+    response = json.dumps(
+        {
+            "new_patterns": [],
+            "updated_patterns": [],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+    fake_llm = FakeLLM(response)
+
+    async def exercise():
+        vault = VaultMemory(vault_root)
+        path = vault.write_pattern(
+            slug="thin-pattern",
+            title="Thin Pattern",
+            status="active",
+            confidence=0.58,
+            first_seen="2026-03-20",
+            last_updated="2026-03-20",
+            observation="A one-day curiosity.",
+            evidence_log=[
+                "2026-03-20: one domain appeared once",
+                "2026-03-20: contextual speculation",
+            ],
+            trend="new",
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("_None yet._", "Keep this around."),
+            encoding="utf-8",
+        )
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            event_repo = EventRepository(db)
+            await analytics.upsert_insight(
+                id="thin-pattern",
+                title="Thin Pattern",
+                status="active",
+                confidence="0.58",
+                first_seen="2026-03-20",
+                last_seen="2026-03-20",
+                vault_path="02-Insights/patterns/thin-pattern.md",
+            )
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 22, 30, tzinfo=UTC),
+                        "github",
+                        "commit.pushed",
+                        {"message": "feat: add new endpoint"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=fake_llm,
+            notification_channel=None,
+        )
+        await engine.run_discovery("daily", target_date)
+
+        async with connect_db(db_path) as db:
+            analytics = AnalyticsRepository(db)
+            insights = await analytics.list_insights()
+
+        return insights, vault.pattern_exists("thin-pattern")
+
+    insights, exists = asyncio.run(exercise())
+
+    assert len(insights) == 1
+    assert insights[0]["id"] == "thin-pattern"
+    assert exists is True
+
+
 def test_discovery_skips_updated_pattern_with_invalid_status(tmp_path):
     """Updated patterns should not write statuses outside the bounded contract."""
     from pulse.analysis.discovery import DiscoveryEngine
@@ -1105,3 +1418,179 @@ def test_discovery_engine_uses_source_summarizer(tmp_path):
 
     assert len(haiku_calls) >= 1, "Should have at least one Haiku summarization call"
     assert len(sonnet_calls) == 1, "Should have exactly one Sonnet discovery call"
+
+
+def test_discovery_marks_inactive_vault_path_and_archives_file(tmp_path):
+    """Inactive updates should move markdown to ``patterns/_archive`` and set vault_path."""
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.analysis.vault_memory import ARCHIVE_RETENTION_DAYS, VaultMemory
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+    slug = "late-night-focus-sessions"
+
+    response = json.dumps(
+        {
+            "new_patterns": [],
+            "updated_patterns": [
+                {
+                    "slug": slug,
+                    "status": "inactive",
+                    "confidence": 0.55,
+                    "update_note": "No longer observed.",
+                    "new_evidence": ["2026-03-20: quiet evening"],
+                    "trend": "decreasing",
+                }
+            ],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+
+    async def exercise():
+        vault = VaultMemory(vault_root)
+        vault.write_pattern(
+            slug=slug,
+            title="Late Night Focus Sessions",
+            status="active",
+            confidence=0.8,
+            first_seen="2026-03-01",
+            last_updated="2026-03-10",
+            observation="Original.",
+            evidence_log=[
+                "2026-03-10: late work block",
+                "2026-03-11: second day evidence",
+            ],
+            trend="stable",
+        )
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            await analytics.upsert_insight(
+                id=slug,
+                title="Late Night Focus Sessions",
+                status="active",
+                confidence="0.8",
+                first_seen="2026-03-01",
+                last_seen="2026-03-10",
+                vault_path=f"02-Insights/patterns/{slug}.md",
+            )
+            event_repo = EventRepository(db)
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 22, 30, tzinfo=UTC),
+                        "github",
+                        "commit.pushed",
+                        {"message": "feat: add new endpoint"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=FakeLLM(response),
+            notification_channel=None,
+        )
+        await engine.run_discovery("daily", target_date)
+
+        async with connect_db(db_path) as db:
+            analytics = AnalyticsRepository(db)
+            insight = await analytics.get_insight(slug)
+
+        active = vault_root / "02-Insights" / "patterns" / f"{slug}.md"
+        archived = vault_root / "02-Insights" / "patterns" / "_archive" / f"{slug}.md"
+        return insight, active, archived
+
+    insight, active, archived = asyncio.run(exercise())
+
+    assert insight is not None
+    assert insight["status"] == "inactive"
+    assert insight["vault_path"] == f"02-Insights/patterns/_archive/{slug}.md"
+    assert not active.exists()
+    assert archived.exists()
+
+
+def test_discovery_purge_removes_old_archived_patterns_from_disk_and_db(tmp_path):
+    """Archive maintenance should delete files past retention and matching insights."""
+    from pulse.analysis.discovery import DiscoveryEngine
+    from pulse.analysis.vault_memory import ARCHIVE_RETENTION_DAYS, VaultMemory
+    from pulse.store.analytics import AnalyticsRepository
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    db_path = tmp_path / "test.db"
+    vault_root = tmp_path / "vault"
+    target_date = date(2026, 3, 20)
+    slug = "old-pattern"
+
+    response = json.dumps(
+        {
+            "new_patterns": [],
+            "updated_patterns": [],
+            "notifications": [],
+            "baseline_updates": None,
+        }
+    )
+
+    async def exercise():
+        vault = VaultMemory(vault_root)
+        archive_dir = vault_root / "02-Insights" / "patterns" / "_archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        archived = archive_dir / f"{slug}.md"
+        archived.write_text("# stub\n\n**Status:** inactive\n", encoding="utf-8")
+        old_at = time.time() - (ARCHIVE_RETENTION_DAYS + 5) * 86400
+        os.utime(archived, (old_at, old_at))
+
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            analytics = AnalyticsRepository(db)
+            await analytics.upsert_insight(
+                id=slug,
+                title="Old Pattern",
+                status="inactive",
+                confidence="0.5",
+                first_seen="2025-01-01",
+                last_seen="2025-02-01",
+                vault_path=f"02-Insights/patterns/_archive/{slug}.md",
+            )
+            event_repo = EventRepository(db)
+            await event_repo.upsert_events(
+                [
+                    _make_event(
+                        "e1",
+                        datetime(2026, 3, 20, 10, 0, tzinfo=UTC),
+                        "gmail",
+                        "email.received",
+                        {"subject": "x", "from": "a@b.com"},
+                    ),
+                ]
+            )
+
+        engine = DiscoveryEngine(
+            database_path=db_path,
+            vault_root=vault_root,
+            llm=FakeLLM(response),
+            notification_channel=None,
+        )
+        await engine.run_discovery("daily", target_date)
+
+        async with connect_db(db_path) as db:
+            analytics = AnalyticsRepository(db)
+            insight = await analytics.get_insight(slug)
+
+        return insight, archived.exists()
+
+    insight, archived_still = asyncio.run(exercise())
+
+    assert insight is None
+    assert archived_still is False

@@ -1,10 +1,12 @@
 """Tests for VaultMemory — read/write pattern and life knowledge files."""
 
+import os
+import time
 from pathlib import Path
 
 import pytest
 
-from pulse.analysis.vault_memory import VaultMemory
+from pulse.analysis.vault_memory import ARCHIVE_RETENTION_DAYS, VaultMemory
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +192,99 @@ def test_update_pattern_does_not_preserve_default_notes(tmp_path: Path) -> None:
     path = tmp_path / "02-Insights" / "patterns" / "late-night-coding.md"
     content = path.read_text(encoding="utf-8")
     assert "_None yet._" in content
+
+
+def test_update_pattern_keeps_footer_tags_singleton(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    _write_sample_pattern(mem)
+
+    mem.update_pattern(
+        slug="late-night-coding",
+        title="Late-night coding sessions",
+        status="active",
+        confidence=0.9,
+        first_seen="2026-01-10",
+        last_updated="2026-03-26",
+        observation="Updated observation.",
+        evidence_log=["2026-03-26: fresh entry"],
+        trend="Up.",
+    )
+
+    path = tmp_path / "02-Insights" / "patterns" / "late-night-coding.md"
+    content = path.read_text(encoding="utf-8")
+
+    assert content.count("#pulse #pulse/pattern") == 1
+
+
+def test_update_pattern_same_day_rerun_replaces_duplicate_update_block(
+    tmp_path: Path,
+) -> None:
+    mem = _make_memory(tmp_path)
+    path = _write_sample_pattern(mem)
+
+    mem.update_pattern(
+        slug="late-night-coding",
+        title="Late-night coding sessions",
+        status="active",
+        confidence=0.9,
+        first_seen="2026-01-10",
+        last_updated="2026-03-26",
+        observation="First same-day update.",
+        evidence_log=["2026-03-26: fresh entry"],
+        trend="Up.",
+    )
+    mem.update_pattern(
+        slug="late-night-coding",
+        title="Late-night coding sessions",
+        status="active",
+        confidence=0.92,
+        first_seen="2026-01-10",
+        last_updated="2026-03-26",
+        observation="Revised same-day update.",
+        evidence_log=["2026-03-26: fresh entry"],
+        trend="Up.",
+    )
+
+    content = path.read_text(encoding="utf-8")
+
+    assert content.count("**Update (2026-03-26):**") == 1
+    assert "Revised same-day update." in content
+    assert "First same-day update." not in content
+
+
+def test_update_pattern_same_day_rerun_for_new_pattern_keeps_single_observation(
+    tmp_path: Path,
+) -> None:
+    mem = _make_memory(tmp_path)
+    path = mem.write_pattern(
+        slug="fresh-pattern",
+        title="Fresh pattern",
+        status="active",
+        confidence=0.7,
+        first_seen="2026-03-26",
+        last_updated="2026-03-26",
+        observation="Founding observation.",
+        evidence_log=["2026-03-26: first evidence"],
+        trend="new",
+    )
+
+    mem.update_pattern(
+        slug="fresh-pattern",
+        title="Fresh pattern",
+        status="active",
+        confidence=0.75,
+        first_seen="2026-03-26",
+        last_updated="2026-03-26",
+        observation="Refined founding observation.",
+        evidence_log=["2026-03-26: first evidence"],
+        trend="stable",
+    )
+
+    content = path.read_text(encoding="utf-8")
+
+    assert "## Observation\nRefined founding observation." in content
+    assert "**Update (2026-03-26):**" not in content
+    assert "Founding observation." not in content
 
 
 # ---------------------------------------------------------------------------
@@ -567,3 +662,81 @@ def test_read_pattern_by_slug_returns_content_or_empty(tmp_path: Path) -> None:
 
     content = mem.read_pattern_by_slug("late-night-coding")
     assert "# Pattern: Late-night coding sessions" in content
+
+
+def test_update_pattern_status_inactive_moves_file_to_archive(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    active = _write_sample_pattern(mem)
+    archived = mem.update_pattern_status("late-night-coding", "inactive")
+
+    assert not active.exists()
+    assert archived.exists()
+    assert "**Status:** inactive" in archived.read_text(encoding="utf-8")
+
+
+def test_update_pattern_inactive_archives_after_full_rewrite(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    active = _write_sample_pattern(mem)
+    result_path = mem.update_pattern(
+        slug="late-night-coding",
+        title="Late-night coding sessions",
+        status="inactive",
+        confidence=0.5,
+        first_seen="2026-01-10",
+        last_updated="2026-04-01",
+        observation="Faded.",
+        evidence_log=["2026-04-01: rare occurrence"],
+        trend="decreasing",
+    )
+
+    assert not active.exists()
+    assert result_path.exists()
+    assert result_path.parent.name == "_archive"
+    body = result_path.read_text(encoding="utf-8")
+    assert "**Status:** inactive" in body
+
+
+def test_read_pattern_by_slug_loads_archived_pattern(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    _write_sample_pattern(mem)
+    mem.update_pattern_status("late-night-coding", "inactive")
+
+    text = mem.read_pattern_by_slug("late-night-coding")
+    assert "Late-night coding sessions" in text
+    assert "**Status:** inactive" in text
+
+
+def test_delete_pattern_removes_active_and_archive(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    _write_sample_pattern(mem)
+    mem.update_pattern_status("late-night-coding", "inactive")
+    mem.delete_pattern("late-night-coding")
+
+    patterns = tmp_path / "02-Insights" / "patterns"
+    assert not (patterns / "late-night-coding.md").exists()
+    assert not (patterns / "_archive" / "late-night-coding.md").exists()
+
+
+def test_purge_archived_patterns_deletes_stale_files(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    _write_sample_pattern(mem)
+    mem.update_pattern_status("late-night-coding", "inactive")
+    archived = tmp_path / "02-Insights" / "patterns" / "_archive" / "late-night-coding.md"
+    assert archived.exists()
+    age_seconds = (ARCHIVE_RETENTION_DAYS + 3) * 86400
+    old_at = time.time() - age_seconds
+    os.utime(archived, (old_at, old_at))
+
+    removed = mem.purge_archived_patterns(max_age_days=ARCHIVE_RETENTION_DAYS)
+    assert removed == ["late-night-coding"]
+    assert not archived.exists()
+
+
+def test_purge_archived_patterns_keeps_recent_files(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    _write_sample_pattern(mem)
+    mem.update_pattern_status("late-night-coding", "inactive")
+
+    assert mem.purge_archived_patterns(max_age_days=ARCHIVE_RETENTION_DAYS) == []
+    archived = tmp_path / "02-Insights" / "patterns" / "_archive" / "late-night-coding.md"
+    assert archived.exists()

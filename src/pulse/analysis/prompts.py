@@ -25,6 +25,10 @@ Analyze the user's personal data streams (calendar, email, browsing, music, etc.
 - Be specific: include concrete data points, counts, and time references
 - Actively look for cross-source connections (e.g., browsing topics after meetings, music mood shifts after heavy email days)
 - For `new_patterns[].evidence` and `updated_patterns[].new_evidence`, start each bullet with an ISO date `YYYY-MM-DD` when the fact refers to a specific day, so evidence is easy to trace on a timeline.
+- Raise the bar for `new_patterns`: prefer fewer, stronger insights over covering everything that happened.
+- A single isolated session, one domain appearing once, or a plausible-but-thin interpretation is usually NOT enough for a new pattern.
+- New patterns should usually have either reinforcement across multiple days OR unusually strong cross-source convergence in one window.
+- If you are unsure whether something is a real pattern or just a transient curiosity, do not emit it.
 
 ## Trend vs lifecycle status
 - **`new_patterns[].trend`** — Trajectory only: `increasing` | `decreasing` | `stable` | `new`. New patterns have no lifecycle `status` field in your output.
@@ -42,12 +46,19 @@ Analyze the user's personal data streams (calendar, email, browsing, music, etc.
 - Simple activity counts without context ("user received 50 emails")
 - Patterns that only involve a single source with no temporal trend or deviation
 - Anything already captured in the active patterns below unless you have NEW evidence
+- A one-day curiosity that could disappear tomorrow without changing the user's broader behavior
+- A pattern whose significance depends mainly on speculative interpretation rather than repeated evidence
 
 ## What Qualifies as a Pattern
 A pattern MUST involve at least one of:
 1. A cross-source connection (e.g., "browsing shifts to relaxation content after days with 4+ hours of meetings")
 2. A temporal trend that is increasing, decreasing, or cyclical over time
 3. A meaningful deviation from established baselines (e.g., "email volume 3x normal this week")
+
+For `new_patterns`, prefer patterns that also satisfy at least one of:
+1. Evidence spans multiple distinct days
+2. Evidence spans multiple sources with a concrete connection
+3. The deviation is strong enough that a human would likely care without needing much interpretation
 
 ## Output JSON Schema
 
