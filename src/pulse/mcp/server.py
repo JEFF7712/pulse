@@ -1,12 +1,14 @@
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import asdict, is_dataclass
 from datetime import UTC, date, datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from mcp.server.fastmcp import Context, FastMCP
 
+from pulse.analysis.preprocessor import EventPreprocessor
 from pulse.analysis.vault_memory import VaultMemory
 from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
@@ -155,6 +157,47 @@ async def pulse_query_events(
         ],
     }
     return json.dumps(payload, indent=2)
+
+
+def _dc(obj):
+    if is_dataclass(obj):
+        return {k: _dc(v) for k, v in asdict(obj).items()}
+    if isinstance(obj, list):
+        return [_dc(x) for x in obj]
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
+
+
+@mcp.tool()
+async def pulse_digest(day: str | None = None, ctx: Context = None) -> str:
+    """Deterministic day digest: per-source counts + clustered activity (no LLM).
+
+    Args:
+        day: ISO date (defaults to today).
+    """
+    pulse_ctx = _get_pulse_ctx(ctx)
+    tz = _context_timezone(pulse_ctx)
+    if day is None:
+        day = _today_for_timezone(tz)
+    parsed = _parse_day(day)
+    if isinstance(parsed, str):
+        return parsed
+    events = await pulse_ctx.events.list_events_for_day(day, timezone=tz)
+    counts: dict[str, int] = {}
+    for e in events:
+        counts[e.source] = counts.get(e.source, 0) + 1
+    preprocessed = EventPreprocessor().preprocess(events)
+    return json.dumps(
+        {
+            "day": day,
+            "total_events": len(events),
+            "by_source": counts,
+            "clusters": _dc(preprocessed),
+        },
+        indent=2,
+        default=str,
+    )
 
 
 @mcp.tool()

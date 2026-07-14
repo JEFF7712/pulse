@@ -257,3 +257,79 @@ def test_pulse_vault_tools_round_trip_list_append_and_reject_unsafe(
             assert "Unsafe vault path" in unsafe
 
     asyncio.run(_run())
+
+
+def test_pulse_digest_returns_source_counts_and_clusters(tmp_path: Path) -> None:
+    """pulse_digest returns per-source counts and preprocessor clusters for a day."""
+    from pulse.mcp import server as server_module
+
+    async def _run() -> None:
+        async with open_pulse_context(
+            db_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="browser:d1",
+                        timestamp=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+                        source="browser",
+                        event_type="browsing.visit",
+                        data={
+                            "url": "https://docs.rs/tokio",
+                            "title": "tokio - Rust",
+                        },
+                        metadata={},
+                    ),
+                    Event(
+                        id="browser:d2",
+                        timestamp=datetime(2026, 7, 1, 10, 10, tzinfo=UTC),
+                        source="browser",
+                        event_type="browsing.visit",
+                        data={
+                            "url": "https://docs.rs/async-std",
+                            "title": "async-std - Rust",
+                        },
+                        metadata={},
+                    ),
+                    Event(
+                        id="gmail:d1",
+                        timestamp=datetime(2026, 7, 1, 11, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "invoice", "sender": "billing@co.com"},
+                        metadata={},
+                    ),
+                    Event(
+                        id="calendar:d1",
+                        timestamp=datetime(2026, 7, 1, 14, 0, tzinfo=UTC),
+                        source="calendar",
+                        event_type="calendar.event",
+                        data={"title": "standup"},
+                        metadata={},
+                    ),
+                ]
+            )
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            result = await server_module.pulse_digest(day="2026-07-01", ctx=ctx)
+            parsed = json.loads(result)
+
+            assert parsed["day"] == "2026-07-01"
+            assert parsed["total_events"] == 4
+            assert parsed["by_source"] == {
+                "browser": 2,
+                "gmail": 1,
+                "calendar": 1,
+            }
+            clusters = parsed["clusters"]
+            assert "browsing_clusters" in clusters
+            assert "calendar_blocks" in clusters
+            assert len(clusters["browsing_clusters"]) >= 1
+            assert clusters["browsing_clusters"][0]["domain"] == "docs.rs"
+            assert len(clusters["calendar_blocks"]) >= 1
+            assert clusters["calendar_blocks"][0]["title"] == "standup"
+
+    asyncio.run(_run())
