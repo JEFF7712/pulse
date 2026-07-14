@@ -231,7 +231,7 @@ def _serialize_pulse_toml_document(full: dict) -> str:
         sec = connectors.get(name)
         if isinstance(sec, dict) and sec:
             lines.extend(_emit_generic_connectors_table(name, sec))
-    skip_top = frozenset(("connectors", "llm")) | _PULSE_ROOT_FIELD_NAMES
+    skip_top = frozenset(("connectors",)) | _PULSE_ROOT_FIELD_NAMES
     for top_key in sorted(k for k in full if k not in skip_top):
         # Forward-compat: extra top-level sections as [key] with flat scalars only.
         block = full[top_key]

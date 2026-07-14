@@ -144,15 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "configure",
         parents=[config_parent],
-        help=(
-            "Interactive setup: core, connectors, notifications, model API keys, "
-            "[llm] roles in pulse.toml, full wizard"
-        ),
+        help="Interactive setup: core, connectors, notifications, full wizard",
     )
     init_parser = subparsers.add_parser(
         "init",
         parents=[config_parent],
-        help="Structure vault profile (optional LLM) and run initial connector pulls",
+        help="Write vault profile and run initial connector pulls",
     )
     init_parser.add_argument(
         "-f",

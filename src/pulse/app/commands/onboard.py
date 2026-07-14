@@ -68,9 +68,7 @@ def onboard_print_prerequisites() -> None:
         "Run from the directory where your Pulse config lives (usually ``.config/pulse.toml`` or repo-root ``pulse.toml``)."
     )
     ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
-    ui.muted_line(
-        "For Google, Spotify, or GitHub, create OAuth apps as needed."
-    )
+    ui.muted_line("For Google, Spotify, or GitHub, create OAuth apps as needed.")
     ui.muted_line(
         "Local callbacks: Spotify :8888, GitHub :8891, Plaid Link :8893, Oura :8894."
     )
@@ -84,7 +82,7 @@ def internal_install(args) -> None:
         ui.kv_line("Command", "pulse")
         ui.muted_line(
             "If «pulse» is not found, open a new shell or run: "
-            "[cmd]export PATH=\"$HOME/.local/bin:$PATH\"[/]"
+            '[cmd]export PATH="$HOME/.local/bin:$PATH"[/]'
         )
         ui.rule("Setup")
         ui.step("Interactive onboarding")
@@ -110,7 +108,7 @@ def onboard_print_next_steps(host: str, port: int) -> None:
             f"Listen address is {host} — use your machine's IP or hostname if you browse from elsewhere."
         )
     ui.step("While Pulse is running")
-    ui.muted_line("In another terminal: [cmd]pulse status[/]   [cmd]pulse insights[/]")
+    ui.muted_line("In another terminal: [cmd]pulse status[/]   [cmd]pulse logs[/]")
 
 
 def onboard(args) -> None:
@@ -186,4 +184,3 @@ def onboard(args) -> None:
     ui.onboard_phase("run")
     onboard_print_next_steps(args.host, args.port)
     run_server(args)
-
