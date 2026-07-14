@@ -36,8 +36,11 @@ def test_pattern_evolution_across_multiple_passes(tmp_path):
             "new_patterns": [{
                 "title": "Late Browsing Pattern",
                 "observation": "Browsing after 10pm on email-heavy days",
-                "confidence": "low",
-                "evidence": ["2026-03-20: email + late browsing"],
+                "confidence": 0.72,
+                "evidence": [
+                    "2026-03-19: email + late browsing",
+                    "2026-03-20: email + late browsing",
+                ],
                 "trend": "New — needs more data",
             }],
             "updated_patterns": [],
@@ -99,7 +102,7 @@ def test_pattern_evolution_across_multiple_passes(tmp_path):
         vault = VaultMemory(vault_root=vault_path)
         patterns = vault.read_patterns()
         assert len(patterns) == 1
-        assert "**Confidence:** low" in patterns[0]["content"]
+        assert "**Confidence:** 0.72" in patterns[0]["content"]
 
         # Add more events for week 2
         async with connect_db(db_path) as db:

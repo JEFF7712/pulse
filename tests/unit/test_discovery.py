@@ -76,6 +76,34 @@ class FakeChannel:
         return True
 
 
+def _seed_existing_pattern(
+    vault_root,
+    *,
+    slug: str = "late-night-focus-sessions",
+    title: str = "Late Night Focus Sessions",
+    confidence: float | str = 0.7,
+    first_seen: str = "2026-03-01",
+    last_updated: str = "2026-03-10",
+    observation: str = "Existing observation.",
+    evidence_log: list[str] | None = None,
+    trend: str = "stable",
+) -> None:
+    """Write a vault pattern file so discovery does not treat the insight as stale."""
+    from pulse.analysis.vault_memory import VaultMemory
+
+    VaultMemory(vault_root).write_pattern(
+        slug=slug,
+        title=title,
+        status="active",
+        confidence=confidence,
+        first_seen=first_seen,
+        last_updated=last_updated,
+        observation=observation,
+        evidence_log=evidence_log or ["2026-03-10: late work block"],
+        trend=trend,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -240,7 +268,10 @@ def test_discovery_counts_existing_pattern_returned_as_new_as_update(tmp_path):
                     "title": "Late Night Focus Sessions",
                     "observation": "Refreshed observation.",
                     "confidence": 0.9,
-                    "evidence": ["2026-03-20: writing 23:00-00:30"],
+                    "evidence": [
+                        "2026-03-19: coding session 22:00-01:00",
+                        "2026-03-20: writing 23:00-00:30",
+                    ],
                     "trend": "increasing",
                 }
             ],
@@ -356,7 +387,10 @@ def test_discovery_notifications_map_context_ids_by_pattern_slug(tmp_path):
                     "title": "Late Night Focus Sessions",
                     "observation": "User consistently works after 22:00 on weeknights.",
                     "confidence": 0.85,
-                    "evidence": ["2026-03-20: writing 23:00-00:30"],
+                    "evidence": [
+                        "2026-03-19: coding session 22:00-01:00",
+                        "2026-03-20: writing 23:00-00:30",
+                    ],
                     "trend": "new",
                 }
             ],
@@ -430,7 +464,10 @@ def test_discovery_notifications_match_canonical_pattern_slug_variants(tmp_path)
                     "title": "Late Night Focus Sessions",
                     "observation": "User consistently works after 22:00 on weeknights.",
                     "confidence": 0.85,
-                    "evidence": ["2026-03-20: writing 23:00-00:30"],
+                    "evidence": [
+                        "2026-03-19: coding session 22:00-01:00",
+                        "2026-03-20: writing 23:00-00:30",
+                    ],
                     "trend": "new",
                 }
             ],
@@ -525,6 +562,7 @@ def test_discovery_notifications_include_context_for_existing_known_pattern(tmp_
     fake_channel = FakeChannel()
 
     async def exercise():
+        _seed_existing_pattern(vault_root)
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
@@ -597,6 +635,7 @@ def test_discovery_updates_preserve_existing_insight_first_seen(tmp_path):
     fake_llm = FakeLLM(response)
 
     async def exercise():
+        _seed_existing_pattern(vault_root)
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
@@ -1050,7 +1089,9 @@ def test_discovery_keeps_low_signal_single_day_pattern_with_user_notes(tmp_path)
             trend="new",
         )
         path.write_text(
-            path.read_text(encoding="utf-8").replace("_None yet._", "Keep this around."),
+            path.read_text(encoding="utf-8").replace(
+                "_None yet._", "Keep this around."
+            ),
             encoding="utf-8",
         )
 
@@ -1132,6 +1173,7 @@ def test_discovery_skips_updated_pattern_with_invalid_status(tmp_path):
     fake_llm = FakeLLM(response)
 
     async def exercise():
+        _seed_existing_pattern(vault_root)
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
@@ -1211,6 +1253,7 @@ def test_discovery_updates_preserve_existing_insight_title(tmp_path):
     fake_llm = FakeLLM(response)
 
     async def exercise():
+        _seed_existing_pattern(vault_root, title="Night Owl Deep Work")
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
@@ -1305,6 +1348,7 @@ def test_discovery_canonicalizes_updated_pattern_slugs(tmp_path):
     fake_channel = FakeChannel()
 
     async def exercise():
+        _seed_existing_pattern(vault_root, title="Night Owl Deep Work")
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             analytics = AnalyticsRepository(db)
