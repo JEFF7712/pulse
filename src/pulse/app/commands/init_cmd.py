@@ -283,50 +283,6 @@ def init_profile(
     )
     ui.muted_line(result.detail)
 
-    # --- Step 4: Initial discovery (if LLM available) ---
-    from pulse.llm.factory import (
-        create_providers_from_config,
-        discovery_model_for_discovery,
-        summarization_model_for_source_summaries,
-    )
-
-    _, disc_llm = create_providers_from_config(config)
-
-    if disc_llm is not None:
-        ui.step("Running initial discovery")
-        from pulse.jobs.runners import run_discovery_job
-        from pulse.notifications.factory import build_notification_channel
-
-        channel = build_notification_channel(config)
-
-        try:
-            result = asyncio.run(
-                run_discovery_job(
-                    cadence="weekly",
-                    target_date=today,
-                    database_path=config.database_path,
-                    vault_path=config.vault_path,
-                    llm=disc_llm,
-                    timezone=config.timezone,
-                    notification_channel=channel,
-                    summarization_model=summarization_model_for_source_summaries(config)
-                    or "",
-                    discovery_model=discovery_model_for_discovery(config) or "",
-                )
-            )
-        except Exception as e:
-            um = user_message_for_anthropic_exception(e)
-            if um:
-                ui.error(um)
-            else:
-                ui.error(f"Initial discovery failed: {e}")
-            raise SystemExit(1) from e
-        ui.muted_line(result.detail)
-    else:
-        ui.muted_line(
-            "Skipping discovery (configure [llm.summarization] and/or [llm.discovery])."
-        )
-
     ui.success(
         "Pulse initialized! Run [cmd]pulse run[/] to start the server and scheduler."
     )

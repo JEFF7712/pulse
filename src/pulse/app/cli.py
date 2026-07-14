@@ -127,13 +127,13 @@ def build_parser() -> argparse.ArgumentParser:
     discover_parser = subparsers.add_parser(
         "discover",
         parents=[config_parent],
-        help="Run LLM discovery pass (scheduled jobs use daily cadence only)",
+        help="Run aggregation for a target day",
     )
     discover_parser.add_argument(
         "--cadence",
         default="daily",
         choices=["daily", "weekly", "monthly"],
-        help="Discovery cadence (default: daily)",
+        help="Unused (kept for CLI compatibility)",
     )
     discover_parser.add_argument(
         "--date",

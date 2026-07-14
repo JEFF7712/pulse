@@ -2,7 +2,6 @@ import asyncio
 from datetime import timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from pulse.app.config import PulseConfig, ConnectorConfig
@@ -14,8 +13,10 @@ from pulse.jobs.intervals import parse_interval
 class FakeConnector(Connector):
     async def pull(self, since=None):
         return []
+
     def get_source_name(self):
         return "fake"
+
     def get_default_interval(self):
         return timedelta(minutes=10)
 
@@ -25,9 +26,11 @@ def test_build_scheduler_creates_pull_jobs_from_registry():
 
     registry = ConnectorRegistry()
     registry.register_pull("fake", lambda: FakeConnector())
-    config = PulseConfig(connectors={
-        "fake": ConnectorConfig(enabled=True, poll_interval="10m"),
-    })
+    config = PulseConfig(
+        connectors={
+            "fake": ConnectorConfig(enabled=True, poll_interval="10m"),
+        }
+    )
     asyncio.run(registry.build_active_connectors(config))
 
     scheduler = build_scheduler(registry=registry, config=config)
@@ -51,8 +54,9 @@ def test_build_scheduler_keeps_analysis_jobs():
 
     assert "aggregation" in jobs
     assert isinstance(jobs["aggregation"].trigger, IntervalTrigger)
-    assert "discovery_daily" in jobs
-    assert isinstance(jobs["discovery_daily"].trigger, CronTrigger)
+    assert "discovery_daily" not in jobs
+    assert "discovery_weekly" not in jobs
+    assert "discovery_monthly" not in jobs
 
 
 def test_parse_interval_handles_various_units():
@@ -64,6 +68,7 @@ def test_parse_interval_handles_various_units():
 
 def test_parse_interval_rejects_invalid_format():
     import pytest
+
     with pytest.raises(ValueError):
         parse_interval("invalid")
 
@@ -74,12 +79,16 @@ from pulse.connectors.spotify import SupplementaryPullMixin
 class FakeSupplementaryConnector(Connector, SupplementaryPullMixin):
     async def pull(self, since=None):
         return []
+
     def get_source_name(self):
         return "supplementary_fake"
+
     def get_default_interval(self):
         return timedelta(minutes=30)
+
     def get_supplementary_jobs(self, config):
         return [("extra", timedelta(hours=2), self._extra_pull)]
+
     async def _extra_pull(self):
         return []
 
@@ -89,9 +98,11 @@ def test_build_scheduler_creates_supplementary_jobs():
 
     registry = ConnectorRegistry()
     registry.register_pull("supplementary_fake", lambda: FakeSupplementaryConnector())
-    config = PulseConfig(connectors={
-        "supplementary_fake": ConnectorConfig(enabled=True, poll_interval="30m"),
-    })
+    config = PulseConfig(
+        connectors={
+            "supplementary_fake": ConnectorConfig(enabled=True, poll_interval="30m"),
+        }
+    )
     asyncio.run(registry.build_active_connectors(config))
 
     scheduler = build_scheduler(registry=registry, config=config)

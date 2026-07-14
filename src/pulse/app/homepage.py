@@ -39,7 +39,6 @@ def render_homepage(
     action_labels = "".join(
         (
             _render_action_form("/actions/pull", "run pull"),
-            _render_action_form("/actions/discover", "run discovery"),
             _render_action_form("/actions/test-telegram", "test telegram"),
         )
     )

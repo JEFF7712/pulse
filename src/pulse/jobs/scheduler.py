@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -10,13 +10,6 @@ from pulse.connectors.registry import ConnectorRegistry
 from pulse.jobs.corrections_notifications import notify_corrections_backlog_if_needed
 from pulse.jobs.failure_notifications import notify_scheduled_job_failure
 from pulse.jobs.intervals import parse_interval
-from pulse.jobs.runners import JobResult
-from pulse.llm.factory import (
-    create_providers_from_config,
-    discovery_model_for_discovery,
-    summarization_model_for_source_summaries,
-)
-from pulse.notifications.factory import build_notification_channel
 
 try:
     from zoneinfo import ZoneInfo
@@ -25,16 +18,6 @@ except ImportError:  # pragma: no cover
 
 
 logger = logging.getLogger(__name__)
-
-
-def _log_llm_related_job_failure(job_label: str, exc: Exception) -> None:
-    from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
-
-    hint = user_message_for_anthropic_exception(exc)
-    if hint:
-        logger.error("%s: %s", job_label, hint, exc_info=exc)
-    else:
-        logger.exception("%s failed", job_label)
 
 
 def build_scheduler(
@@ -76,28 +59,6 @@ def build_scheduler(
         "interval",
         hours=1,
         id="aggregation",
-    )
-
-    # Discovery jobs
-    scheduler.add_job(
-        _make_discovery_job("daily", config),
-        "cron",
-        hour=23,
-        id="discovery_daily",
-    )
-    scheduler.add_job(
-        _make_discovery_job("weekly", config),
-        "cron",
-        day_of_week="sun",
-        hour=20,
-        id="discovery_weekly",
-    )
-    scheduler.add_job(
-        _make_discovery_job("monthly", config),
-        "cron",
-        day=1,
-        hour=10,
-        id="discovery_monthly",
     )
 
     return scheduler
@@ -177,43 +138,6 @@ def _make_aggregation_job(config):
         except Exception as e:
             await notify_scheduled_job_failure(config, "aggregation", e)
             logger.exception("Aggregation job failed")
-            raise
-
-    return job
-
-
-def _make_discovery_job(cadence, config):
-    async def job():
-        try:
-            from pulse.jobs.runners import run_discovery_job
-
-            day = _resolve_current_day(config)
-            _, disc_llm = create_providers_from_config(config)
-
-            if disc_llm is None:
-                return JobResult(
-                    status="skipped",
-                    detail=f"Discovery ({cadence}) skipped: no LLM provider configured",
-                )
-
-            channel = build_notification_channel(config)
-            return await run_discovery_job(
-                cadence=cadence,
-                target_date=day,
-                database_path=config.database_path,
-                vault_path=config.vault_path,
-                llm=disc_llm,
-                timezone=config.timezone,
-                notification_channel=channel,
-                summarization_model=summarization_model_for_source_summaries(config)
-                or "",
-                discovery_model=discovery_model_for_discovery(config) or "",
-            )
-        except Exception as e:
-            await notify_scheduled_job_failure(
-                config, f"discovery_{cadence}", e
-            )
-            _log_llm_related_job_failure(f"discovery_{cadence}", e)
             raise
 
     return job

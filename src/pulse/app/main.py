@@ -8,7 +8,6 @@ from pulse.app.config import PulseConfig
 from pulse.app.dependencies import get_settings
 from pulse.app.home_actions import (
     ActionResult,
-    run_discovery_action,
     run_pull_action,
     run_test_telegram_action,
 )
@@ -33,14 +32,11 @@ Settings = PulseConfig
 _NOTICE_MESSAGES = {
     "pull-skipped": "pull skipped",
     "pull-complete": "pull complete",
-    "discovery-complete": "discovery complete",
     "telegram-test-sent": "telegram test sent",
 }
 
 _ERROR_MESSAGES = {
     "pull-failed": "pull failed",
-    "discovery-not-configured": "discovery not configured",
-    "discovery-failed": "discovery failed",
     "telegram-not-configured": "telegram not configured",
     "telegram-test-failed": "telegram test failed",
 }
@@ -88,13 +84,6 @@ def create_app(
         current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
     ) -> RedirectResponse:
         result = await run_pull_action(current_settings, registry)
-        return _redirect_home(result)
-
-    @app.post("/actions/discover")
-    async def run_discover(
-        current_settings: Annotated[PulseConfig, Depends(settings_dependency)],
-    ) -> RedirectResponse:
-        result = await run_discovery_action(current_settings)
         return _redirect_home(result)
 
     @app.post("/actions/test-telegram")

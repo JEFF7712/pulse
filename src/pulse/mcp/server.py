@@ -10,14 +10,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from pulse.app.config_loader import load_config
 from pulse.domain.events import Event
-from pulse.jobs.runners import run_aggregation_job, run_discovery_job
-from pulse.llm.factory import (
-    create_providers_from_config,
-    discovery_model_for_discovery,
-    summarization_model_for_source_summaries,
-)
 from pulse.mcp.context import PulseContext, open_pulse_context
-from pulse.notifications.factory import build_notification_channel
 from pulse.services.corrections import build_correction_service
 from pulse.store.analytics import AnalyticsRepository
 from pulse.store.schema import bootstrap_schema
@@ -171,54 +164,6 @@ async def pulse_correct(context_id: str, message_text: str, ctx: Context = None)
     correction = await service.record_correction(context_id, message_text)
 
     return f"Correction {correction.id} recorded."
-
-
-@mcp.tool()
-async def pulse_discovery(
-    cadence: str = "daily",
-    day: str | None = None,
-    ctx: Context = None,
-) -> str:
-    """Run LLM insight discovery (patterns, vault updates, optional notifications).
-
-    Args:
-        cadence: One of daily, weekly, monthly.
-        day: Target date YYYY-MM-DD (end of window). Defaults to today.
-    """
-    if cadence not in ("daily", "weekly", "monthly"):
-        return f"Invalid cadence '{cadence}'. Use daily, weekly, or monthly."
-
-    pulse_ctx = _get_pulse_ctx(ctx)
-    if day is None:
-        day = _today_for_timezone(_context_timezone(pulse_ctx))
-
-    target_date = _parse_day(day)
-    if isinstance(target_date, str):
-        return target_date
-
-    config = pulse_ctx.config if pulse_ctx.config is not None else load_config()
-    _, disc_llm = create_providers_from_config(config)
-    if disc_llm is None:
-        return "Discovery skipped: no LLM provider configured."
-
-    await run_aggregation_job(
-        day=target_date,
-        database_path=pulse_ctx.database_path,
-        timezone=_context_timezone(pulse_ctx),
-    )
-    channel = build_notification_channel(config)
-    job = await run_discovery_job(
-        cadence=cadence,
-        target_date=target_date,
-        database_path=pulse_ctx.database_path,
-        vault_path=pulse_ctx.vault_path,
-        llm=disc_llm,
-        timezone=_context_timezone(pulse_ctx),
-        notification_channel=channel,
-        summarization_model=summarization_model_for_source_summaries(config) or "",
-        discovery_model=discovery_model_for_discovery(config) or "",
-    )
-    return f"{job.status}: {job.detail}"
 
 
 @mcp.tool()

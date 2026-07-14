@@ -50,7 +50,6 @@ def test_status_shows_actionable_message_when_config_missing(tmp_path, capsys):
 
 def test_discover_uses_config_timezone_when_date_omitted(monkeypatch, tmp_path) -> None:
     import pulse.jobs.runners as runners
-    import pulse.llm.factory as llm_factory
 
     observed: dict[str, object] = {}
 
@@ -63,9 +62,6 @@ def test_discover_uses_config_timezone_when_date_omitted(monkeypatch, tmp_path) 
     async def fake_run_aggregation_job(*, day, database_path: str, timezone: str):
         observed["aggregation_day"] = day
         observed["aggregation_timezone"] = timezone
-
-    async def fake_run_discovery_job(**kwargs):
-        observed["discovery_day"] = kwargs["target_date"]
 
         class Result:
             status = "ok"
@@ -86,25 +82,12 @@ def test_discover_uses_config_timezone_when_date_omitted(monkeypatch, tmp_path) 
     monkeypatch.setattr(ops, "datetime", FixedDateTime)
     monkeypatch.setattr(ops, "load_config", lambda: config)
     monkeypatch.setattr(runners, "run_aggregation_job", fake_run_aggregation_job)
-    monkeypatch.setattr(runners, "run_discovery_job", fake_run_discovery_job)
-    monkeypatch.setattr(
-        llm_factory, "create_providers_from_config", lambda _config: (None, object())
-    )
-    monkeypatch.setattr(
-        llm_factory,
-        "summarization_model_for_source_summaries",
-        lambda _config: "summary",
-    )
-    monkeypatch.setattr(
-        llm_factory, "discovery_model_for_discovery", lambda _config: "discovery"
-    )
     monkeypatch.setattr(ops.ui, "rule", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(ops.ui, "say", lambda *_args, **_kwargs: None)
 
     ops.discover(args)
 
     assert observed["aggregation_day"] == date(2026, 3, 27)
-    assert observed["discovery_day"] == date(2026, 3, 27)
     assert observed["aggregation_timezone"] == "America/Los_Angeles"
 
 

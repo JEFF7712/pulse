@@ -14,7 +14,6 @@ except ImportError:  # pragma: no cover
 
 from pulse.app import cli_ui as ui
 from pulse.app.config_loader import PulseConfigNotFoundError, load_config
-from pulse.llm.anthropic_errors import user_message_for_anthropic_exception
 
 
 def _resolve_current_day(timezone: str) -> date:
@@ -24,12 +23,7 @@ def _resolve_current_day(timezone: str) -> date:
 
 
 def discover(args) -> None:
-    from pulse.jobs.runners import run_aggregation_job, run_discovery_job
-    from pulse.llm.factory import (
-        create_providers_from_config,
-        discovery_model_for_discovery,
-        summarization_model_for_source_summaries,
-    )
+    from pulse.jobs.runners import run_aggregation_job
 
     config = load_config()
     target = (
@@ -38,47 +32,15 @@ def discover(args) -> None:
         else _resolve_current_day(config.timezone)
     )
 
-    _, disc_llm = create_providers_from_config(config)
-    if disc_llm is None:
-        ui.error(
-            "No discovery LLM configured. Set [llm.discovery] (or [llm.summarization]) in pulse.toml."
-        )
-        sys.exit(1)
-
     ui.rule("pulse discover")
     ui.say(f"[accent]Aggregating stats[/] for [bold]{target.isoformat()}[/]…")
-    asyncio.run(
+    result = asyncio.run(
         run_aggregation_job(
             day=target,
             database_path=config.database_path,
             timezone=config.timezone,
         )
     )
-
-    ui.say(
-        f"[accent]Running {args.cadence} discovery[/] for [bold]{target.isoformat()}[/]…"
-    )
-    try:
-        result = asyncio.run(
-            run_discovery_job(
-                cadence=args.cadence,
-                target_date=target,
-                database_path=config.database_path,
-                vault_path=config.vault_path,
-                llm=disc_llm,
-                timezone=config.timezone,
-                summarization_model=summarization_model_for_source_summaries(config)
-                or "",
-                discovery_model=discovery_model_for_discovery(config) or "",
-            )
-        )
-    except Exception as e:
-        um = user_message_for_anthropic_exception(e)
-        if um:
-            ui.error(um)
-        else:
-            ui.error(f"Discovery failed: {e}")
-        raise SystemExit(1) from e
     ui.say(f"[bold]{result.status}[/]: {result.detail}")
 
 
