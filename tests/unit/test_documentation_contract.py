@@ -22,7 +22,6 @@ QUICKSTART_REQUIRED_SNIPPETS = [
     "pulse init",
     "pulse run",
     "pulse status",
-    "pulse insights",
 ]
 
 CONNECTOR_REQUIRED_SNIPPETS = [
@@ -62,13 +61,11 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "PULSE_SPOTIFY_CLIENT_ID",
     "PULSE_SPOTIFY_CLIENT_SECRET",
     "PULSE_PLAID_CLIENT_ID",
-    "PULSE_ANTHROPIC_API_KEY",
     "pulse.toml",
     "google_tokens.json",
     "spotify_tokens.json",
     "plaid_tokens.json",
     "Same **`load_config()`**",
-    "One configured role can cover both summarization and discovery if the other is omitted.",
 ]
 
 RUNBOOK_REQUIRED_SNIPPETS = [
@@ -78,15 +75,10 @@ RUNBOOK_REQUIRED_SNIPPETS = [
     "pulse logs",
     "pulse reset",
     "aggregation",
-    "discovery_daily",
     "**host** timezone",
     "PULSE_TIMEZONE",
     "invalid-publisher",
     "pypi-trusted-publishing.md",
-]
-
-QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS = [
-    "optional discovery when LLM",
 ]
 
 # README copy is allowed to use the deployed docs site instead of repo-relative
@@ -186,17 +178,6 @@ def test_quickstart_documents_pulse_onboard() -> None:
 
     missing = [s for s in QUICKSTART_ONBOARD_SNIPPETS if s not in quickstart]
     assert not missing, f"quickstart.md should document pulse onboard: {missing}"
-
-
-def test_quickstart_documents_discovery_role_fallback() -> None:
-    quickstart = (REPO_ROOT / "docs/self-hosting/quickstart.md").read_text(
-        encoding="utf-8"
-    )
-
-    missing = [s for s in QUICKSTART_DISCOVERY_REQUIRED_SNIPPETS if s not in quickstart]
-    assert not missing, (
-        f"quickstart.md should document discovery role fallback: {missing}"
-    )
 
 
 def test_quickstart_marks_auth_commands_as_optional() -> None:

@@ -1,4 +1,4 @@
-"""Read-only ops commands: discover, status, insights, logs, reset."""
+"""Read-only ops commands: discover, status, logs, reset."""
 
 from __future__ import annotations
 
@@ -87,36 +87,6 @@ def status(config_dir: Path | None = None) -> None:
                 event_rows=rows,
                 sync_rows=sync_rows,
             )
-
-    asyncio.run(_show())
-
-
-def insights() -> None:
-    from pulse.store.analytics import AnalyticsRepository
-    from pulse.store.db import connect_db
-    from pulse.store.schema import bootstrap_schema
-
-    config = load_config()
-
-    if not Path(config.database_path).exists():
-        ui.error("No database found. Run [cmd]pulse pull[/] first.")
-        sys.exit(1)
-
-    async def _show():
-        async with connect_db(config.database_path) as db:
-            await bootstrap_schema(db)
-            analytics = AnalyticsRepository(db)
-            insights = await analytics.list_insights()
-
-            ui.rule("pulse insights")
-            if not insights:
-                ui.warning(
-                    "No patterns discovered yet. Run [cmd]pulse discover[/] first."
-                )
-                return
-
-            ui.say(f"[accent]Discovered patterns[/] [bold]({len(insights)})[/]\n")
-            ui.insights_panel(insights)
 
     asyncio.run(_show())
 

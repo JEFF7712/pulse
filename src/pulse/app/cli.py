@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pulse",
         description=(
             f"[bold {SITE_ACCENT}]Pulse[/] — [{SITE_CREAM}]self-hosted personal intelligence[/] "
-            f"[dim {SITE_MUTED_FG}](connectors · insights)[/]"
+            f"[dim {SITE_MUTED_FG}](connectors · MCP)[/]"
         ),
         formatter_class=RichHelpFormatter,
     )
@@ -173,11 +173,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show database paths, counts, and connector snapshot",
     )
     subparsers.add_parser(
-        "insights",
-        parents=[config_parent],
-        help="List stored discovery patterns (from the database)",
-    )
-    subparsers.add_parser(
         "test-telegram",
         parents=[config_parent],
         help="Send one Telegram test message (requires Telegram settings in pulse.toml or env)",
@@ -237,8 +232,6 @@ def main() -> None:
         )
     elif args.command == "status":
         ops.status(config_dir=getattr(args, "config_dir", None))
-    elif args.command == "insights":
-        ops.insights()
     elif args.command == "logs":
         ops.logs(args)
     elif args.command == "reset":
