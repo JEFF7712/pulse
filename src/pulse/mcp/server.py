@@ -49,6 +49,21 @@ def _today_for_timezone(timezone: str) -> str:
     return datetime.now(ZoneInfo(timezone)).date().isoformat()
 
 
+_MAX_STR = 240
+
+
+def _trim_value(v, full: bool):
+    if full:
+        return v
+    if isinstance(v, str) and len(v) > _MAX_STR:
+        return v[:_MAX_STR] + f"… (+{len(v) - _MAX_STR} chars)"
+    if isinstance(v, list) and len(v) > 20:
+        return v[:20] + [f"… (+{len(v) - 20} more)"]
+    if isinstance(v, dict):
+        return {k: _trim_value(val, full) for k, val in v.items()}
+    return v
+
+
 @mcp.tool()
 async def pulse_events_for_day(
     day: str | None = None, source: str | None = None, ctx: Context = None
@@ -90,6 +105,55 @@ async def pulse_events_for_day(
         ],
         indent=2,
     )
+
+
+@mcp.tool()
+async def pulse_query_events(
+    start: str | None = None,
+    end: str | None = None,
+    sources: str | None = None,
+    text: str | None = None,
+    limit: int = 100,
+    full: bool = False,
+    ctx: Context = None,
+) -> str:
+    """Query events by time range, source(s), and text; newest first, paginated.
+
+    Args:
+        start: ISO datetime/date lower bound (inclusive). Optional.
+        end: ISO datetime/date upper bound (exclusive). Optional.
+        sources: comma-separated source names (e.g. "gmail,github"). Optional.
+        text: case-insensitive substring over event data/type. Optional.
+        limit: max events to return (default 100, hard cap 500).
+        full: if true, return untrimmed event data.
+    """
+    pulse_ctx = _get_pulse_ctx(ctx)
+    limit = max(1, min(limit, 500))
+    source_list = (
+        [s.strip() for s in sources.split(",") if s.strip()] if sources else None
+    )
+    total = await pulse_ctx.events.count_events(
+        start=start, end=end, sources=source_list, text=text
+    )
+    events = await pulse_ctx.events.query_events(
+        start=start, end=end, sources=source_list, text=text, limit=limit
+    )
+    payload = {
+        "count": total,
+        "returned": len(events),
+        "truncated": total > len(events),
+        "events": [
+            {
+                "id": e.id,
+                "timestamp": e.timestamp.isoformat(),
+                "source": e.source,
+                "event_type": e.event_type,
+                "data": _trim_value(e.data, full),
+            }
+            for e in events
+        ],
+    }
+    return json.dumps(payload, indent=2)
 
 
 @mcp.tool()

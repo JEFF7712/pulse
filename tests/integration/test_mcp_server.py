@@ -140,3 +140,72 @@ def test_connector_status_fresh_db(tmp_path: Path) -> None:
             assert cursor is None
 
     asyncio.run(_run())
+
+
+def test_pulse_query_events_trims_by_default_and_supports_full(tmp_path: Path) -> None:
+    """pulse_query_events returns trimmed data by default; full=True keeps raw."""
+    from pulse.mcp import server as server_module
+
+    long_body = "x" * 300
+
+    async def _run() -> None:
+        async with open_pulse_context(
+            db_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="gmail:q1",
+                        timestamp=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "invoice", "body": long_body},
+                        metadata={},
+                    ),
+                    Event(
+                        id="github:q1",
+                        timestamp=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+                        source="github",
+                        event_type="commit",
+                        data={"message": "fix bug"},
+                        metadata={},
+                    ),
+                    Event(
+                        id="calendar:q1",
+                        timestamp=datetime(2026, 7, 1, 11, 0, tzinfo=UTC),
+                        source="calendar",
+                        event_type="calendar.event",
+                        data={"title": "standup"},
+                        metadata={},
+                    ),
+                ]
+            )
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+
+            result = await server_module.pulse_query_events(ctx=ctx)
+            parsed = json.loads(result)
+            assert set(parsed.keys()) >= {"count", "returned", "events"}
+            assert parsed["count"] == 3
+            assert parsed["returned"] == 3
+            assert len(parsed["events"]) == 3
+
+            gmail = next(e for e in parsed["events"] if e["id"] == "gmail:q1")
+            assert "… (+" in gmail["data"]["body"]
+            assert len(gmail["data"]["body"]) < len(long_body)
+
+            full = json.loads(
+                await server_module.pulse_query_events(full=True, ctx=ctx)
+            )
+            gmail_full = next(e for e in full["events"] if e["id"] == "gmail:q1")
+            assert gmail_full["data"]["body"] == long_body
+
+            filtered = json.loads(
+                await server_module.pulse_query_events(sources="gmail,github", ctx=ctx)
+            )
+            assert filtered["count"] == 2
+            assert {e["source"] for e in filtered["events"]} == {"gmail", "github"}
+
+    asyncio.run(_run())
