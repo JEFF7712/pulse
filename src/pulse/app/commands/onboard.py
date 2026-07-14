@@ -8,9 +8,7 @@ from pathlib import Path
 from pulse.app import cli_ui as ui
 from pulse.app.commands.auth import (
     auth_github,
-    auth_gitlab,
     auth_google,
-    auth_microsoft,
     auth_oura,
     auth_plaid,
     auth_spotify,
@@ -41,30 +39,11 @@ def onboard_should_run_spotify_auth(config: PulseConfig) -> bool:
     return spot is not None and spot.enabled
 
 
-def onboard_should_run_microsoft_auth(config: PulseConfig) -> bool:
-    if not config.microsoft_client_id or not config.microsoft_client_secret:
-        return False
-    for name in ("microsoft_mail", "microsoft_calendar"):
-        cc = config.connectors.get(name)
-        if cc is not None and cc.enabled:
-            return True
-    return False
-
-
 def onboard_should_run_github_auth(config: PulseConfig) -> bool:
     if not config.github_client_id or not config.github_client_secret:
         return False
     gh = config.connectors.get("github")
     return gh is not None and gh.enabled
-
-
-def onboard_should_run_gitlab_auth(config: PulseConfig) -> bool:
-    gl = config.connectors.get("gitlab")
-    if gl is None or not gl.enabled:
-        return False
-    if config.gitlab_token:
-        return False
-    return bool(config.gitlab_client_id and config.gitlab_client_secret)
 
 
 def onboard_should_run_plaid_link(config: PulseConfig) -> bool:
@@ -90,10 +69,10 @@ def onboard_print_prerequisites() -> None:
     )
     ui.muted_line("Install the CLI first (e.g. pip install -e . or uv sync).")
     ui.muted_line(
-        "For Google, Spotify, Microsoft, GitHub, or GitLab, create OAuth apps as needed."
+        "For Google, Spotify, or GitHub, create OAuth apps as needed."
     )
     ui.muted_line(
-        "Local callbacks: Spotify :8888, Microsoft :8890, GitHub :8891, GitLab :8892, Plaid Link :8893, Oura :8894."
+        "Local callbacks: Spotify :8888, GitHub :8891, Plaid Link :8893, Oura :8894."
     )
 
 
@@ -166,25 +145,11 @@ def onboard(args) -> None:
             "Skipping — Spotify client secrets missing, connector disabled, or spotify not in pulse.toml."
         )
 
-    ui.onboard_phase("auth microsoft")
-    if strict or onboard_should_run_microsoft_auth(config):
-        auth_microsoft(show_rule=False)
-    else:
-        ui.muted_line("Skipping — Microsoft 365 OAuth not needed or not configured.")
-
     ui.onboard_phase("auth github")
     if strict or onboard_should_run_github_auth(config):
         auth_github(show_rule=False)
     else:
         ui.muted_line("Skipping — GitHub OAuth not needed or not configured.")
-
-    ui.onboard_phase("auth gitlab")
-    if strict or onboard_should_run_gitlab_auth(config):
-        auth_gitlab(show_rule=False)
-    else:
-        ui.muted_line(
-            "Skipping — GitLab OAuth not needed, PAT in use, or not configured."
-        )
 
     ui.onboard_phase("plaid link")
     if strict or onboard_should_run_plaid_link(config):

@@ -8,9 +8,7 @@ from pathlib import Path
 from pulse.app import cli_ui as ui
 from pulse.app.commands.auth import (
     auth_github,
-    auth_gitlab,
     auth_google,
-    auth_microsoft,
     auth_oura,
     auth_plaid,
     auth_spotify,
@@ -30,6 +28,7 @@ from .toml_io import (
     _write_connectors_state,
 )
 
+
 def _connector_prereqs_met(name: str, env: dict[str, str]) -> bool:
     g = (env.get("PULSE_GOOGLE_CLIENT_ID") or "").strip() and (
         env.get("PULSE_GOOGLE_CLIENT_SECRET") or ""
@@ -41,23 +40,10 @@ def _connector_prereqs_met(name: str, env: dict[str, str]) -> bool:
             (env.get("PULSE_SPOTIFY_CLIENT_ID") or "").strip()
             and (env.get("PULSE_SPOTIFY_CLIENT_SECRET") or "").strip()
         )
-    if name in ("microsoft_mail", "microsoft_calendar"):
-        return bool(
-            (env.get("PULSE_MICROSOFT_CLIENT_ID") or "").strip()
-            and (env.get("PULSE_MICROSOFT_CLIENT_SECRET") or "").strip()
-        )
     if name == "github":
         return bool(
             (env.get("PULSE_GITHUB_CLIENT_ID") or "").strip()
             and (env.get("PULSE_GITHUB_CLIENT_SECRET") or "").strip()
-        )
-    if name == "gitlab":
-        return bool(
-            (env.get("PULSE_GITLAB_TOKEN") or "").strip()
-            or (
-                (env.get("PULSE_GITLAB_CLIENT_ID") or "").strip()
-                and (env.get("PULSE_GITLAB_CLIENT_SECRET") or "").strip()
-            )
         )
     if name == "plaid":
         return bool(
@@ -73,10 +59,6 @@ def _connector_prereqs_met(name: str, env: dict[str, str]) -> bool:
                 and (env.get("PULSE_OURA_CLIENT_SECRET") or "").strip()
             )
         )
-    if name == "notion":
-        return bool((env.get("PULSE_NOTION_TOKEN") or "").strip())
-    if name == "linear":
-        return bool((env.get("PULSE_LINEAR_API_KEY") or "").strip())
     return True
 
 
@@ -119,7 +101,9 @@ def _prompt_one_connector_toml_section(
     if existing:
         status = "enabled" if was_enabled else "disabled"
         answer = (
-            input(f"  {label}: {status}, poll {interval} — keep? [Y/n] ").strip().lower()
+            input(f"  {label}: {status}, poll {interval} — keep? [Y/n] ")
+            .strip()
+            .lower()
         )
         if answer in ("n", "no"):
             enabled = _prompt_enable_connector(
@@ -135,9 +119,7 @@ def _prompt_one_connector_toml_section(
                     "  (Note: still enabled, but matching credentials look missing.)"
                 )
     else:
-        enabled = _prompt_enable_connector(
-            label, creds_ok=creds_ok, was_enabled=False
-        )
+        enabled = _prompt_enable_connector(label, creds_ok=creds_ok, was_enabled=False)
         if enabled:
             new_interval = input(f"    Poll interval [{interval}]: ").strip()
             if new_interval:
@@ -192,51 +174,6 @@ def _prompt_one_connector_toml_section(
         if enabled and db_path_val:
             section["db_path"] = db_path_val
 
-    if name == "microsoft_calendar":
-        cal_id = (existing.get("calendar_id") if existing else None) or "primary"
-        if not isinstance(cal_id, str):
-            cal_id = str(cal_id)
-        if enabled:
-            if existing:
-                answer = (
-                    input(f"    Calendar ID [{cal_id}] — keep? [Y/n] ").strip().lower()
-                )
-                if answer in ("n", "no"):
-                    cal_id = (
-                        input(
-                            "    Graph calendar id (primary or calendar UUID): "
-                        ).strip()
-                        or cal_id
-                    )
-            else:
-                cal_id = (
-                    input("    Graph calendar id [primary]: ").strip() or "primary"
-                )
-        section["calendar_id"] = cal_id
-
-    if name == "gitlab":
-        base_url = (
-            (existing.get("gitlab_base_url") if existing else None)
-            or "https://gitlab.com"
-        )
-        if not isinstance(base_url, str):
-            base_url = str(base_url)
-        if enabled:
-            if existing:
-                answer = (
-                    input(f"    GitLab base URL [{base_url}] — keep? [Y/n] ")
-                    .strip()
-                    .lower()
-                )
-                if answer in ("n", "no"):
-                    base_url = input("    GitLab base URL: ").strip() or base_url
-            else:
-                base_url = (
-                    input("    GitLab base URL [https://gitlab.com]: ").strip()
-                    or base_url
-                )
-        section["gitlab_base_url"] = base_url
-
     if name == "plaid":
         raw_existing = existing or {}
         omit = bool(
@@ -252,51 +189,6 @@ def _prompt_one_connector_toml_section(
             if yn in ("y", "yes"):
                 omit = True
         section["omit_amounts_in_summary"] = omit
-
-    if name == "notion":
-        prev_dbs: list = list(existing.get("database_ids", [])) if existing else []
-        if isinstance(prev_dbs, str):
-            prev_dbs = [prev_dbs] if prev_dbs else []
-        if enabled:
-            if prev_dbs:
-                preview = ", ".join(str(x) for x in prev_dbs[:2])
-                if len(prev_dbs) > 2:
-                    preview += "…"
-                keep = (
-                    input(f"    Keep Notion database_ids ({preview})? [Y/n] ")
-                    .strip()
-                    .lower()
-                )
-                if keep in ("n", "no"):
-                    prev_dbs = []
-            if not prev_dbs:
-                line = input(
-                    "    Optional database UUIDs (comma-separated) to query in addition "
-                    "to workspace search; leave empty for search only: "
-                ).strip()
-                prev_dbs = [u.strip() for u in line.split(",") if u.strip()]
-        section["database_ids"] = prev_dbs
-
-    if name == "feeds":
-        prev_urls: list = list(existing.get("urls", [])) if existing else []
-        if isinstance(prev_urls, str):
-            prev_urls = [prev_urls] if prev_urls else []
-        if enabled:
-            if prev_urls:
-                preview = ", ".join(prev_urls[:2]) + (
-                    "…" if len(prev_urls) > 2 else ""
-                )
-                keep = (
-                    input(f"    Keep feed URLs ({preview})? [Y/n] ").strip().lower()
-                )
-                if keep in ("n", "no"):
-                    prev_urls = []
-            if not prev_urls:
-                line = input(
-                    "    Feed URLs (comma-separated RSS/Atom URLs; leave empty to add later): "
-                ).strip()
-                prev_urls = [u.strip() for u in line.split(",") if u.strip()]
-        section["urls"] = prev_urls
 
     return section
 
@@ -343,9 +235,7 @@ def _pick_connector_submenu(
 ) -> str | None:
     rows: list[tuple[str, str]] = []
     for name, default_interval, _label in _CONNECTOR_DEFS:
-        disp = _connector_submenu_row_label(
-            name, default_interval, working_env, state
-        )
+        disp = _connector_submenu_row_label(name, default_interval, working_env, state)
         rows.append((name, disp))
     rows.append(("__back__", exit_label))
 
@@ -421,7 +311,9 @@ def _configure_connectors_hub(
         ui.step(label)
         fields = _CONNECTOR_ENV_FIELDS.get(name, [])
         if fields:
-            ui.muted_line("Credentials for this connector (saved in pulse.toml; leave blank to skip).")
+            ui.muted_line(
+                "Credentials for this connector (saved in pulse.toml; leave blank to skip)."
+            )
             _prompt_env_field_list(
                 fields,
                 working_env,
@@ -487,26 +379,6 @@ def _configure_oauth_prompts(
             if answer not in ("n", "no"):
                 auth_spotify()
 
-    ms_connectors = [
-        c for c in enabled_connectors if c in ("microsoft_mail", "microsoft_calendar")
-    ]
-    has_ms_creds = env_values.get("PULSE_MICROSOFT_CLIENT_ID") and env_values.get(
-        "PULSE_MICROSOFT_CLIENT_SECRET"
-    )
-    microsoft_tokens = data_dir / "microsoft_tokens.json"
-    if ms_connectors and has_ms_creds:
-        if microsoft_tokens.exists():
-            ui.muted_line(f"Microsoft 365: already authorized ({microsoft_tokens})")
-            answer = input("  Re-authorize? [y/N] ").strip().lower()
-            if answer in ("y", "yes"):
-                auth_microsoft()
-        else:
-            ui.step("Microsoft 365 authorization")
-            ui.kv_line("Connectors", ", ".join(ms_connectors))
-            answer = input("  Run Microsoft OAuth now? [Y/n] ").strip().lower()
-            if answer not in ("n", "no"):
-                auth_microsoft()
-
     gh_enabled = "github" in enabled_connectors
     has_gh = env_values.get("PULSE_GITHUB_CLIENT_ID") and env_values.get(
         "PULSE_GITHUB_CLIENT_SECRET"
@@ -523,26 +395,6 @@ def _configure_oauth_prompts(
             answer = input("  Run GitHub OAuth now? [Y/n] ").strip().lower()
             if answer not in ("n", "no"):
                 auth_github()
-
-    gl_enabled = "gitlab" in enabled_connectors
-    has_gl_oauth = env_values.get("PULSE_GITLAB_CLIENT_ID") and env_values.get(
-        "PULSE_GITLAB_CLIENT_SECRET"
-    )
-    has_gl_pat = bool(env_values.get("PULSE_GITLAB_TOKEN"))
-    gitlab_tokens = data_dir / "gitlab_tokens.json"
-    if gl_enabled and has_gl_oauth and not has_gl_pat:
-        if gitlab_tokens.exists():
-            ui.muted_line(f"GitLab: already authorized ({gitlab_tokens})")
-            answer = input("  Re-authorize GitLab? [y/N] ").strip().lower()
-            if answer in ("y", "yes"):
-                auth_gitlab()
-        else:
-            ui.step("GitLab authorization")
-            answer = input("  Run GitLab OAuth now? [Y/n] ").strip().lower()
-            if answer not in ("n", "no"):
-                auth_gitlab()
-    elif gl_enabled and has_gl_pat:
-        ui.muted_line("GitLab: using PULSE_GITLAB_TOKEN — OAuth skipped.")
 
     plaid_enabled = "plaid" in enabled_connectors
     has_plaid = env_values.get("PULSE_PLAID_CLIENT_ID") and env_values.get(
@@ -580,4 +432,3 @@ def _configure_oauth_prompts(
                 auth_oura()
     elif oura_enabled and has_oura_pat:
         ui.muted_line("Oura: using PULSE_OURA_PERSONAL_ACCESS_TOKEN — OAuth skipped.")
-

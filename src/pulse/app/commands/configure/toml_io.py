@@ -184,44 +184,12 @@ def _connector_emit_lines(name: str, sec: dict, default_interval: str) -> list[s
         if enabled and isinstance(dbp, str) and dbp.strip():
             safe = dbp.replace("\\", "\\\\").replace('"', '\\"')
             lines.append(f'db_path = "{safe}"')
-    if name == "microsoft_calendar":
-        cal_id = sec.get("calendar_id", "primary")
-        if not isinstance(cal_id, str):
-            cal_id = str(cal_id)
-        safe_cal = cal_id.replace("\\", "\\\\").replace('"', '\\"')
-        lines.append(f'calendar_id = "{safe_cal}"')
-    if name == "gitlab":
-        bu = sec.get("gitlab_base_url", "https://gitlab.com")
-        if not isinstance(bu, str):
-            bu = str(bu)
-        escaped = bu.replace("\\", "\\\\").replace('"', '\\"')
-        lines.append(f'gitlab_base_url = "{escaped}"')
     if name == "plaid":
         omit = bool(
             sec.get("omit_amounts_in_summary")
             or sec.get("omit_amounts_in_digest", False)
         )
         lines.append(f"omit_amounts_in_summary = {'true' if omit else 'false'}")
-    if name == "notion":
-        prev_dbs = sec.get("database_ids") or []
-        if isinstance(prev_dbs, str):
-            prev_dbs = [prev_dbs] if prev_dbs else []
-        escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_dbs]
-        if escaped:
-            lines.append(
-                "database_ids = [" + ", ".join(f'"{u}"' for u in escaped) + "]"
-            )
-    if name == "feeds":
-        prev_urls = sec.get("urls")
-        if prev_urls is None:
-            prev_urls = []
-        if isinstance(prev_urls, str):
-            prev_urls = [prev_urls] if prev_urls else []
-        escaped = [u.replace("\\", "\\\\").replace('"', '\\"') for u in prev_urls]
-        if escaped:
-            lines.append("urls = [" + ", ".join(f'"{u}"' for u in escaped) + "]")
-        else:
-            lines.append("urls = []")
     lines.append("")
     return lines
 

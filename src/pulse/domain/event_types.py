@@ -32,7 +32,6 @@ DEV_ISSUE: Final = "dev.issue"
 DEV_PULL_REQUEST: Final = "dev.pull_request"
 DEV_COMMENT: Final = "dev.comment"
 DEV_REPO_ACTIVITY: Final = "dev.repo_activity"
-DEV_LINEAR_ISSUE: Final = "dev.linear.issue"
 
 # --- Finance ---
 FINANCE_TRANSACTION: Final = "finance.transaction"
@@ -43,12 +42,6 @@ HEALTH_READINESS: Final = "health.readiness"
 HEALTH_ACTIVITY: Final = "health.activity"
 HEALTH_WORKOUT: Final = "health.workout"
 
-# --- Notion ---
-NOTION_PAGE_EDITED: Final = "notion.page_edited"
-
-# --- Feeds (time blocks only; no dedicated preprocessor section) ---
-FEED_ITEM: Final = "feed.item"
-
 DEV_EVENT_TYPES: Final[frozenset[str]] = frozenset(
     {
         DEV_PUSH,
@@ -56,7 +49,6 @@ DEV_EVENT_TYPES: Final[frozenset[str]] = frozenset(
         DEV_PULL_REQUEST,
         DEV_COMMENT,
         DEV_REPO_ACTIVITY,
-        DEV_LINEAR_ISSUE,
     }
 )
 
@@ -85,8 +77,6 @@ REGISTERED_EVENT_TYPES: Final[frozenset[str]] = frozenset(
         HEALTH_READINESS,
         HEALTH_ACTIVITY,
         HEALTH_WORKOUT,
-        NOTION_PAGE_EDITED,
-        FEED_ITEM,
     }
 )
 
@@ -102,6 +92,4 @@ EVENT_TYPE_TO_BUCKET: Final[dict[str, str]] = {
     HEALTH_READINESS: "health",
     HEALTH_ACTIVITY: "health",
     HEALTH_WORKOUT: "health",
-    NOTION_PAGE_EDITED: "notion",
-    FEED_ITEM: "unbucketed",
 }

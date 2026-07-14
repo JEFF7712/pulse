@@ -19,9 +19,7 @@ from pulse.app.commands import configure as configure_cmd
 from pulse.app.commands import init_cmd, onboard as onboard_cmd, ops, serve
 from pulse.app.commands.auth import (
     auth_github,
-    auth_gitlab,
     auth_google,
-    auth_microsoft,
     auth_oura,
     auth_plaid,
     auth_spotify,
@@ -56,9 +54,15 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[config_parent],
         help="Start FastAPI server, scheduler, and operator web UI",
     )
-    run_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
-    run_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
-    run_parser.add_argument("--log-level", default="info", help="Log level (default: info)")
+    run_parser.add_argument(
+        "--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)"
+    )
+    run_parser.add_argument(
+        "--port", type=int, default=8000, help="Port (default: 8000)"
+    )
+    run_parser.add_argument(
+        "--log-level", default="info", help="Log level (default: info)"
+    )
 
     onboard_parser = subparsers.add_parser(
         "onboard",
@@ -68,15 +72,23 @@ def build_parser() -> argparse.ArgumentParser:
             "pulse init, then pulse run"
         ),
     )
-    onboard_parser.add_argument("--host", default="0.0.0.0", help="Bind address for pulse run (default: 0.0.0.0)")
-    onboard_parser.add_argument("--port", type=int, default=8000, help="Port for pulse run (default: 8000)")
-    onboard_parser.add_argument("--log-level", default="info", help="Log level for pulse run (default: info)")
+    onboard_parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Bind address for pulse run (default: 0.0.0.0)",
+    )
+    onboard_parser.add_argument(
+        "--port", type=int, default=8000, help="Port for pulse run (default: 8000)"
+    )
+    onboard_parser.add_argument(
+        "--log-level", default="info", help="Log level for pulse run (default: info)"
+    )
     onboard_parser.add_argument(
         "--strict",
         action="store_true",
         help=(
-            "Always run every onboard auth/link step that applies (Google, Spotify, Microsoft, "
-            "GitHub, GitLab, Plaid, Oura); exit non-zero if a required step fails"
+            "Always run every onboard auth/link step that applies (Google, Spotify, "
+            "GitHub, Plaid, Oura); exit non-zero if a required step fails"
         ),
     )
     onboard_parser.add_argument(
@@ -108,7 +120,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[config_parent],
         help="Run connector pull jobs now (omit sources to pull all enabled)",
     )
-    pull_parser.add_argument("sources", nargs="*", help="Connectors to pull (default: all)")
+    pull_parser.add_argument(
+        "sources", nargs="*", help="Connectors to pull (default: all)"
+    )
 
     discover_parser = subparsers.add_parser(
         "discover",
@@ -154,10 +168,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Free-form profile text (non-interactive; skips paste prompt)",
     )
     subparsers.add_parser(
-        "status", parents=[config_parent], help="Show database paths, counts, and connector snapshot"
+        "status",
+        parents=[config_parent],
+        help="Show database paths, counts, and connector snapshot",
     )
     subparsers.add_parser(
-        "insights", parents=[config_parent], help="List stored discovery patterns (from the database)"
+        "insights",
+        parents=[config_parent],
+        help="List stored discovery patterns (from the database)",
     )
     subparsers.add_parser(
         "test-telegram",
@@ -178,10 +196,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     logs_parser = subparsers.add_parser(
-        "logs", parents=[config_parent], help="Print recent rows from the event store (newest first)"
+        "logs",
+        parents=[config_parent],
+        help="Print recent rows from the event store (newest first)",
     )
     logs_parser.add_argument("--source", default=None, help="Filter by source")
-    logs_parser.add_argument("-n", type=int, default=20, help="Number of events (default: 20)")
+    logs_parser.add_argument(
+        "-n", type=int, default=20, help="Number of events (default: 20)"
+    )
     logs_parser.add_argument(
         "--all", action="store_true", help="Include future events (excluded by default)"
     )
@@ -204,7 +226,9 @@ def main() -> None:
     elif args.command == "discover":
         ops.discover(args)
     elif args.command == "configure":
-        configure_cmd.configure(offer_oauth=True, config_dir=getattr(args, "config_dir", None))
+        configure_cmd.configure(
+            offer_oauth=True, config_dir=getattr(args, "config_dir", None)
+        )
     elif args.command == "init":
         init_cmd.init_profile(
             profile_file=getattr(args, "profile_file", None),
@@ -231,9 +255,7 @@ def main() -> None:
 # ``pulse.app.commands.*`` directly.
 __all__ = [
     "auth_github",
-    "auth_gitlab",
     "auth_google",
-    "auth_microsoft",
     "auth_oura",
     "auth_plaid",
     "auth_spotify",

@@ -43,14 +43,8 @@ _CONFIGURE_INTEGRATION_FIELDS: list[tuple[str, str, bool]] = [
     ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
     ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
     ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
-    ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
-    ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
-    ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
     ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
     ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
-    ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
-    ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
-    ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
     ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
     ("PULSE_PLAID_SECRET", "Plaid secret", True),
     ("PULSE_PLAID_ENV", "Plaid environment (sandbox or production)", False),
@@ -61,8 +55,6 @@ _CONFIGURE_INTEGRATION_FIELDS: list[tuple[str, str, bool]] = [
         "Oura personal access token (optional; skips OAuth if set)",
         True,
     ),
-    ("PULSE_NOTION_TOKEN", "Notion integration secret (internal integration)", True),
-    ("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True),
 ]
 
 # LLM vendor API keys (see pulse.llm.factory — also ``anthropic_api_key`` / ``PULSE_ANTHROPIC_API_KEY`` in TOML or env).
@@ -280,15 +272,9 @@ _CONNECTOR_DEFS: list[tuple[str, str, str]] = [
     ("calendar", "30m", "Google Calendar"),
     ("youtube", "1h", "YouTube"),
     ("spotify", "30m", "Spotify"),
-    ("microsoft_mail", "15m", "Microsoft 365 mail (Outlook)"),
-    ("microsoft_calendar", "30m", "Microsoft 365 calendar"),
     ("github", "30m", "GitHub activity"),
-    ("linear", "30m", "Linear (issues assigned to you)"),
-    ("gitlab", "30m", "GitLab activity"),
     ("plaid", "6h", "Plaid bank transactions"),
     ("browser", "15m", "Browser history"),
-    ("feeds", "1h", "RSS/Atom feeds (URLs in pulse.toml)"),
-    ("notion", "45m", "Notion (pages shared with your integration)"),
     ("oura", "6h", "Oura Ring (sleep & readiness)"),
 ]
 
@@ -297,15 +283,9 @@ _CONNECTOR_MENU_EMOJI: dict[str, str] = {
     "calendar": "📅",
     "youtube": "▶️",
     "spotify": "🎵",
-    "microsoft_mail": "✉️",
-    "microsoft_calendar": "📆",
     "github": "🐙",
-    "linear": "⚡",
-    "gitlab": "🦊",
     "plaid": "🏦",
     "browser": "🌍",
-    "feeds": "📡",
-    "notion": "📓",
     "oura": "💍",
 }
 
@@ -314,26 +294,15 @@ _CONNECTOR_MENU_SHORT: dict[str, str] = {
     "calendar": "G Cal",
     "youtube": "YouTube",
     "spotify": "Spotify",
-    "microsoft_mail": "Outlook",
-    "microsoft_calendar": "365 Cal",
     "github": "GitHub",
-    "linear": "Linear",
-    "gitlab": "GitLab",
     "plaid": "Plaid",
     "browser": "Browser",
-    "feeds": "Feeds",
-    "notion": "Notion",
     "oura": "Oura",
 }
 
 _GOOGLE_ENV_FIELDS: list[tuple[str, str, bool]] = [
     ("PULSE_GOOGLE_CLIENT_ID", "Google Client ID", True),
     ("PULSE_GOOGLE_CLIENT_SECRET", "Google Client Secret", True),
-]
-_MS_ENV_FIELDS: list[tuple[str, str, bool]] = [
-    ("PULSE_MICROSOFT_CLIENT_ID", "Microsoft / Azure app Client ID", True),
-    ("PULSE_MICROSOFT_CLIENT_SECRET", "Microsoft / Azure app Client Secret", True),
-    ("PULSE_MICROSOFT_TENANT_ID", "Microsoft tenant (blank = common)", False),
 ]
 
 _CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
@@ -344,16 +313,9 @@ _CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
         ("PULSE_SPOTIFY_CLIENT_ID", "Spotify Client ID", True),
         ("PULSE_SPOTIFY_CLIENT_SECRET", "Spotify Client Secret", True),
     ],
-    "microsoft_mail": _MS_ENV_FIELDS,
-    "microsoft_calendar": _MS_ENV_FIELDS,
     "github": [
         ("PULSE_GITHUB_CLIENT_ID", "GitHub OAuth Client ID", True),
         ("PULSE_GITHUB_CLIENT_SECRET", "GitHub OAuth Client Secret", True),
-    ],
-    "gitlab": [
-        ("PULSE_GITLAB_CLIENT_ID", "GitLab OAuth Application ID", True),
-        ("PULSE_GITLAB_CLIENT_SECRET", "GitLab OAuth Secret", True),
-        ("PULSE_GITLAB_TOKEN", "GitLab personal access token (optional)", True),
     ],
     "plaid": [
         ("PULSE_PLAID_CLIENT_ID", "Plaid client ID", True),
@@ -368,16 +330,6 @@ _CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
             "Oura personal access token (optional; skips OAuth if set)",
             True,
         ),
-    ],
-    "notion": [
-        (
-            "PULSE_NOTION_TOKEN",
-            "Notion integration secret (internal integration)",
-            True,
-        ),
-    ],
-    "linear": [
-        ("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True)
     ],
 }
 

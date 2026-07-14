@@ -1,9 +1,7 @@
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from pulse.app.config import PulseConfig
 from pulse.domain.correction_applications import CorrectionApplication
@@ -63,7 +61,9 @@ def test_corrections_backlog_notify_respects_cooldown(tmp_path: Path) -> None:
             telegram_bot_token="x",
             telegram_chat_id="y",
         )
-        from pulse.jobs.corrections_notifications import notify_corrections_backlog_if_needed
+        from pulse.jobs.corrections_notifications import (
+            notify_corrections_backlog_if_needed,
+        )
 
         with patch(
             "pulse.jobs.corrections_notifications.build_notification_channel",
@@ -76,20 +76,3 @@ def test_corrections_backlog_notify_respects_cooldown(tmp_path: Path) -> None:
     assert len(sent) == 1
     assert "correction backlog" in sent[0].title.lower()
     assert sent[0].category == "operations"
-
-
-def test_linear_401_raises_connector_auth() -> None:
-    from pulse.connectors.linear import LinearConnector
-    from pulse.domain.connectors import ConnectorAuthError
-
-    resp = MagicMock()
-    resp.status_code = 401
-    client = MagicMock()
-    client.post = AsyncMock(return_value=resp)
-
-    async def run() -> None:
-        conn = LinearConnector(api_key="tok", http_client=client)
-        with pytest.raises(ConnectorAuthError):
-            await conn.pull()
-
-    asyncio.run(run())

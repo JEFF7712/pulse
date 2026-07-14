@@ -106,15 +106,6 @@ class HealthWorkout:
 
 
 @dataclass(slots=True)
-class NotionEdit:
-    title: str
-    url: str
-    timestamp: datetime
-    object_type: str
-    via: str
-
-
-@dataclass(slots=True)
 class PreprocessedDay:
     browsing_clusters: list[TopicCluster] = field(default_factory=list)
     email_threads: list[EmailThread] = field(default_factory=list)
@@ -124,7 +115,6 @@ class PreprocessedDay:
     finance_summary: FinanceDaySummary | None = None
     health_days: list[HealthDay] = field(default_factory=list)
     health_workouts: list[HealthWorkout] = field(default_factory=list)
-    notion_edits: list[NotionEdit] = field(default_factory=list)
     time_blocks: list[TimeBlock] = field(default_factory=list)
     raw_stats: dict[str, int] = field(default_factory=dict)
 
@@ -156,7 +146,6 @@ class EventPreprocessor:
             health_workouts=self._build_health_workouts(
                 by_type.get("health.workout", []),
             ),
-            notion_edits=self._build_notion_edits(by_type.get("notion.page_edited", [])),
             time_blocks=self._build_time_blocks(sorted_events),
             raw_stats=dict(source_counts),
         )
@@ -340,21 +329,6 @@ class EventPreprocessor:
                     repo=str(e.data.get("repo", "")),
                     timestamp=e.timestamp,
                     url=str(e.data.get("url", "")),
-                )
-            )
-        rows.sort(key=lambda r: r.timestamp, reverse=True)
-        return rows[:40]
-
-    def _build_notion_edits(self, events: list[Event]) -> list[NotionEdit]:
-        rows: list[NotionEdit] = []
-        for e in events:
-            rows.append(
-                NotionEdit(
-                    title=str(e.data.get("title") or "").strip() or "(untitled)",
-                    url=str(e.data.get("url") or "").strip(),
-                    timestamp=e.timestamp,
-                    object_type=str(e.data.get("object_type") or ""),
-                    via=str(e.data.get("via") or ""),
                 )
             )
         rows.sort(key=lambda r: r.timestamp, reverse=True)

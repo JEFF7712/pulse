@@ -42,8 +42,6 @@ class SourceSummarizer:
             tasks.append(("finance", self._summarize_finance(day)))
         if day.health_days or day.health_workouts:
             tasks.append(("health", self._summarize_health(day)))
-        if day.notion_edits:
-            tasks.append(("notion", self._summarize_notion(day)))
 
         if not tasks:
             return {}
@@ -132,21 +130,8 @@ class SourceSummarizer:
         for act in day.dev_activities[:20]:
             lines.append(f"- [{act.provider}] {act.title}")
         prompt = (
-            "Summarize this person's development activity (GitHub, GitLab, Linear) in 1-2 paragraphs. "
+            "Summarize this person's development activity (GitHub) in 1-2 paragraphs. "
             "Focus on what they shipped, reviewed, or discussed.\n\n"
-            + "\n".join(lines)
-        )
-        return await self._complete(prompt)
-
-    async def _summarize_notion(self, day: PreprocessedDay) -> str:
-        lines = []
-        for n in day.notion_edits[:25]:
-            lines.append(
-                f"- {n.timestamp.strftime('%H:%M')} {n.object_type} ({n.via}): {n.title}"
-            )
-        prompt = (
-            "Summarize this person's Notion activity for the day in 1-2 short paragraphs. "
-            "Note which pages or databases changed and any themes — stay factual.\n\n"
             + "\n".join(lines)
         )
         return await self._complete(prompt)

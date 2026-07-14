@@ -22,11 +22,6 @@ poll_interval = "15m"
 enabled = true
 poll_interval = "30m"
 
-[connectors.feeds]
-enabled = true
-poll_interval = "1h"
-urls = ["https://hnrss.org/newest"]
-
 # LLM roles — provider defaults to "anthropic" when anthropic_api_key is set.
 # If omitted, corrections reuse [llm.discovery].
 # [llm]

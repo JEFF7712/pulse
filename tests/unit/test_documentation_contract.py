@@ -28,22 +28,17 @@ QUICKSTART_REQUIRED_SNIPPETS = [
 CONNECTOR_REQUIRED_SNIPPETS = [
     "Google",
     "Spotify",
-    "Microsoft",
     "GitHub",
-    "GitLab",
     "Plaid",
     "browser history",
-    "RSS",
     "pulse configure",
     "Configure → Connectors",
     "db_path",
     "[connectors.browser]",
-    "[connectors.feeds]",
-    "urls",
 ]
 
 QUICKSTART_OPTIONAL_AUTH_SNIPPETS = [
-    "Notion",
+    "Oura",
 ]
 
 QUICKSTART_ONBOARD_SNIPPETS = [
@@ -68,13 +63,11 @@ CONFIG_REFERENCE_REQUIRED_SNIPPETS = [
     "PULSE_GOOGLE_CLIENT_ID",
     "PULSE_SPOTIFY_CLIENT_ID",
     "PULSE_SPOTIFY_CLIENT_SECRET",
-    "PULSE_MICROSOFT_CLIENT_ID",
     "PULSE_PLAID_CLIENT_ID",
     "PULSE_ANTHROPIC_API_KEY",
     "pulse.toml",
     "google_tokens.json",
     "spotify_tokens.json",
-    "microsoft_tokens.json",
     "plaid_tokens.json",
     "llm.corrections",
     "corrections are stored but vault application is skipped",
