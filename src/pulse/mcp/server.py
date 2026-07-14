@@ -340,18 +340,25 @@ async def pulse_vault_append_section(
 # --- Resources ---
 
 
-@mcp.resource("pulse://events/today")
-async def today_events_resource() -> str:
-    """Today's events from all sources."""
+@mcp.resource("pulse://digest/today")
+async def digest_today_resource() -> str:
+    """Today's deterministic digest (per-source counts + clusters)."""
     ctx = mcp.get_context()
-    return await pulse_events_for_day(ctx=ctx)
+    return await pulse_digest(ctx=ctx)
 
 
-@mcp.resource("pulse://connectors/status")
-async def connectors_status_resource() -> str:
-    """Current sync state of all connectors."""
+@mcp.resource("pulse://coverage")
+async def coverage_resource() -> str:
+    """Per-source coverage: last sync, event count, and freshness."""
     ctx = mcp.get_context()
     return await pulse_coverage(ctx=ctx)
+
+
+@mcp.resource("pulse://vault/index")
+async def vault_index_resource() -> str:
+    """Index of markdown notes in the vault."""
+    ctx = mcp.get_context()
+    return await pulse_vault_list(ctx=ctx)
 
 
 def main() -> None:

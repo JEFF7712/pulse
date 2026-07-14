@@ -371,3 +371,84 @@ def test_pulse_digest_returns_source_counts_and_clusters(tmp_path: Path) -> None
             assert clusters["calendar_blocks"][0]["title"] == "standup"
 
     asyncio.run(_run())
+
+
+def test_mcp_resources_digest_coverage_and_vault_index(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Resources expose today's digest, coverage, and vault note index."""
+    from pulse.app.config import PulseConfig
+    from pulse.mcp import server as server_module
+
+    class FakeDatetime:
+        @staticmethod
+        def now(tz):
+            return datetime(2026, 7, 1, 15, 0, tzinfo=tz)
+
+    monkeypatch.setattr(server_module, "datetime", FakeDatetime)
+
+    async def _run() -> None:
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+            timezone="UTC",
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="gmail:r1",
+                        timestamp=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "hello"},
+                        metadata={},
+                    ),
+                    Event(
+                        id="github:r1",
+                        timestamp=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+                        source="github",
+                        event_type="commit",
+                        data={"message": "ship it"},
+                        metadata={},
+                    ),
+                ]
+            )
+            await pulse_ctx.sync_state.save("github", "cursor-xyz")
+
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+            monkeypatch.setattr(server_module.mcp, "get_context", lambda: ctx)
+
+            await server_module.pulse_vault_write(
+                path="notes/today.md",
+                content="# Today\n",
+                ctx=ctx,
+            )
+
+            digest = json.loads(await server_module.digest_today_resource())
+            assert digest["day"] == "2026-07-01"
+            assert digest["total_events"] == 2
+            assert digest["by_source"] == {"gmail": 1, "github": 1}
+            tool_digest = json.loads(
+                await server_module.pulse_digest(day="2026-07-01", ctx=ctx)
+            )
+            assert digest == tool_digest
+
+            coverage = json.loads(await server_module.coverage_resource())
+            tool_coverage = json.loads(await server_module.pulse_coverage(ctx=ctx))
+            assert coverage == tool_coverage
+            assert coverage["gmail"]["event_count"] == 1
+            assert coverage["github"]["last_sync"] == "cursor-xyz"
+
+            index = json.loads(await server_module.vault_index_resource())
+            tool_list = json.loads(await server_module.pulse_vault_list(ctx=ctx))
+            assert index == tool_list
+            assert "notes/today.md" in index
+
+    asyncio.run(_run())
