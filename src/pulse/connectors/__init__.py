@@ -55,8 +55,12 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
         )
 
     registry.register_pull("gmail", lambda: GmailConnector(auth_manager=auth_manager))
-    registry.register_pull("calendar", lambda: GoogleCalendarConnector(auth_manager=auth_manager))
-    registry.register_pull("youtube", lambda: YouTubeConnector(auth_manager=auth_manager))
+    registry.register_pull(
+        "calendar", lambda: GoogleCalendarConnector(auth_manager=auth_manager)
+    )
+    registry.register_pull(
+        "youtube", lambda: YouTubeConnector(auth_manager=auth_manager)
+    )
 
     # Spotify
     spotify_auth: SpotifyAuthManager | None = None
@@ -67,7 +71,9 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
             client_secret=config.spotify_client_secret,
             token_path=token_path,
         )
-    registry.register_pull("spotify", lambda: SpotifyConnector(auth_manager=spotify_auth))
+    registry.register_pull(
+        "spotify", lambda: SpotifyConnector(auth_manager=spotify_auth)
+    )
 
     ms_auth: MicrosoftAuthManager | None = None
     if config.microsoft_client_id and config.microsoft_client_secret:
@@ -152,11 +158,17 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
 
     # Browser history
     browser_config = config.connectors.get("browser")
-    browser_type = getattr(browser_config, "browser", "chrome") if browser_config else "chrome"
+    browser_type = (
+        getattr(browser_config, "browser", "chrome") if browser_config else "chrome"
+    )
     db_path = getattr(browser_config, "db_path", None) if browser_config else None
-    registry.register_pull("browser", lambda: BrowserHistoryConnector(
-        browser=browser_type, db_path=db_path,
-    ))
+    registry.register_pull(
+        "browser",
+        lambda: BrowserHistoryConnector(
+            browser=browser_type,
+            db_path=db_path,
+        ),
+    )
 
     feeds_cfg = config.connectors.get("feeds")
     feed_urls = _urls_from_connector_config(feeds_cfg)
@@ -165,7 +177,6 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
         lambda u=feed_urls: FeedConnector(urls=u),
     )
 
-    from pulse.connectors.companion import CompanionConnector
     from pulse.connectors.linear import LinearConnector
     from pulse.connectors.notion import NotionConnector
 
@@ -208,5 +219,3 @@ def register_all(registry: ConnectorRegistry, config: PulseConfig) -> None:
             personal_access_token=oura_pat,
         ),
     )
-
-    registry.register_push("companion", CompanionConnector)

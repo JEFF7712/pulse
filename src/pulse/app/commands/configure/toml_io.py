@@ -13,6 +13,7 @@ from .constants import (
     _PULSE_ROOT_FIELD_NAMES,
 )
 
+
 def _env_key_to_pulse_field(ek: str) -> str | None:
     if ek in _ENV_KEY_TO_CONFIG_FIELD:
         return _ENV_KEY_TO_CONFIG_FIELD[ek]
@@ -150,7 +151,9 @@ def _emit_pulse_root_scalar_lines(full: dict) -> list[str]:
             continue
         lines.append(f"{fname} = {_toml_inline_value(v)}")
         seen.add(fname)
-    for fname in sorted(k for k in full if k in _PULSE_ROOT_FIELD_NAMES and k not in seen):
+    for fname in sorted(
+        k for k in full if k in _PULSE_ROOT_FIELD_NAMES and k not in seen
+    ):
         v = full[fname]
         if _pulse_scalar_empty_for_emit(v):
             continue
@@ -158,9 +161,7 @@ def _emit_pulse_root_scalar_lines(full: dict) -> list[str]:
     return lines
 
 
-def _connector_emit_lines(
-    name: str, sec: dict, default_interval: str
-) -> list[str]:
+def _connector_emit_lines(name: str, sec: dict, default_interval: str) -> list[str]:
     lines: list[str] = []
     enabled = _connector_section_enabled(sec)
     interval = sec.get("poll_interval") or default_interval
@@ -197,7 +198,8 @@ def _connector_emit_lines(
         lines.append(f'gitlab_base_url = "{escaped}"')
     if name == "plaid":
         omit = bool(
-            sec.get("omit_amounts_in_summary") or sec.get("omit_amounts_in_digest", False)
+            sec.get("omit_amounts_in_summary")
+            or sec.get("omit_amounts_in_digest", False)
         )
         lines.append(f"omit_amounts_in_summary = {'true' if omit else 'false'}")
     if name == "notion":
@@ -225,7 +227,7 @@ def _connector_emit_lines(
 
 
 def _emit_generic_connectors_table(name: str, sec: dict) -> list[str]:
-    """Emit [connectors.X] for keys not in _CONNECTOR_DEFS (e.g. companion)."""
+    """Emit [connectors.X] for keys not in _CONNECTOR_DEFS."""
     lines = [f"[connectors.{name}]"]
     for k, v in sorted(sec.items()):
         if isinstance(v, dict):
@@ -366,4 +368,3 @@ def _connector_section_enabled(section: dict) -> bool:
     if isinstance(raw, (int, float)):
         return raw != 0
     return False
-

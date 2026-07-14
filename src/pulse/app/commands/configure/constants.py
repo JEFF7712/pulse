@@ -169,7 +169,11 @@ _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool
         "Discord",
         "🎮",
         [
-            ("PULSE_DISCORD_WEBHOOK_URL", "Discord incoming webhook URL (optional)", False),
+            (
+                "PULSE_DISCORD_WEBHOOK_URL",
+                "Discord incoming webhook URL (optional)",
+                False,
+            ),
         ],
     ),
     (
@@ -226,15 +230,10 @@ _NOTIFICATION_PROVIDER_DEFS: list[tuple[str, str, str, list[tuple[str, str, bool
         ],
     ),
     (
-        "companion",
-        "Companion / FCM",
+        "fcm",
+        "FCM",
         "🤝",
         [
-            (
-                "PULSE_COMPANION_TOKEN",
-                "Companion API bearer token (POST /webhooks/companion)",
-                True,
-            ),
             (
                 "PULSE_FCM_SERVICE_ACCOUNT_PATH",
                 "Path to Firebase service account JSON (FCM push)",
@@ -383,9 +382,15 @@ _CONNECTOR_ENV_FIELDS: dict[str, list[tuple[str, str, bool]]] = {
         ),
     ],
     "notion": [
-        ("PULSE_NOTION_TOKEN", "Notion integration secret (internal integration)", True),
+        (
+            "PULSE_NOTION_TOKEN",
+            "Notion integration secret (internal integration)",
+            True,
+        ),
     ],
-    "linear": [("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True)],
+    "linear": [
+        ("PULSE_LINEAR_API_KEY", "Linear personal API key (assigned issues)", True)
+    ],
 }
 
 _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
@@ -396,7 +401,7 @@ _CONFIGURE_MENU_ITEMS: list[tuple[str, str]] = [
     ),
     (
         "notifications",
-        "🔔 Notifications (Telegram, SMTP, webhooks, companion/FCM, …)",
+        "🔔 Notifications (Telegram, SMTP, webhooks, FCM, …)",
     ),
     (
         "model",
@@ -429,4 +434,3 @@ _CONFIGURE_SECTION_BANNER: dict[str, str] = {
     "notifications": "Notifications",
     "model": "Model",
 }
-

@@ -17,7 +17,7 @@ Configure the path with `vault_path` in `pulse.toml` or the **`PULSE_VAULT_PATH`
 | `02-Insights/patterns/` | Recurring insights (“patterns”) with evidence and trends |
 | `03-Life/` | Longer-lived context (e.g. `routines.md` baselines from discovery) |
 | `04-Config/` | `profile.md` and other operator-facing notes |
-| `Meta/` | This README’s companion: **`AGENTS.md`** (rules for AI tools) |
+| `Meta/` | Alongside this README: **`AGENTS.md`** (rules for AI tools) |
 
 Some folders appear only after Pulse has generated content (for example patterns after discovery).
 

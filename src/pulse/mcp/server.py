@@ -293,7 +293,7 @@ async def pulse_connector_status(ctx: Context = None) -> str:
     cfg = pulse_ctx.config
     if cfg:
         for name, cc in cfg.connectors.items():
-            if not cc.enabled or name == "companion":
+            if not cc.enabled:
                 continue
             if name not in statuses:
                 statuses[name] = {

@@ -1,9 +1,0 @@
-.dart_tool/
-.packages
-.flutter-plugins
-.flutter-plugins-dependencies
-build/
-.idea/
-*.iml
-pulse_companion.iml
-android/pulse_companion_android.iml

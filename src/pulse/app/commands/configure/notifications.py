@@ -1,4 +1,4 @@
-"""``pulse configure → Notifications`` hub (Telegram, SMTP, webhooks, companion/FCM, …)."""
+"""``pulse configure → Notifications`` hub (Telegram, SMTP, webhooks, FCM, …)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,9 @@ from .constants import _CONFIGURE_NOTIFICATION_FIELDS, _NOTIFICATION_PROVIDER_DE
 from .env_prompts import _prompt_env_field_list
 from .toml_io import _save_pulse_settings
 
+
 def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
-    """● row hint: outbound channel ready, corrections secret set, or companion/FCM partially configured."""
+    """● row hint: outbound channel ready, corrections secret set, or FCM partially configured."""
 
     def g(key: str) -> str:
         return (env.get(key) or "").strip()
@@ -38,8 +39,8 @@ def _notification_provider_ready(provider_id: str, env: dict[str, str]) -> bool:
         return bool(to_list)
     if provider_id == "corrections":
         return bool(g("PULSE_CORRECTIONS_WEBHOOK_SECRET"))
-    if provider_id == "companion":
-        return bool(g("PULSE_COMPANION_TOKEN") or g("PULSE_FCM_SERVICE_ACCOUNT_PATH"))
+    if provider_id == "fcm":
+        return bool(g("PULSE_FCM_SERVICE_ACCOUNT_PATH"))
     return False
 
 
@@ -127,7 +128,9 @@ def _configure_notifications_hub(
         row = next(r for r in _NOTIFICATION_PROVIDER_DEFS if r[0] == pick)
         _pid, label, _emoji, fields = row
         ui.step(label)
-        ui.muted_line("Values for this channel (saved in pulse.toml; leave blank to skip).")
+        ui.muted_line(
+            "Values for this channel (saved in pulse.toml; leave blank to skip)."
+        )
         _prompt_env_field_list(
             fields,
             working_env,
@@ -147,4 +150,3 @@ def _configure_notifications_only(working_env: dict[str, str], toml_path: Path) 
         offer_bulk_keep=toml_path.exists(),
         section_label="notification settings",
     )
-
