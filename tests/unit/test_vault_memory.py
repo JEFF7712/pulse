@@ -740,3 +740,53 @@ def test_purge_archived_patterns_keeps_recent_files(tmp_path: Path) -> None:
     assert mem.purge_archived_patterns(max_age_days=ARCHIVE_RETENTION_DAYS) == []
     archived = tmp_path / "02-Insights" / "patterns" / "_archive" / "late-night-coding.md"
     assert archived.exists()
+
+
+# ---------------------------------------------------------------------------
+# Generic note read / write / list / append
+# ---------------------------------------------------------------------------
+
+
+def test_write_and_read_note_round_trip(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+
+    path = mem.write_note("notes/today.md", "hello")
+
+    assert path.exists()
+    assert path == tmp_path / "notes" / "today.md"
+    assert mem.read_note("notes/today.md") == "hello"
+
+
+def test_list_notes_includes_written_note(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    mem.write_note("notes/today.md", "hello")
+
+    assert "notes/today.md" in mem.list_notes()
+
+
+def test_append_section_adds_or_updates_section(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+    mem.write_note("notes/today.md", "# Today\n\nIntro.\n")
+
+    mem.append_section("notes/today.md", "## Log", "- did a thing")
+    content = mem.read_note("notes/today.md")
+
+    assert "## Log" in content
+    assert "- did a thing" in content
+
+    mem.append_section("notes/today.md", "## Log", "- did another thing")
+    content = mem.read_note("notes/today.md")
+
+    assert content.count("## Log") == 1
+    assert "- did another thing" in content
+    assert "- did a thing" not in content  # upsert replaces section body
+
+
+def test_read_and_write_note_reject_unsafe_paths(tmp_path: Path) -> None:
+    mem = _make_memory(tmp_path)
+
+    with pytest.raises(ValueError, match="Unsafe vault path"):
+        mem.read_note("../escape.md")
+
+    with pytest.raises(ValueError, match="Unsafe vault path"):
+        mem.write_note("/abs.md", "x")

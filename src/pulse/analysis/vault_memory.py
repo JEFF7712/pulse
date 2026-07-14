@@ -409,6 +409,45 @@ class VaultMemory:
         return path
 
     # ------------------------------------------------------------------
+    # Generic notes (arbitrary vault-relative paths)
+    # ------------------------------------------------------------------
+
+    def _safe_note_path(self, rel: str) -> Path:
+        p = Path(rel)
+        if p.is_absolute() or ".." in p.parts:
+            raise ValueError(f"Unsafe vault path: {rel!r}")
+        full = (self._root / p).resolve()
+        root = self._root.resolve()
+        try:
+            full.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Unsafe vault path: {rel!r}") from exc
+        return full
+
+    def read_note(self, rel: str) -> str:
+        path = self._safe_note_path(rel)
+        if not path.exists():
+            return ""
+        return path.read_text(encoding="utf-8")
+
+    def write_note(self, rel: str, content: str) -> Path:
+        path = self._safe_note_path(rel)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    def list_notes(self) -> list[str]:
+        root = self._root.resolve()
+        return sorted(
+            str(p.relative_to(root)) for p in root.rglob("*.md") if p.is_file()
+        )
+
+    def append_section(self, rel: str, heading: str, body: str) -> Path:
+        content = self.read_note(rel)
+        updated = self._upsert_section(content, heading, body)
+        return self.write_note(rel, updated)
+
+    # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
