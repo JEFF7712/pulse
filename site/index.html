@@ -1089,6 +1089,11 @@
         animation: sourcesFlowDashPush 22s linear infinite;
       }
 
+      .sources-ingest.is-flow-paused .sources-flow-glow,
+      .sources-ingest.is-flow-paused .sources-flow-glow--push {
+        animation-play-state: paused;
+      }
+
       @keyframes sourcesFlowDash {
         to {
           stroke-dashoffset: -132;
@@ -1921,6 +1926,22 @@
         var reducedMotion =
           window.matchMedia &&
           window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if ("IntersectionObserver" in window) {
+          var flowVisibility = new IntersectionObserver(
+            function (entries) {
+              for (var i = 0; i < entries.length; i++) {
+                if (entries[i].isIntersecting) {
+                  root.classList.remove("is-flow-paused");
+                } else {
+                  root.classList.add("is-flow-paused");
+                }
+              }
+            },
+            { root: null, rootMargin: "0px", threshold: 0 },
+          );
+          flowVisibility.observe(root);
+        }
 
         function layoutSourcesFlow() {
           var cr = root.getBoundingClientRect();
