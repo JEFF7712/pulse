@@ -5,6 +5,9 @@ from zoneinfo import ZoneInfo
 import aiosqlite
 
 from pulse.domain.events import Event
+from pulse.store.normalizer import EventNormalizer
+
+_NORMALIZER = EventNormalizer()
 
 
 def _local_day_bounds(day: str, timezone: str) -> tuple[str, str]:
@@ -42,6 +45,10 @@ class EventRepository:
         """Upsert events and return the number of genuinely new rows inserted."""
         if not events:
             return 0
+
+        # Tier-1 normalization: strip pure noise (URL tracking params, zero-width
+        # chars) deterministically at ingest so every query works on clean data.
+        events = [_NORMALIZER.normalize(e) for e in events]
 
         ids = [e.id for e in events]
         placeholders = ",".join("?" for _ in ids)

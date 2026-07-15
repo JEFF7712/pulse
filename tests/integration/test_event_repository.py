@@ -262,3 +262,31 @@ def test_count_events_matches_filters(tmp_path):
             assert await repo.count_events() == 2
 
     asyncio.run(exercise())
+
+
+def test_upsert_events_normalizes_tracking_params_at_ingest(tmp_path):
+    async def exercise() -> None:
+        from datetime import UTC, datetime
+
+        from pulse.domain.events import Event
+        from pulse.store.db import connect_db
+        from pulse.store.events import EventRepository
+        from pulse.store.schema import bootstrap_schema
+
+        db_path = tmp_path / "norm.db"
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            repo = EventRepository(db)
+            await repo.upsert_events([
+                Event(
+                    id="browser:1",
+                    timestamp=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
+                    source="browser",
+                    event_type="browsing.visit",
+                    data={"url": "https://ex.com/a?id=1&utm_source=x&fbclid=y", "title": "A"},
+                )
+            ])
+            got = await repo.query_events(sources=["browser"])
+            assert got[0].data["url"] == "https://ex.com/a?id=1"
+
+    asyncio.run(exercise())
