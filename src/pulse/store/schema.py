@@ -91,5 +91,14 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS event_embeddings (
+            event_id TEXT PRIMARY KEY,
+            dim INTEGER NOT NULL,
+            vector BLOB NOT NULL
+        )
+        """
+    )
 
     await db.commit()
