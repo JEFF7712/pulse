@@ -7,6 +7,11 @@ class ConnectorConfig(BaseModel):
     poll_interval: str = "15m"
 
 
+class SemanticConfig(BaseModel):
+    enabled: bool = False
+    model: str = "minishlab/potion-base-32M"
+
+
 class PulseConfig(BaseModel):
     database_path: str = "data/pulse.db"
     vault_path: str = "Pulse-Vault"
@@ -45,6 +50,7 @@ class PulseConfig(BaseModel):
     oura_client_secret: str | None = None
     oura_personal_access_token: str | None = None
     connectors: dict[str, ConnectorConfig] = {}
+    semantic: SemanticConfig | None = None
 
 
 # Backward compatibility alias
