@@ -89,6 +89,23 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 Pulse does not reason: these tools expose your data so your agent can. Orient with `pulse_digest`, then drill in with `pulse_query_events`.
 
+#### Semantic search (optional)
+
+By default `pulse_query_events(text=...)` does a substring match. For local semantic ranking, install the extra and enable it:
+
+```bash
+pip install pulse-agent[semantic]   # or: uv tool install "pulse-agent[semantic]"
+```
+
+Add to `pulse.toml`:
+
+```toml
+[semantic]
+enabled = true
+```
+
+Then run **`pulse embed`** once to backfill embeddings for existing events (re-run after large pulls). The first run downloads a ~30MB local model ([model2vec](https://github.com/MinishLab/model2vec)); nothing leaves your machine and no API key is used. When disabled or the extra is absent, `text=` falls back to substring match.
+
 ### MCP resources
 
 | Resource | URI |

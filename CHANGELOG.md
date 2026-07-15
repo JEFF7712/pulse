@@ -11,6 +11,14 @@ Pulse is being refocused as an **MCP-first personal-data context layer**: it ing
 set of high-signal sources and exposes them to your own agent, which does the reasoning. Pulse no
 longer calls an LLM and needs no LLM API key. This release is the first phase (subtractive).
 
+### Added
+
+- **MCP context surface:** `pulse_query_events` (range/source/text, paginated, trimmed), `pulse_digest` (deterministic day rollup), `pulse_coverage`, and vault-memory tools (`pulse_vault_read`/`list`/`write`/`append_section`), plus `pulse://digest/today`, `pulse://coverage`, `pulse://vault/index` resources.
+- **Agent skills** (`skills/`): `pulse-review` and `pulse-recall`.
+- **NixOS module** (`nixosModules.default`): systemd service for `pulse run`.
+- **Tier-1 ingest normalization:** deterministic, lossless stripping of URL tracking params and zero-width characters at ingest.
+- **Optional local semantic search** (`pip install pulse-agent[semantic]`, [model2vec](https://github.com/MinishLab/model2vec)) behind `[semantic] enabled`; `pulse embed` backfills embeddings and `pulse_query_events(text=...)` then ranks by similarity. Off by default; no new base dependencies.
+
 ### Removed
 
 - **Mobile companion app:** the Flutter `companion_app/`, its connector, REST API, token auth, and the FCM push / device-token store (all mobile-only).

@@ -58,3 +58,12 @@ omit_amounts_in_digest = false
 [connectors.oura]
 enabled = false
 poll_interval = "6h"
+
+# --- Optional local semantic search (off by default) ---
+# Requires the extra: `pip install pulse-agent[semantic]`. When enabled,
+# `pulse_query_events(text=...)` ranks by local embedding similarity instead of
+# substring match. Run `pulse embed` once to backfill embeddings for existing
+# events. First run downloads a ~30MB model. Disabled = substring match, no deps.
+# [semantic]
+# enabled = false
+# model = "minishlab/potion-base-32M"

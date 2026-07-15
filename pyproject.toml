@@ -33,6 +33,10 @@ dependencies = [
     "questionary>=2.1.1",
 ]
 
+[project.optional-dependencies]
+# Local semantic search over events (model2vec's only major dep is numpy).
+semantic = ["model2vec>=0.8"]
+
 [project.scripts]
 pulse-mcp = "pulse.mcp.server:main"
 pulse = "pulse.app.cli:main"
