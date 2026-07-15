@@ -79,22 +79,29 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 | Tool | Description |
 | --- | --- |
-| `pulse_events_for_day` | Query events for a specific date, optionally filtered by source |
+| `pulse_query_events` | Query events by time range, source(s), and text; newest-first, paginated, trimmed (pass `full=true` for raw) |
+| `pulse_digest` | Deterministic day digest: per-source counts + clustered activity (browsing, email, calendar, media, dev, health, finance) |
+| `pulse_coverage` | Per-source event count, last-event freshness, and connector sync state |
+| `pulse_events_for_day` | Query all events for a specific date, optionally filtered by source |
 | `pulse_ingest_event` | Manually push an event into the store |
-| `pulse_connector_status` | Check sync state of all connectors |
+| `pulse_vault_read` / `pulse_vault_list` | Read a vault note / list all vault notes |
+| `pulse_vault_write` / `pulse_vault_append_section` | Write a vault note / upsert a `## heading` section (agent memory) |
+
+Pulse does not reason: these tools expose your data so your agent can. Orient with `pulse_digest`, then drill in with `pulse_query_events`.
 
 ### MCP resources
 
 | Resource | URI |
 | --- | --- |
-| Today's events | `pulse://events/today` |
-| Connector status | `pulse://connectors/status` |
+| Today's digest | `pulse://digest/today` |
+| Source coverage | `pulse://coverage` |
+| Vault index | `pulse://vault/index` |
 
 ### 5. Verify
 
 - Run **`pulse status`** to confirm DB path and event counts.
 - Confirm the MCP server process starts without `PulseConfigNotFoundError` or missing-module errors.
-- Optional: invoke tool **`pulse_connector_status`** or resource **`pulse://events/today`** from the client if it exposes them.
+- Optional: invoke tool **`pulse_coverage`** or resource **`pulse://digest/today`** from the client if it exposes them.
 
 ## Reference
 
