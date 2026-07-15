@@ -115,6 +115,27 @@ Uses root [`compose.yaml`](https://github.com/JEFF7712/pulse/blob/main/compose.y
 
 For a **pipx** / **`uv tool install`** layout, copy and enable the example user unit from [`deploy/systemd/pulse-user.service.example`](https://github.com/JEFF7712/pulse/blob/main/deploy/systemd/pulse-user.service.example) to `~/.config/systemd/user/pulse.service`, adjust **`ExecStart`** if your `pulse` binary lives elsewhere, then `systemctl --user daemon-reload` and `systemctl --user enable --now pulse.service`. Use **`loginctl enable-linger "$USER"`** if you want the unit to start at boot without an interactive session.
 
+#### NixOS module
+
+The flake exposes `nixosModules.default`, a systemd service that runs `pulse run`. In your system flake:
+
+```nix
+{
+  inputs.pulse.url = "github:JEFF7712/pulse";
+
+  outputs = { nixpkgs, pulse, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        pulse.nixosModules.default
+        { services.pulse.enable = true; }   # optional: services.pulse.port, .stateDir, .host, .environment
+      ];
+    };
+  };
+}
+```
+
+Before starting, place your `pulse.toml` (with secrets) in `services.pulse.stateDir` (default `/var/lib/pulse`), or run `pulse configure` against it — secrets are never put in the Nix store. The service binds `127.0.0.1:8000` by default and reads `PULSE_CONFIG_DIR` / `PULSE_DATABASE_PATH` / `PULSE_VAULT_PATH` from that directory.
+
 #### Data volumes and stopping
 
 - **`pulse-data`** — database and vault (`/data` in the container).
