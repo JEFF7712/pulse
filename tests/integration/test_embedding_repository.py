@@ -44,3 +44,21 @@ def test_embedding_repository_upserts_load_all_and_missing_ids(tmp_path):
             assert await repository.upsert_embeddings([]) is None
 
     asyncio.run(exercise())
+
+
+def test_load_for_ids_returns_only_requested(tmp_path):
+    async def exercise() -> None:
+        from pulse.store.db import connect_db
+        from pulse.store.embeddings import EmbeddingRepository
+        from pulse.store.schema import bootstrap_schema
+
+        db_path = tmp_path / "emb_ids.db"
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            repo = EmbeddingRepository(db)
+            await repo.upsert_embeddings([("a", [1.0, 0.0]), ("b", [0.0, 1.0]), ("c", [1.0, 1.0])])
+            got = dict(await repo.load_for_ids(["a", "c", "missing"]))
+            assert set(got) == {"a", "c"}
+            assert got["a"] == [1.0, 0.0]
+
+    asyncio.run(exercise())

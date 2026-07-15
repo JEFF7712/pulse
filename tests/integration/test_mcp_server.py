@@ -249,6 +249,111 @@ def test_pulse_query_events_trims_by_default_and_supports_full(tmp_path: Path) -
     asyncio.run(_run())
 
 
+def test_pulse_query_events_ranks_semantically_when_enabled(tmp_path: Path) -> None:
+    """With semantic enabled and an embedder present, text= ranks by similarity."""
+    from pulse.app.config import PulseConfig, SemanticConfig
+    from pulse.mcp import server as server_module
+    from pulse.semantic.embedder import FakeEmbedder, event_text
+    from pulse.store.embeddings import EmbeddingRepository
+
+    async def _run() -> None:
+        config = PulseConfig(
+            database_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+            semantic=SemanticConfig(enabled=True),
+        )
+        async with open_pulse_context(
+            db_path=config.database_path,
+            vault_path=config.vault_path,
+            config=config,
+        ) as pulse_ctx:
+            # Both events contain the token "report" (so a substring query matches
+            # both). The OLDER event is more about "report"; substring ordering is
+            # newest-first (would rank e:decoy first), so asserting e:target is first
+            # proves semantic ranking — not substring — produced the order.
+            events = [
+                Event(
+                    id="e:target",
+                    timestamp=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+                    source="gmail",
+                    event_type="email.received",
+                    data={"subject": "report report"},
+                    metadata={},
+                ),
+                Event(
+                    id="e:decoy",
+                    timestamp=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+                    source="gmail",
+                    event_type="email.received",
+                    data={"subject": "report meeting agenda notes"},
+                    metadata={},
+                ),
+            ]
+            await pulse_ctx.events.upsert_events(events)
+            embedder = FakeEmbedder(dim=64)
+            emb_repo = EmbeddingRepository(pulse_ctx._db)
+            await emb_repo.upsert_embeddings(
+                [(e.id, embedder.embed([event_text(e)])[0]) for e in events]
+            )
+            # sanity: substring ordering alone would put the newer decoy first
+            substring_first = (await pulse_ctx.events.query_events(text="report"))[0].id
+            assert substring_first == "e:decoy"
+
+            # inject the fake embedder (semantic already enabled on config)
+            pulse_ctx.embedder = embedder
+
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+            result = json.loads(
+                await server_module.pulse_query_events(text="report", ctx=ctx)
+            )
+            assert result["events"][0]["id"] == "e:target"
+
+    asyncio.run(_run())
+
+
+def test_pulse_query_events_substring_when_semantic_disabled(tmp_path: Path) -> None:
+    """With semantic disabled (default), text= keeps the substring behavior."""
+    from pulse.mcp import server as server_module
+
+    async def _run() -> None:
+        async with open_pulse_context(
+            db_path=str(tmp_path / "test.db"),
+            vault_path=str(tmp_path / "vault"),
+        ) as pulse_ctx:
+            await pulse_ctx.events.upsert_events(
+                [
+                    Event(
+                        id="e:invoice",
+                        timestamp=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "invoice due"},
+                        metadata={},
+                    ),
+                    Event(
+                        id="e:lunch",
+                        timestamp=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={"subject": "lunch"},
+                        metadata={},
+                    ),
+                ]
+            )
+            ctx = SimpleNamespace(
+                request_context=SimpleNamespace(lifespan_context=pulse_ctx)
+            )
+            result = json.loads(
+                await server_module.pulse_query_events(text="invoice", ctx=ctx)
+            )
+            assert result["count"] == 1
+            assert result["events"][0]["id"] == "e:invoice"
+
+    asyncio.run(_run())
+
+
 def test_pulse_vault_tools_round_trip_list_append_and_reject_unsafe(
     tmp_path: Path,
 ) -> None:

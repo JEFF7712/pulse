@@ -20,6 +20,7 @@ class PulseContext:
     database_path: str
     _db: aiosqlite.Connection
     config: PulseConfig | None = None
+    embedder: object | None = None
 
     async def close(self) -> None:
         await self._db.close()
@@ -33,6 +34,11 @@ async def open_pulse_context(
     await enable_foreign_keys(db)
     await bootstrap_schema(db)
     ensure_vault_onboarding(vault_path)
+    embedder = None
+    if config is not None:
+        from pulse.semantic.factory import load_embedder
+
+        embedder = load_embedder(config)
     try:
         yield PulseContext(
             events=EventRepository(db),
@@ -41,6 +47,7 @@ async def open_pulse_context(
             database_path=db_path,
             _db=db,
             config=config,
+            embedder=embedder,
         )
     finally:
         await db.close()

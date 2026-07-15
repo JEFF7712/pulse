@@ -170,6 +170,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show database paths, counts, and connector snapshot",
     )
     subparsers.add_parser(
+        "embed",
+        parents=[config_parent],
+        help="Backfill local semantic embeddings for events (requires [semantic])",
+    )
+    subparsers.add_parser(
         "test-telegram",
         parents=[config_parent],
         help="Send one Telegram test message (requires Telegram settings in pulse.toml or env)",
@@ -229,6 +234,8 @@ def main() -> None:
         )
     elif args.command == "status":
         ops.status(config_dir=getattr(args, "config_dir", None))
+    elif args.command == "embed":
+        ops.embed(args)
     elif args.command == "logs":
         ops.logs(args)
     elif args.command == "reset":

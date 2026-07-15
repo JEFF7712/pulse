@@ -67,6 +67,39 @@ def _trim_value(v, full: bool):
     return v
 
 
+async def _maybe_semantic_query(pulse_ctx, start, end, source_list, text, limit):
+    """Rank matching events by embedding similarity to ``text``.
+
+    Returns ``(events, total)`` when semantic search is active, else ``None`` so
+    the caller falls back to the substring path. Active only when ``text`` is set,
+    semantic is enabled in config, and an embedder is present on the context.
+    """
+    if not text or getattr(pulse_ctx, "embedder", None) is None:
+        return None
+    from pulse.semantic.factory import semantic_enabled
+
+    if pulse_ctx.config is None or not semantic_enabled(pulse_ctx.config):
+        return None
+
+    from pulse.semantic.search import rank_ids
+    from pulse.store.embeddings import EmbeddingRepository
+
+    candidate_ids = await pulse_ctx.events.query_event_ids(
+        start=start, end=end, sources=source_list
+    )
+    if not candidate_ids:
+        return [], 0
+    emb_repo = EmbeddingRepository(pulse_ctx._db)
+    candidates = await emb_repo.load_for_ids(candidate_ids)
+    if not candidates:
+        return None  # nothing embedded yet → let substring handle it
+    query_vec = pulse_ctx.embedder.embed([text])[0]
+    ranked_ids = rank_ids(query_vec, candidates, limit)
+    by_id = await pulse_ctx.events.get_events_by_ids(ranked_ids)
+    events = [by_id[i] for i in ranked_ids if i in by_id]
+    return events, len(candidates)
+
+
 @mcp.tool()
 async def pulse_events_for_day(
     day: str | None = None, source: str | None = None, ctx: Context = None
@@ -135,12 +168,19 @@ async def pulse_query_events(
     source_list = (
         [s.strip() for s in sources.split(",") if s.strip()] if sources else None
     )
-    total = await pulse_ctx.events.count_events(
-        start=start, end=end, sources=source_list, text=text
+
+    semantic_events = await _maybe_semantic_query(
+        pulse_ctx, start, end, source_list, text, limit
     )
-    events = await pulse_ctx.events.query_events(
-        start=start, end=end, sources=source_list, text=text, limit=limit
-    )
+    if semantic_events is not None:
+        events, total = semantic_events
+    else:
+        total = await pulse_ctx.events.count_events(
+            start=start, end=end, sources=source_list, text=text
+        )
+        events = await pulse_ctx.events.query_events(
+            start=start, end=end, sources=source_list, text=text, limit=limit
+        )
     payload = {
         "count": total,
         "returned": len(events),

@@ -91,6 +91,54 @@ def status(config_dir: Path | None = None) -> None:
     asyncio.run(_show())
 
 
+async def _backfill_embeddings(db, embedder) -> int:
+    """Embed every event that has no stored embedding yet. Returns the count embedded."""
+    from pulse.semantic.embedder import event_text
+    from pulse.store.embeddings import EmbeddingRepository
+    from pulse.store.events import EventRepository
+
+    events_repo = EventRepository(db)
+    emb_repo = EmbeddingRepository(db)
+
+    missing = await emb_repo.missing_ids(await events_repo.all_ids())
+    if not missing:
+        return 0
+
+    by_id = await events_repo.get_events_by_ids(missing)
+    ordered = [by_id[i] for i in missing if i in by_id]
+    vectors = embedder.embed([event_text(e) for e in ordered])
+    await emb_repo.upsert_embeddings([(e.id, vec) for e, vec in zip(ordered, vectors)])
+    return len(ordered)
+
+
+def embed(args) -> None:
+    from pulse.semantic.factory import load_embedder
+    from pulse.store.db import connect_db
+    from pulse.store.schema import bootstrap_schema
+
+    config = load_config()
+    embedder = load_embedder(config)
+    if embedder is None:
+        ui.error(
+            "Semantic search is not available. Enable [semantic] in pulse.toml and "
+            "install the extra: [cmd]pip install pulse-agent\\[semantic][/]."
+        )
+        sys.exit(1)
+
+    if not Path(config.database_path).exists():
+        ui.error("No database found. Run [cmd]pulse pull[/] first.")
+        sys.exit(1)
+
+    async def _run() -> int:
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+            return await _backfill_embeddings(db, embedder)
+
+    ui.rule("pulse embed")
+    count = asyncio.run(_run())
+    ui.success(f"Embedded {count} event(s).")
+
+
 def logs(args) -> None:
     import json as json_mod
     from datetime import UTC, datetime

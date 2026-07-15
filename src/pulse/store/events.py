@@ -162,3 +162,42 @@ class EventRepository:
         row = await cursor.fetchone()
         await cursor.close()
         return int(row[0])
+
+    async def query_event_ids(
+        self,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        sources: list[str] | None = None,
+    ) -> list[str]:
+        """Return ids of events matching the range/source filter, newest first."""
+        where, params = self._build_filters(start, end, sources, None)
+        cursor = await self._db.execute(
+            "SELECT id FROM events"
+            + where
+            + " ORDER BY unixepoch(timestamp) DESC, id ASC",
+            params,
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [row[0] for row in rows]
+
+    async def all_ids(self) -> list[str]:
+        cursor = await self._db.execute("SELECT id FROM events")
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [row[0] for row in rows]
+
+    async def get_events_by_ids(self, ids: list[str]) -> dict[str, Event]:
+        """Fetch events by id, returned as a dict keyed by id (order-independent)."""
+        if not ids:
+            return {}
+        placeholders = ",".join("?" for _ in ids)
+        cursor = await self._db.execute(
+            "SELECT id, timestamp, source, event_type, data, metadata FROM events "
+            f"WHERE id IN ({placeholders})",
+            ids,
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return {row[0]: _row_to_event(row) for row in rows}

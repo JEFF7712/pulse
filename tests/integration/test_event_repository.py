@@ -290,3 +290,32 @@ def test_upsert_events_normalizes_tracking_params_at_ingest(tmp_path):
             assert got[0].data["url"] == "https://ex.com/a?id=1"
 
     asyncio.run(exercise())
+
+
+def test_query_event_ids_and_all_ids(tmp_path):
+    async def exercise() -> None:
+        from datetime import UTC, datetime
+
+        from pulse.domain.events import Event
+        from pulse.store.db import connect_db
+        from pulse.store.events import EventRepository
+        from pulse.store.schema import bootstrap_schema
+
+        db_path = tmp_path / "ids.db"
+        async with connect_db(db_path) as db:
+            await bootstrap_schema(db)
+            repo = EventRepository(db)
+            await repo.upsert_events([
+                Event(id="g1", timestamp=datetime(2026, 7, 1, tzinfo=UTC), source="gmail",
+                      event_type="email", data={"x": 1}),
+                Event(id="h1", timestamp=datetime(2026, 7, 2, tzinfo=UTC), source="github",
+                      event_type="commit", data={"x": 2}),
+            ])
+            assert set(await repo.all_ids()) == {"g1", "h1"}
+            assert await repo.query_event_ids(sources=["gmail"]) == ["g1"]
+            ids = await repo.query_event_ids(
+                start="2026-07-02T00:00:00+00:00", end="2026-07-03T00:00:00+00:00"
+            )
+            assert ids == ["h1"]
+
+    asyncio.run(exercise())

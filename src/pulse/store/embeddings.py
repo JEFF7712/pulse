@@ -33,6 +33,18 @@ class EmbeddingRepository:
         await cur.close()
         return [(r[0], _unpack(r[1])) for r in rows]
 
+    async def load_for_ids(self, ids: list[str]) -> list[tuple[str, list[float]]]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        cur = await self._db.execute(
+            f"SELECT event_id, vector FROM event_embeddings WHERE event_id IN ({placeholders})",
+            ids,
+        )
+        rows = await cur.fetchall()
+        await cur.close()
+        return [(r[0], _unpack(r[1])) for r in rows]
+
     async def missing_ids(self, candidate_ids: list[str]) -> list[str]:
         if not candidate_ids:
             return []
