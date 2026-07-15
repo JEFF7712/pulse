@@ -204,7 +204,7 @@ Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
-Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_events_for_day`, `pulse_ingest_event`, `pulse_connector_status`, …) against the same database and vault as this install.
+Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_query_events`, `pulse_digest`, `pulse_coverage`, the `pulse_vault_*` memory tools, …) against the same database and vault as this install.
 
 **Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
 
