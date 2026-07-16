@@ -3,21 +3,25 @@ from datetime import UTC, datetime
 
 def _make_fake_service(messages):
     """Mimics: service.users().messages().list().execute() / .get().execute()"""
+
     class FakeGetRequest:
         def __init__(self, msg):
             self._msg = msg
+
         def execute(self):
             return self._msg
 
     class FakeListRequest:
         def __init__(self, stubs):
             self._stubs = stubs
+
         def execute(self):
             return {"messages": self._stubs}
 
     class FakeMessages:
         def list(self, **kwargs):
             return FakeListRequest([{"id": m["id"]} for m in messages])
+
         def get(self, userId, id, **kwargs):
             for m in messages:
                 if m["id"] == id:
@@ -73,6 +77,29 @@ def test_gmail_connector_normalizes_messages():
         datetime(2025, 10, 21, 11, 30, tzinfo=UTC),
     ]
     assert [event.data for event in events] == [
-        {"subject": "Welcome", "sender": "sender@example.com"},
-        {"subject": "", "sender": ""},
+        {"subject": "Welcome", "sender": "sender@example.com", "category": "primary"},
+        {"subject": "", "sender": "", "category": "primary"},
     ]
+
+
+def test_gmail_connector_captures_category_from_labels():
+    from pulse.connectors.gmail import GmailConnector
+
+    raw = [
+        {
+            "id": "promo",
+            "internalDate": "1761042600000",
+            "labelIds": ["INBOX", "CATEGORY_PROMOTIONS"],
+            "payload": {"headers": [{"name": "From", "value": "sale@shop.com"}]},
+        },
+        {
+            "id": "personal",
+            "internalDate": "1761046200000",
+            "labelIds": ["INBOX", "CATEGORY_PERSONAL"],
+            "payload": {"headers": [{"name": "From", "value": "friend@x.com"}]},
+        },
+    ]
+    connector = GmailConnector(client=_make_fake_service(raw))
+    events = __import__("asyncio").run(connector.pull(None))
+    cats = {e.id: e.data["category"] for e in events}
+    assert cats == {"gmail:promo": "promotions", "gmail:personal": "primary"}

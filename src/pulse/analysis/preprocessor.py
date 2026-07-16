@@ -42,6 +42,56 @@ class EmailThread:
     message_count: int
     senders: list[str]
     is_active: bool  # 3+ messages = active conversation
+    is_promotional: bool = False  # bulk/marketing/social — low signal
+
+
+# Sender fragments that mark bulk/automated mail, used only as a fallback when the
+# event has no Gmail category label (e.g. events ingested before categories existed).
+_BULK_SENDER_HINTS = (
+    "noreply",
+    "no-reply",
+    "donotreply",
+    "do-not-reply",
+    "notify",
+    "notification",
+    "newsletter",
+    "mailer",
+    "marketing",
+    "updates@",
+    "info@",
+    "@e.",
+    "@m.",
+    "@a.",
+    "@e-",
+    "@reply.",
+    "@email.",
+    "@mail.",
+    "@news.",
+    "@newsletter.",
+    "@selections.",
+    "jobalert",
+    "noreply@",
+    "offers@",
+    "offers.",
+    "deals",
+    "promo",
+    "-noreply",
+    "customerservice",
+    "store-news",
+    "store-",
+)
+
+
+def _thread_is_promotional(thread_events: list[Event], senders: list[str]) -> bool:
+    categories = {
+        e.data.get("category") for e in thread_events if e.data.get("category")
+    }
+    if categories:
+        # Trust Gmail's own classification: primary is the only high-signal category.
+        return categories.isdisjoint({"primary"})
+    # Fallback for events without a category: heuristic on the sender address.
+    low = " ".join(senders).lower()
+    return any(hint in low for hint in _BULK_SENDER_HINTS)
 
 
 @dataclass(slots=True)
@@ -242,11 +292,12 @@ class EventPreprocessor:
                     message_count=len(thread_events),
                     senders=senders,
                     is_active=len(thread_events) >= 3,
+                    is_promotional=_thread_is_promotional(thread_events, senders),
                 )
             )
 
-        # Active threads first, then by message count
-        result.sort(key=lambda t: (not t.is_active, -t.message_count))
+        # Real correspondence first, then active threads, then by message count.
+        result.sort(key=lambda t: (t.is_promotional, not t.is_active, -t.message_count))
         return result
 
     def _build_calendar_blocks(self, events: list[Event]) -> list[CalendarBlock]:

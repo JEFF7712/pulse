@@ -5,9 +5,29 @@ from pulse.connectors.google_auth import GoogleAuthManager
 from pulse.domain.connectors import Connector
 from pulse.domain.events import Event
 
+# Gmail's own inbox categories, mapped to a compact tag. "promotions"/"social"/
+# "updates"/"forums" are bulk/low-signal; "primary" is real correspondence.
+_GMAIL_CATEGORY_LABELS = {
+    "CATEGORY_PROMOTIONS": "promotions",
+    "CATEGORY_SOCIAL": "social",
+    "CATEGORY_UPDATES": "updates",
+    "CATEGORY_FORUMS": "forums",
+    "CATEGORY_PERSONAL": "primary",
+}
+
+
+def _category_from_labels(label_ids: list[str]) -> str:
+    for label in label_ids:
+        mapped = _GMAIL_CATEGORY_LABELS.get(label)
+        if mapped is not None:
+            return mapped
+    return "primary"
+
 
 class GmailConnector(Connector):
-    def __init__(self, auth_manager: GoogleAuthManager | None = None, client: Any = None) -> None:
+    def __init__(
+        self, auth_manager: GoogleAuthManager | None = None, client: Any = None
+    ) -> None:
         self._auth_manager = auth_manager
         self._client = client
 
@@ -33,7 +53,12 @@ class GmailConnector(Connector):
             msg = (
                 service.users()
                 .messages()
-                .get(userId="me", id=msg_stub["id"], format="metadata", metadataHeaders=["Subject", "From"])
+                .get(
+                    userId="me",
+                    id=msg_stub["id"],
+                    format="metadata",
+                    metadataHeaders=["Subject", "From"],
+                )
                 .execute()
             )
             events.append(self._to_event(msg))
@@ -58,6 +83,7 @@ class GmailConnector(Connector):
             raise RuntimeError("No auth_manager or client provided")
         creds = self._auth_manager.get_credentials()
         from googleapiclient.discovery import build
+
         return build("gmail", "v1", credentials=creds)
 
     def _to_event(self, row: dict[str, Any]) -> Event:
@@ -70,6 +96,7 @@ class GmailConnector(Connector):
             data={
                 "subject": headers.get("subject", ""),
                 "sender": headers.get("from", ""),
+                "category": _category_from_labels(row.get("labelIds", [])),
             },
         )
 

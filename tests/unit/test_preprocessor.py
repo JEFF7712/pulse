@@ -201,3 +201,36 @@ def test_browsing_time_counts_continuous_session():
     cluster = next(c for c in pp.browsing_clusters if c.domain == "docs.site.com")
     # 5 gaps of 2 min each = ~10 min of continuous reading.
     assert 8 <= cluster.estimated_minutes <= 14
+
+
+def test_email_threads_flag_promotional_by_category_and_sort_signal_first():
+    from datetime import UTC, datetime
+
+    from pulse.analysis.preprocessor import EventPreprocessor
+    from pulse.domain.events import Event
+
+    def _email(i, subject, sender, category=None):
+        data = {"subject": subject, "sender": sender}
+        if category is not None:
+            data["category"] = category
+        return Event(
+            id=f"gmail:{i}",
+            timestamp=datetime(2026, 7, 15, 9, i, tzinfo=UTC),
+            source="gmail",
+            event_type="email.received",
+            data=data,
+        )
+
+    events = [
+        _email(1, "70% off sale", "deals@shop.com", category="promotions"),
+        _email(2, "Re: project sync", "colleague@work.com", category="primary"),
+        # no category → sender-heuristic fallback should flag this bulk one
+        _email(3, "Your receipt", "noreply@service.com"),
+    ]
+    pp = EventPreprocessor().preprocess(events)
+    by_subject = {t.subject: t for t in pp.email_threads}
+    assert by_subject["70% off sale"].is_promotional is True
+    assert by_subject["project sync"].is_promotional is False
+    assert by_subject["Your receipt"].is_promotional is True  # fallback heuristic
+    # real correspondence sorts ahead of promotional
+    assert pp.email_threads[0].is_promotional is False
