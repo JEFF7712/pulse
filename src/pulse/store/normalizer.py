@@ -49,16 +49,23 @@ _ZERO_WIDTH = str.maketrans({"​": None, "‌": None, "‍": None, "﻿": None}
 
 
 def clean_url(value: str) -> str:
-    """Strip tracking query params from a URL. Non-URLs are returned unchanged."""
-    parts = urlsplit(value)
+    """Strip tracking query params from a URL. Non-URLs / unparseable input returned unchanged."""
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        # e.g. "Invalid IPv6 URL" on unmatched '[' — Tier-1 is lossless-or-identity, never raises.
+        return value
     if not parts.scheme or not parts.netloc:
         return value
-    kept = [
-        (k, v)
-        for k, v in parse_qsl(parts.query, keep_blank_values=True)
-        if k.lower() not in _TRACKING_PARAMS
-    ]
-    return urlunsplit(parts._replace(query=urlencode(kept)))
+    try:
+        kept = [
+            (k, v)
+            for k, v in parse_qsl(parts.query, keep_blank_values=True)
+            if k.lower() not in _TRACKING_PARAMS
+        ]
+        return urlunsplit(parts._replace(query=urlencode(kept)))
+    except ValueError:
+        return value
 
 
 def _clean_str(value: str) -> str:

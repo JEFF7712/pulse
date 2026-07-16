@@ -70,3 +70,27 @@ def test_normalize_is_noop_for_already_clean_data():
     )
     out = EventNormalizer().normalize(ev)
     assert out.data == data
+
+
+def test_clean_url_returns_value_unchanged_on_unparseable_url():
+    # Real browser history contains URLs with unmatched brackets, which urlsplit
+    # rejects with "Invalid IPv6 URL". Tier-1 must be lossless-or-identity, never raise.
+    for bad in ["http://[", "http://[not-ipv6/path", "https://["]:
+        assert clean_url(bad) == bad
+
+
+def test_normalize_survives_malformed_url_in_event_data():
+    from datetime import UTC, datetime
+
+    from pulse.domain.events import Event
+
+    ev = Event(
+        id="browser:bad",
+        timestamp=datetime(2026, 7, 16, tzinfo=UTC),
+        source="browser",
+        event_type="browsing.visit",
+        data={"url": "http://[", "title": "weird"},
+    )
+    out = EventNormalizer().normalize(ev)  # must not raise
+    assert out.data["url"] == "http://["
+    assert out.data["title"] == "weird"
