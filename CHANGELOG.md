@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-07-16
+
+### Fixed
+
+- **Browser pulls crashed** on real history: the Tier-1 URL normalizer raised `ValueError: Invalid IPv6 URL` on any URL with an unmatched `[`, aborting the entire pull batch. Normalization is now lossless-or-identity and never raises. (Affected the highest-volume connector in 3.0.0–3.1.0.)
+- **GitHub connector returned 404**: it requested `/user/events` (not a real endpoint). It now resolves the authenticated login and pulls from `/users/{login}/events`.
+- **Browsing time estimates were inflated**: the digest summed inter-visit gaps as on-site time, so domains revisited across the day (e.g. Google) reported hours instead of minutes. Time is now sessionized, gaps beyond a session threshold count only a small dwell.
+
+### Added
+
+- **Email signal/noise separation in the digest**: the Gmail connector captures Gmail's own category (`primary`/`promotions`/`social`/`updates`/`forums`), and `EventPreprocessor` flags promotional/bulk threads (`is_promotional`, with a sender heuristic fallback for mail ingested before categories), sorting real correspondence first.
+
 ## [3.1.0] - 2026-07-16
 
 ### Added
