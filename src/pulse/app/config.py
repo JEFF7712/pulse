@@ -12,6 +12,22 @@ class SemanticConfig(BaseModel):
     model: str = "minishlab/potion-base-32M"
 
 
+_DEFAULT_PROACTIVE_PROMPT = (
+    "Use the Pulse MCP tools (pulse_digest, pulse_query_events, pulse_coverage, and the "
+    "pulse_vault_* memory tools) to review my last day of data. If the pulse-review skill "
+    "is available, follow it. Surface only non-obvious, actionable insights, each grounded "
+    "in specific events; if nothing clears that bar, say 'Nothing notable.' Keep it short."
+)
+
+
+class ProactiveConfig(BaseModel):
+    enabled: bool = False
+    command: list[str] = ["claude", "-p"]
+    prompt: str = _DEFAULT_PROACTIVE_PROMPT
+    at: str = "08:00"  # local HH:MM in config timezone
+    timeout_seconds: int = 600
+
+
 class PulseConfig(BaseModel):
     database_path: str = "data/pulse.db"
     vault_path: str = "Pulse-Vault"
@@ -51,6 +67,7 @@ class PulseConfig(BaseModel):
     oura_personal_access_token: str | None = None
     connectors: dict[str, ConnectorConfig] = {}
     semantic: SemanticConfig | None = None
+    proactive: ProactiveConfig | None = None
 
 
 # Backward compatibility alias
