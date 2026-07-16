@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-16
+
 ### Added
 
-- Optional proactive review: scheduled headless-agent review delivered to your notification channel (`[proactive]`, `pulse review`).
+- **Optional proactive review:** on a schedule, Pulse invokes your own agent headless (default `claude -p`) to review recent data and delivers the result to your notification channel. Configured via `[proactive]` (off by default); run on demand with `pulse review`. Uses your agent subscription, not an API key.
+
+### Removed
+
+- Dead insight-storage left over from the removed discovery engine: the `insights` table and `AnalyticsRepository.upsert_insight`/`get_insight`/`delete_insights`/`list_insights`, plus the unused `insights_panel` CLI helper.
 
 ## [3.0.0] - 2026-07-16
 
@@ -135,6 +141,8 @@ First stable release of **Pulse** (`pulse-agent` on PyPI).
 - Configuration lives primarily in **`pulse.toml`** (with `PULSE_*` and documented API key env overrides). See `pulse.toml.example` and the self-hosting quickstart.
 - **Breaking changes** after 1.0 will be called out in this file and reflected in semver (MAJOR for incompatible behavior or config schema changes, MINOR for backward-compatible features, PATCH for fixes).
 
+[Unreleased]: https://github.com/JEFF7712/pulse/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/JEFF7712/pulse/releases/tag/v3.0.0
 [2.0.3]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.3
 [2.0.2]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.2
 [2.0.1]: https://github.com/JEFF7712/pulse/releases/tag/v2.0.1

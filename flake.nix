@@ -55,7 +55,7 @@
 
         packages.default = pythonPkgs.buildPythonApplication {
           pname = "pulse-agent";
-          version = "3.0.0";
+          version = "3.1.0";
           pyproject = true;
           src = ./.;
           nativeBuildInputs = [ pythonPkgs.setuptools ];

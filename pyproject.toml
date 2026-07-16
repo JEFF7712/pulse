@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pulse-agent"
-version = "3.0.0"
-description = "Self-hosted personal intelligence agent"
+version = "3.1.0"
+description = "Self-hosted personal-data context layer for agents (MCP)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
