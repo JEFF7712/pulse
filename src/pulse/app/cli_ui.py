@@ -139,7 +139,9 @@ def status_tables(
     event_rows: list[tuple[Any, ...]],
     sync_rows: list[tuple[Any, ...]],
 ) -> None:
-    console.print(Panel(f"[label]Database[/]  {database}", border_style=_ACCENT, box=box.ROUNDED))
+    console.print(
+        Panel(f"[label]Database[/]  {database}", border_style=_ACCENT, box=box.ROUNDED)
+    )
     summary = Table(show_header=False, box=None, padding=(0, 2))
     summary.add_column(style="label")
     summary.add_column(style="value")
@@ -148,7 +150,11 @@ def status_tables(
     console.print(summary)
 
     if event_rows:
-        et = Table(title="[accent]Events by source[/]", box=box.ROUNDED, header_style=f"bold {_ACCENT}")
+        et = Table(
+            title="[accent]Events by source[/]",
+            box=box.ROUNDED,
+            header_style=f"bold {_ACCENT}",
+        )
         et.add_column("Source", style=f"bold {_ACCENT_SOFT}")
         et.add_column("Type", style="default")
         et.add_column("Count", justify="right", style=f"bold {_ACCENT}")
@@ -157,7 +163,11 @@ def status_tables(
         console.print(et)
 
     if sync_rows:
-        st = Table(title="[accent]Sync cursors[/]", box=box.ROUNDED, header_style=f"bold {_ACCENT}")
+        st = Table(
+            title="[accent]Sync cursors[/]",
+            box=box.ROUNDED,
+            header_style=f"bold {_ACCENT}",
+        )
         st.add_column("Source", style=f"bold {_ACCENT_SOFT}")
         st.add_column("Cursor", style="default", max_width=36, overflow="ellipsis")
         st.add_column("Updated", style="muted")
@@ -168,7 +178,11 @@ def status_tables(
 
 def logs_table(rows: list[tuple[str, str, str, str]]) -> None:
     """Rows: (ts_short, source, etype, detail)."""
-    t = Table(title="[accent]Recent events[/]", box=box.ROUNDED, header_style=f"bold {_ACCENT}")
+    t = Table(
+        title="[accent]Recent events[/]",
+        box=box.ROUNDED,
+        header_style=f"bold {_ACCENT}",
+    )
     t.add_column("Time", style=f"bold {_ACCENT_SOFT}", no_wrap=True)
     t.add_column("Source", style="bold")
     t.add_column("Type", style="muted")
@@ -176,16 +190,3 @@ def logs_table(rows: list[tuple[str, str, str, str]]) -> None:
     for ts_short, source, etype, detail in rows:
         t.add_row(ts_short, source, etype, detail)
     console.print(t)
-
-
-def insights_panel(rows: list[dict[str, Any]]) -> None:
-    for i in rows:
-        conf = i["confidence"]
-        status = i["status"]
-        title = f"[accent.soft]{status}[/]  [bold]{i['title']}[/]"
-        body = (
-            f"[muted]confidence[/] {conf}  ·  [muted]seen[/] {i['first_seen']} → {i['last_seen']}\n"
-            f"[muted]vault[/] {i['vault_path']}"
-        )
-        console.print(Panel(body, title=title, border_style=_ACCENT, box=box.ROUNDED))
-        console.print()

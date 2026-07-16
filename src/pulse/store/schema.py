@@ -61,20 +61,6 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
-    await db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS insights (
-            id          TEXT PRIMARY KEY,
-            title       TEXT NOT NULL,
-            status      TEXT NOT NULL,
-            confidence  TEXT NOT NULL,
-            first_seen  TEXT NOT NULL,
-            last_seen   TEXT NOT NULL,
-            vault_path  TEXT NOT NULL,
-            created_at  TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
 
     # Indexes on events table
     await db.execute(

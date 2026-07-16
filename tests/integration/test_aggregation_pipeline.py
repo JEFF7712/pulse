@@ -15,10 +15,24 @@ def test_run_aggregation_job(tmp_path):
         async with connect_db(db_path) as db:
             await bootstrap_schema(db)
             repo = EventRepository(db)
-            await repo.upsert_events([
-                Event(id="e1", timestamp=datetime(2026, 3, 25, 9, 0, tzinfo=UTC), source="gmail", event_type="email.received", data={}),
-                Event(id="e2", timestamp=datetime(2026, 3, 25, 14, 0, tzinfo=UTC), source="gmail", event_type="email.received", data={}),
-            ])
+            await repo.upsert_events(
+                [
+                    Event(
+                        id="e1",
+                        timestamp=datetime(2026, 3, 25, 9, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={},
+                    ),
+                    Event(
+                        id="e2",
+                        timestamp=datetime(2026, 3, 25, 14, 0, tzinfo=UTC),
+                        source="gmail",
+                        event_type="email.received",
+                        data={},
+                    ),
+                ]
+            )
 
         result = await run_aggregation_job(day=date(2026, 3, 25), database_path=db_path)
         assert result.status == "success"
@@ -54,10 +68,6 @@ def test_schema_creates_analytics_tables(tmp_path):
             await db.execute(
                 "INSERT INTO weekly_baselines (week_start, source, event_type, avg_daily, total) "
                 "VALUES ('2026-03-17', 'gmail', 'email.received', 5.2, 36)"
-            )
-            await db.execute(
-                "INSERT INTO insights (id, title, status, confidence, first_seen, last_seen, vault_path) "
-                "VALUES ('ins-1', 'Test Pattern', 'active', 'medium', '2026-03-25', '2026-03-25', '02-Insights/patterns/test.md')"
             )
             await db.commit()
 
