@@ -26,6 +26,8 @@ Default install: pull connectors only unless you register push connectors with w
 
 `aggregation` (hourly), plus pull jobs for each enabled connector.
 
+When **`[proactive] enabled = true`**, a daily **`proactive_poke`** job runs at `at` (config timezone): headless agent subprocess → notification channel. Test on demand with **`pulse review`**. Requires the agent CLI on `PATH` and a configured notify channel — see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
+
 Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
 
 **Failures:** set **`notify_on_job_failure = true`** (and at least one outbound channel: Telegram, ntfy, …) to receive **rate-limited** alerts when a scheduled job throws (per-job cooldown **`job_failure_alert_cooldown`**, default `6h`). Category **`operations`**. Connector **401 / missing OAuth** paths that used to return empty now raise **`ConnectorAuthError`** so the same path can alert on **`pull_<source>`** failures.

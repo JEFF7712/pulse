@@ -51,7 +51,7 @@ grep -q '^  --vp-font-family-base: system-ui, -apple-system, BlinkMacSystemFont,
 grep -q '^  --vp-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,$' docs-app/docs/.vitepress/theme/custom.css
 grep -q '^\.pulse-docs-home \.vp-doc > div {$' docs-app/docs/.vitepress/theme/custom.css
 npm ci --ignore-scripts --no-audit --no-fund --prefix docs-app >/dev/null
-grep -q '^FROM node:20-alpine AS docs-builder$' Dockerfile
+grep -q '^FROM node:24-alpine AS docs-builder$' Dockerfile
 grep -q '^WORKDIR /app/site/docs-app$' Dockerfile
 grep -q '^COPY site/docs-app/package.json site/docs-app/package-lock.json \./$' Dockerfile
 grep -q '^RUN npm ci --ignore-scripts --no-audit --no-fund$' Dockerfile
@@ -115,20 +115,17 @@ curl_nginx "http://127.0.0.1:$port$docs_nav_path" >/dev/null
 [[ -n "${docs_bridge_html:-}" ]]
 grep -q '<title>Pulse</title>' <<<"$html"
 grep -q 'https://pulseagent.dev/docs/' <<<"$html"
-grep -q 'Personal intelligence agent' <<<"$html"
-grep -q 'Turn your life data into useful observations\.' <<<"$html"
+grep -q 'Personal-data context layer' <<<"$html"
+grep -q 'Your life data, ready for your agent\.' <<<"$html"
 # Phrase is split across lines in index.html; match stable parts.
-grep -q 'It explains what' <<<"$html"
-grep -q 'is changing in plain English' <<<"$html"
+grep -q 'Pulse holds the context' <<<"$html"
+grep -q 'your agent</strong> does the reasoning' <<<"$html"
 grep -q 'Pulse connects the tools you already use' <<<"$html"
-grep -q 'useful observations to your vault\.' <<<"$html"
-grep -q 'late meetings are pushing dinner' <<<"$html"
-grep -q 'sleep shorter' <<<"$html"
-grep -q 'weeks with two strength workouts' <<<"$html"
-grep -q 'most focused' <<<"$html"
-grep -q 'Every observation lands as readable notes' <<<"$html"
+grep -q 'Obsidian-compatible vault' <<<"$html"
+grep -q 'Optional proactive review' <<<"$html"
+grep -q 'Everything stays as readable notes' <<<"$html"
 grep -q 'Obsidian' <<<"$html"
-grep -q 'Together they turn scattered signals into unique and actionable insights' <<<"$html"
+grep -q 'Together they give your agent the timeline it needs' <<<"$html"
 # Connectors perf: no multi-layer SVG drop-shadow on push glow; pause wiring present
 ! grep -q 'drop-shadow(0 0 48px rgba(74, 222, 128' index.html
 grep -q 'is-flow-paused' index.html
@@ -141,6 +138,7 @@ grep -q '<h3>The Reclamation</h3>' <<<"$html"
 grep -q 'Same data\. Different agenda\.' <<<"$html"
 grep -q '<h3>Sovereignty</h3>' <<<"$html"
 grep -q 'Every insight, every memory' <<<"$html"
+grep -q 'hands it to an agent that works for' <<<"$html"
 ! grep -q '<h3>On Your Terms</h3>' <<<"$html"
 ! grep -q '<form' <<<"$html"
 ! grep -q 'formspree.io' <<<"$html"
@@ -154,6 +152,9 @@ grep -q 'View documentation' <<<"$html"
 ! grep -q 'Notify Me' <<<"$html"
 ! grep -q 'This is being built in the open\.' <<<"$html"
 ! grep -q 'In development' <<<"$html"
+! grep -q 'Personal intelligence agent' <<<"$html"
+! grep -q 'unique and actionable insights' <<<"$html"
+! grep -q 'runs it through an AI that works' <<<"$html"
 
 grep -q '<title>Pulse Docs</title>' <<<"$docs_bridge_html"
 assert_contains "$docs_html" 'Pulse Docs'
@@ -175,7 +176,7 @@ assert_contains "$quickstart_html" 'Self-Hosting Quickstart'
 assert_contains "$quickstart_html" 'pulse configure'
 assert_contains "$quickstart_html" 'Manual install (if you already use pipx):'
 assert_contains "$quickstart_html" 'pulseagent.dev/install.sh'
-assert_contains "$quickstart_html" 'docker build'
+assert_contains "$quickstart_html" 'Build and run from a clone'
 assert_contains "$install_sh_body" '#!/usr/bin/env bash'
 assert_contains "$install_sh_body" 'pulse-agent'
 assert_contains "$install_sh_body" 'pipx'

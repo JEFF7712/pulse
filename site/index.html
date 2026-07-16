@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Pulse is a self-hosted personal intelligence agent that runs in the background, syncs connectors on a schedule, writes observations to your Obsidian vault, and exposes MCP so Claude Code, Codex, OpenClaw, and other agents can use the same memory."
+      content="Pulse is a self-hosted personal-data context layer: it syncs connectors on a schedule, writes to your Obsidian vault, and exposes MCP so Claude Code, Codex, OpenClaw, and other agents can reason over the same memory. Pulse does not call an LLM itself."
     />
     <meta name="theme-color" content="#050505" />
     <title>Pulse</title>
@@ -1436,9 +1436,9 @@
       <div class="corner corner--br"></div>
 
       <div class="content">
-        <p class="label">Personal intelligence agent</p>
+        <p class="label">Personal-data context layer</p>
         <h1 class="title"><span>Pulse</span></h1>
-        <p class="tagline">Turn your life data into useful observations.</p>
+        <p class="tagline">Your life data, ready for your agent.</p>
         <div class="divider"></div>
         <div class="install-cta">
           <p class="install-label">Install now</p>
@@ -1538,32 +1538,27 @@
       <div class="about-main">
         <p class="about-label">What is Pulse</p>
         <p>
-          Pulse connects the tools you already use, watches for patterns across
-          them, and writes useful observations to your vault. It runs in the
-          background on your machine—scheduled syncs keep connectors fresh and
-          the pipeline moving without you watching a dashboard. It explains what
-          is changing in plain English, so you are not stitching the story
-          together yourself.
+          Pulse connects the tools you already use, pulls high-signal events
+          into a local store, and keeps an
+          <strong>Obsidian-compatible vault</strong> in sync. It runs in the
+          background on your machine—scheduled syncs keep connectors fresh
+          without you watching a dashboard. Pulse holds the context;
+          <strong>your agent</strong> does the reasoning.
         </p>
         <p>
-          That might mean noticing that
-          <strong
-            >late meetings are pushing dinner later and sleep shorter</strong
-          >, that
-          <strong>errands across town keep leading to extra spending</strong>,
-          or that
-          <strong
-            >weeks with two strength workouts are your most focused
-            workweeks</strong
-          >.
+          Ask your agent what changed this week, when a habit slipped, or how
+          spending tracked against late meetings—grounded in the same timeline
+          Pulse already ingested. Optional proactive review can poke your agent
+          on a schedule and deliver the result to Telegram, ntfy, or another
+          channel you configure.
         </p>
         <p>
-          Every observation lands as readable notes in your
+          Everything stays as readable notes in your
           <strong>Obsidian vault</strong>—yours to inspect, edit, or delete. A
           <strong>Model Context Protocol</strong> server lets
           <strong>Claude Code</strong>, <strong>Codex</strong>,
-          <strong>OpenClaw</strong>, and other MCP-capable tools query the same
-          timeline and insight patterns.
+          <strong>OpenClaw</strong>, and other MCP-capable tools query digests,
+          events, coverage, and vault memory.
         </p>
       </div>
       <div class="about-gutter about-gutter--right" aria-hidden="true">
@@ -1588,7 +1583,7 @@
         <div class="about-float-slot">
           <div
             class="about-float"
-            data-messages='["Patterns ready.","Corrections yours.","End of line."]'
+            data-messages='["Context ready.","Your agent reasons.","End of line."]'
           ></div>
         </div>
       </div>
@@ -1597,12 +1592,12 @@
     <section class="sources reveal-section reveal-stagger-children">
       <p class="section-label">Connectors</p>
       <h2 class="section-heading">
-        One background agent. <br />
+        One context layer. <br />
         Every signal in your life.
       </h2>
       <p class="section-intro">
-        Together they turn scattered signals into unique and actionable insights
-        about your life.
+        Together they give your agent the timeline it needs to surface
+        actionable insights about your life.
       </p>
       <div class="sources-ingest" id="sourcesIngest">
         <div class="source-grid">
@@ -1650,11 +1645,13 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <path d="M12 21s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z" />
-                <circle cx="12" cy="10" r="2.5" />
+                <path
+                  d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65S8.93 17.38 9 18v4"
+                />
+                <path d="M9 18c-4.51 2-5-2-7-2" />
               </svg>
             </span>
-            <span class="source-name">Location</span>
+            <span class="source-name">GitHub</span>
           </div>
           <div class="source-item">
             <span class="source-icon" aria-hidden="true">
@@ -1776,17 +1773,16 @@
           <h3>The Reclamation</h3>
           <p>
             Pulse doesn't ask you to stop using these services. It connects to
-            them, pulls your data home, and runs it through an AI that works for
+            them, pulls your data home, and hands it to an agent that works for
             you, not for advertisers. Same data. Different agenda.
           </p>
         </div>
         <div class="manifesto-point">
           <h3>Transparency</h3>
           <p>
-            Every insight, every memory, every piece of data the agent touches
+            Every insight, every memory, every piece of data your agent touches
             is stored as plain text in an Obsidian vault on your machine. There
-            is no black box. You can read, edit, or delete anything the agent
-            knows.
+            is no black box. You can read, edit, or delete anything it knows.
           </p>
         </div>
         <div class="manifesto-point">
@@ -1804,7 +1800,7 @@
       <p>
         Pulse &middot; 2026 &middot;
         <a href="https://pulseagent.dev/docs/">Documentation</a>
-        &middot; Your data, your intelligence
+        &middot; Your data, your agent
       </p>
     </footer>
 

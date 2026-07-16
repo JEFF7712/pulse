@@ -15,7 +15,7 @@ Thanks for helping improve Pulse. This document covers how to set up a developme
 uv sync --group dev
 ```
 
-**Nix** — From the repo root: `nix develop`, then use the provided environment (uv keeps `.venv` in sync). For the Flutter companion app, use `nix develop .#companion` (pulls Flutter, JDK 17, and on Linux GTK for optional `flutter run -d linux`).
+**Nix** — From the repo root: `nix develop`, then use the provided environment (uv keeps `.venv` in sync).
 
 **Classic venv** — Create a virtualenv, then `pip install -e .` and `pip install pytest` (or install the `dev` group equivalent).
 
@@ -55,16 +55,11 @@ Python package source lives under `src/pulse/`. High-level areas:
 | `src/pulse/domain/event_types.py` | Canonical `event_type` strings and preprocessor buckets — register new types when adding a connector |
 | `src/pulse/mcp/` | MCP server |
 | `src/pulse/store/` | SQLite persistence |
+| `src/pulse/semantic/` | Optional local embeddings / ranking (`pulse-agent[semantic]`) |
+| `src/pulse/jobs/` | Scheduler jobs (aggregation, connector pulls, optional proactive review) |
 | `tests/` | Pytest suite |
-| `companion_app/` | Flutter iOS companion (insights, corrections; see design in repo docs) |
-
-### Companion app (Flutter)
-
-From `companion_app/`: install the [Flutter SDK](https://docs.flutter.dev/get-started/install), then `flutter pub get`. The repo includes `ios/` and `android/` scaffolding; if you strip them locally, regenerate with `flutter create . --platforms=ios,android` (it preserves `lib/`). Run `flutter test` and `flutter run` on a device or simulator.
-
-**Push (FCM):** The app registers the device with Pulse (`POST /api/device-token`) when Firebase initializes. Add your Firebase project files: **`ios/Runner/GoogleService-Info.plist`** (Xcode → Runner). For Android, add **`android/app/google-services.json`** and apply the [Google services Gradle plugin](https://firebase.google.com/docs/flutter/setup?platform=android) to `android/settings.gradle.kts` and `android/app/build.gradle.kts`. Without those files the app still runs; push setup is skipped at runtime. Enable the Push Notifications capability and APNs in the Apple Developer portal for production iOS builds.
-
-**Health & location:** The app reads steps and sleep (HealthKit on iOS, Health Connect on Android) and occasionally records a coarse `location.enter` snapshot (`place: snapshot`), queues events locally, and POSTs batches to `/webhooks/companion`. Enable the **`companion`** connector on the Pulse server. In Xcode, add the **HealthKit** capability (in addition to the `Info.plist` strings already in the template). On Android, `MainActivity` extends **`FlutterFragmentActivity`** (required for Health Connect permission flows on newer APIs); install the Health Connect app and grant **Steps** and **Sleep** read access when prompted.
+| `skills/` | Agent skills (`pulse-review`, `pulse-recall`) |
+| `site/` | Marketing homepage + VitePress docs app |
 
 ## License
 

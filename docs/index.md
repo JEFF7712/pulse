@@ -2,7 +2,7 @@
 
 ## What is Pulse?
 
-Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, purchases, health, media, and more) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others) cover operational alerts. **No app to open, no daily check-ins** — your data stays on your stack.
+Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, GitHub, browsing, and optional health/media/finance) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others), **local semantic search**, and **proactive review** via your agent CLI. **No app to open, no daily check-ins** — your data stays on your stack.
 
 ## How it works
 
@@ -70,6 +70,8 @@ Data Sources (Gmail, Calendar, GitHub, Oura, …)
 For [Model Context Protocol](https://modelcontextprotocol.io/) integration with **Claude Code**, **OpenClaw**, Cursor, and other MCP clients, run `pulse-mcp` or `python -m pulse.mcp.server`. The server requires a **`pulse.toml` on disk** at the resolved config path (same rules as the standalone app). **JSON examples, tools, and resources:** [MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html). **Paths and env:** [Configuration reference](https://pulseagent.dev/docs/reference/configuration.html) (*App, CLI, MCP*, *Runtime notes*).
 
 To have an **AI agent install and wire MCP for you**, use the one-liner in [Self-Hosting Quickstart → Connect Pulse to your coding agent (MCP)](https://pulseagent.dev/docs/self-hosting/quickstart.html#mcp-agent-paste) and follow [MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html).
+
+**Agent skills** in [`skills/`](https://github.com/JEFF7712/pulse/tree/main/skills): `pulse-review` and `pulse-recall` teach your agent to use the MCP surface well.
 
 ## Contributing and releases
 

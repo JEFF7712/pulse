@@ -109,6 +109,44 @@ poll_interval = "6h"
 
 **`ConnectorConfig`:** `enabled` defaults false, `poll_interval` default `15m`; extra keys (`browser`, `calendar_id`, …) pass through.
 
+## Optional `[semantic]`
+
+Local embedding ranking for `pulse_query_events(text=...)`. Off by default; no base-package dependency. Install the extra first: `pip install pulse-agent[semantic]` (or `uv tool install "pulse-agent[semantic]"`).
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `enabled` | `false` | When `true`, text queries rank by cosine similarity over stored embeddings. |
+| `model` | `minishlab/potion-base-32M` | [model2vec](https://github.com/MinishLab/model2vec) model id; first use downloads ~30MB locally. |
+
+```toml
+[semantic]
+enabled = true
+# model = "minishlab/potion-base-32M"
+```
+
+After enabling, run **`pulse embed`** once to backfill embeddings for existing events (re-run after large pulls). When disabled or the extra is absent, `text=` falls back to substring match. See [MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html).
+
+## Optional `[proactive]`
+
+Scheduled (or on-demand) review via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …) so the result can be delivered.
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `enabled` | `false` | When `true`, `pulse run` registers a daily poke job. |
+| `command` | `["claude", "-p"]` | Headless agent argv; must be on `PATH`. |
+| `prompt` | (built-in review prompt) | Instructs the agent to use Pulse MCP tools / `pulse-review` skill. |
+| `at` | `"08:00"` | Local time in config `timezone`. |
+| `timeout_seconds` | `600` | Subprocess timeout. |
+
+```toml
+[proactive]
+enabled = true
+command = ["claude", "-p"]
+at = "08:00"
+```
+
+Test with **`pulse review`**. Each run spends your agent subscription. See [Self-Hosting Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html#proactive-review-optional).
+
 ## Token files
 
 OAuth refresh tokens live next to the DB: `google_tokens.json`, `spotify_tokens.json`, `github_tokens.json`, `plaid_tokens.json`. Directory = parent of **`database_path`** — changing **`PULSE_DATABASE_PATH`** moves them.
