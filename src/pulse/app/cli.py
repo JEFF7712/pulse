@@ -205,6 +205,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--all", action="store_true", help="Include future events (excluded by default)"
     )
 
+    subparsers.add_parser(
+        "review",
+        parents=[config_parent],
+        help="Run the proactive review now (on demand; works even if schedule is off)",
+    )
+
     return parser
 
 
@@ -240,6 +246,8 @@ def main() -> None:
         ops.logs(args)
     elif args.command == "reset":
         ops.reset(args)
+    elif args.command == "review":
+        ops.review(args)
     elif args.command == "test-telegram":
         test_telegram()
     else:

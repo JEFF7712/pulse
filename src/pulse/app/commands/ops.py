@@ -1,4 +1,4 @@
-"""Read-only ops commands: discover, status, logs, reset."""
+"""Read-only ops commands: discover, status, logs, reset, review."""
 
 from __future__ import annotations
 
@@ -13,7 +13,9 @@ except ImportError:  # pragma: no cover
     ZoneInfo = None
 
 from pulse.app import cli_ui as ui
+from pulse.app.config import ProactiveConfig, PulseConfig
 from pulse.app.config_loader import PulseConfigNotFoundError, load_config
+from pulse.domain.notifications import NotificationChannel
 
 
 def _resolve_current_day(timezone: str) -> date:
@@ -276,3 +278,76 @@ def reset(args) -> None:
                 )
 
     asyncio.run(_do_reset())
+
+
+async def _run_review(
+    config: PulseConfig,
+    *,
+    channel: NotificationChannel | None,
+    runner=None,
+) -> tuple[bool, str]:
+    """On-demand review: force-enable proactive even when the schedule is off.
+
+    Returns ``(delivered, message)`` where ``message`` is the delivered body,
+    a clear error (e.g. empty command), or a not-delivered note.
+    """
+    from pulse.jobs.proactive import run_proactive_review
+
+    pc = config.proactive if config.proactive is not None else ProactiveConfig()
+    if not pc.command:
+        return (
+            False,
+            "No proactive command configured. Set [proactive].command in pulse.toml.",
+        )
+
+    forced = config.model_copy(
+        update={"proactive": pc.model_copy(update={"enabled": True})}
+    )
+
+    class _CaptureChannel:
+        def __init__(self, inner: NotificationChannel | None):
+            self._inner = inner
+            self.sent: list = []
+
+        def send(self, notification):
+            self.sent.append(notification)
+            if self._inner is not None:
+                return self._inner.send(notification)
+            return True
+
+    capture = _CaptureChannel(channel)
+    kwargs: dict = {"channel": capture}
+    if runner is not None:
+        kwargs["runner"] = runner
+
+    delivered = await run_proactive_review(forced, **kwargs)
+    if delivered and capture.sent:
+        return True, capture.sent[-1].body
+    if delivered:
+        return True, "Delivered."
+    return False, "Nothing notable / not delivered."
+
+
+def review(args) -> None:
+    from pulse.notifications.factory import build_notification_channel
+
+    config = load_config(config_dir=getattr(args, "config_dir", None))
+    channel = build_notification_channel(config)
+    if channel is None:
+        ui.error(
+            "No notification channel configured. Set Telegram, ntfy, or another "
+            "channel in pulse.toml."
+        )
+        sys.exit(1)
+
+    ui.rule("pulse review")
+    ui.say("[accent]Running proactive review[/]…")
+
+    delivered, message = asyncio.run(_run_review(config, channel=channel))
+    if not delivered and "command" in message.lower():
+        ui.error(message)
+        sys.exit(1)
+    if delivered:
+        ui.success(message)
+    else:
+        ui.muted_line(message)
