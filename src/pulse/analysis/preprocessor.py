@@ -1,4 +1,5 @@
 """EventPreprocessor — clusters raw events into structured summaries."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -8,6 +9,12 @@ from urllib.parse import urlparse
 
 from pulse.domain.event_types import DEV_EVENT_TYPES
 from pulse.domain.events import Event
+
+# Browsing time-estimation (sessionization). A gap between consecutive visits to a
+# domain shorter than the session threshold is treated as continuous browsing; a
+# larger gap is a return visit and counts only a small fixed dwell.
+_SESSION_GAP_MINUTES = 10.0
+_DWELL_MINUTES = 1.0
 
 
 def _maybe_int(value: object) -> int | None:
@@ -134,7 +141,9 @@ class EventPreprocessor:
         return PreprocessedDay(
             browsing_clusters=self._cluster_browsing(by_type.get("browsing.visit", [])),
             email_threads=self._group_email_threads(by_type.get("email.received", [])),
-            calendar_blocks=self._build_calendar_blocks(by_type.get("calendar.event", [])),
+            calendar_blocks=self._build_calendar_blocks(
+                by_type.get("calendar.event", [])
+            ),
             media_sessions=self._build_media_sessions(sorted_events),
             dev_activities=self._build_dev_activities(sorted_events),
             finance_summary=self._build_finance_summary(finance_events),
@@ -175,24 +184,31 @@ class EventPreprocessor:
                     if title:
                         unique_titles.append(title)
 
-            # Estimate time: sum gaps between consecutive visits (cap at 30 min each)
+            # Estimate on-site time by sessionizing visits. Browser history only has
+            # visit timestamps, not dwell time. A gap within a session (short) is
+            # continuous browsing and counts as-is; a gap larger than the session
+            # threshold means the user left and returned later, so it counts only a
+            # small fixed dwell — otherwise revisits spread across the day inflate the
+            # estimate (e.g. 12 hourly lookups reading as hours instead of minutes).
             timestamps = sorted(e.timestamp for e in domain_events)
-            total_minutes = 0.0
+            total_minutes = _DWELL_MINUTES  # dwell for the final (or only) visit
             for i in range(1, len(timestamps)):
                 gap = (timestamps[i] - timestamps[i - 1]).total_seconds() / 60
-                total_minutes += min(gap, 30)
-            # Add minimum 1 minute for single visits
-            if total_minutes == 0:
-                total_minutes = 1.0
+                if gap <= _SESSION_GAP_MINUTES:
+                    total_minutes += gap
+                else:
+                    total_minutes += _DWELL_MINUTES
 
-            clusters.append(TopicCluster(
-                domain=domain,
-                titles=unique_titles,
-                visit_count=len(seen_urls),
-                estimated_minutes=round(total_minutes, 1),
-                first_visit=timestamps[0],
-                last_visit=timestamps[-1],
-            ))
+            clusters.append(
+                TopicCluster(
+                    domain=domain,
+                    titles=unique_titles,
+                    visit_count=len(seen_urls),
+                    estimated_minutes=round(total_minutes, 1),
+                    first_visit=timestamps[0],
+                    last_visit=timestamps[-1],
+                )
+            )
 
         # Sort by visit count descending
         clusters.sort(key=lambda c: c.visit_count, reverse=True)
@@ -207,23 +223,27 @@ class EventPreprocessor:
             normalized = subject
             for prefix in ("Re: ", "RE: ", "Fwd: ", "FWD: ", "Fw: "):
                 while normalized.startswith(prefix):
-                    normalized = normalized[len(prefix):]
+                    normalized = normalized[len(prefix) :]
             normalized = normalized.strip() or "(no subject)"
             threads[normalized].append(event)
 
         result = []
         for subject, thread_events in threads.items():
-            senders = list(dict.fromkeys(
-                (e.data.get("from") or e.data.get("sender") or "").strip()
-                for e in thread_events
-                if (e.data.get("from") or e.data.get("sender"))
-            ))
-            result.append(EmailThread(
-                subject=subject,
-                message_count=len(thread_events),
-                senders=senders,
-                is_active=len(thread_events) >= 3,
-            ))
+            senders = list(
+                dict.fromkeys(
+                    (e.data.get("from") or e.data.get("sender") or "").strip()
+                    for e in thread_events
+                    if (e.data.get("from") or e.data.get("sender"))
+                )
+            )
+            result.append(
+                EmailThread(
+                    subject=subject,
+                    message_count=len(thread_events),
+                    senders=senders,
+                    is_active=len(thread_events) >= 3,
+                )
+            )
 
         # Active threads first, then by message count
         result.sort(key=lambda t: (not t.is_active, -t.message_count))
@@ -242,19 +262,23 @@ class EventPreprocessor:
                 gap = (sorted_events[i + 1].timestamp - start).total_seconds() / 60
                 back_to_back = gap <= 15
 
-            blocks.append(CalendarBlock(
-                title=title,
-                start=start,
-                duration_minutes=30.0,  # Default; calendar API doesn't give end time
-                back_to_back=back_to_back,
-            ))
+            blocks.append(
+                CalendarBlock(
+                    title=title,
+                    start=start,
+                    duration_minutes=30.0,  # Default; calendar API doesn't give end time
+                    back_to_back=back_to_back,
+                )
+            )
 
         return blocks
 
     def _build_media_sessions(self, events: list[Event]) -> list[MediaSession]:
         media_events = [
-            e for e in events
-            if e.event_type in (
+            e
+            for e in events
+            if e.event_type
+            in (
                 "media.spotify.play",
                 "media.youtube.activity",
                 "media.youtube.like",
@@ -393,7 +417,9 @@ class EventPreprocessor:
                         ae.data.get("active_calories") if ae else None
                     ),
                     equivalent_walking_distance_meters=_maybe_int(
-                        ae.data.get("equivalent_walking_distance_meters") if ae else None
+                        ae.data.get("equivalent_walking_distance_meters")
+                        if ae
+                        else None
                     ),
                 )
             )
@@ -408,7 +434,9 @@ class EventPreprocessor:
             except (TypeError, ValueError):
                 dm = 0.0
             intens = e.data.get("intensity")
-            intens_s = str(intens) if intens is not None and str(intens).strip() else None
+            intens_s = (
+                str(intens) if intens is not None and str(intens).strip() else None
+            )
             rows.append(
                 HealthWorkout(
                     title=str(e.data.get("title") or "Workout"),

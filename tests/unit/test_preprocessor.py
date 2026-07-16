@@ -151,3 +151,53 @@ def test_time_blocks_group_by_2h_windows():
     # Block 7 = 14:00-16:00 should have browser:1
     block_7 = next(b for b in result.time_blocks if b.block == 7)
     assert block_7.sources["browser"] == 1
+
+
+def test_browsing_time_does_not_inflate_for_spread_out_revisits():
+    """Isolated revisits across the day (big gaps) must not count as continuous on-site time.
+    Regression: the old heuristic summed inter-visit gaps (cap 30min), so 20 spread-out
+    Google visits reported ~220min. Sessionization should keep this small."""
+    from datetime import UTC, datetime
+
+    from pulse.analysis.preprocessor import EventPreprocessor
+    from pulse.domain.events import Event
+
+    # 12 visits to one domain, each ~1 hour apart (clearly separate quick lookups)
+    events = [
+        Event(
+            id=f"browser:{i}",
+            timestamp=datetime(2026, 7, 15, 8 + i, 0, tzinfo=UTC),
+            source="browser",
+            event_type="browsing.visit",
+            data={"url": f"https://www.google.com/search?q=q{i}", "title": f"q{i}"},
+        )
+        for i in range(12)
+    ]
+    pp = EventPreprocessor().preprocess(events)
+    cluster = next(c for c in pp.browsing_clusters if c.domain == "www.google.com")
+    assert cluster.visit_count == 12
+    # 12 isolated lookups should read as a handful of minutes, not hours.
+    assert cluster.estimated_minutes <= 30
+
+
+def test_browsing_time_counts_continuous_session():
+    """Rapid consecutive visits (small gaps) are continuous browsing and should sum."""
+    from datetime import UTC, datetime
+
+    from pulse.analysis.preprocessor import EventPreprocessor
+    from pulse.domain.events import Event
+
+    events = [
+        Event(
+            id=f"browser:{i}",
+            timestamp=datetime(2026, 7, 15, 9, i * 2, tzinfo=UTC),  # every 2 min
+            source="browser",
+            event_type="browsing.visit",
+            data={"url": f"https://docs.site.com/page{i}", "title": f"p{i}"},
+        )
+        for i in range(6)
+    ]
+    pp = EventPreprocessor().preprocess(events)
+    cluster = next(c for c in pp.browsing_clusters if c.domain == "docs.site.com")
+    # 5 gaps of 2 min each = ~10 min of continuous reading.
+    assert 8 <= cluster.estimated_minutes <= 14
