@@ -60,6 +60,16 @@ def build_scheduler(
         id="aggregation",
     )
 
+    if config.proactive is not None and config.proactive.enabled:
+        from apscheduler.triggers.cron import CronTrigger
+
+        hh, mm = (config.proactive.at.split(":") + ["0"])[:2]
+        scheduler.add_job(
+            _make_proactive_job(config),
+            trigger=CronTrigger(hour=int(hh), minute=int(mm), timezone=config.timezone),
+            id="proactive",
+        )
+
     return scheduler
 
 
@@ -136,6 +146,22 @@ def _make_aggregation_job(config):
         except Exception as e:
             await notify_scheduled_job_failure(config, "aggregation", e)
             logger.exception("Aggregation job failed")
+            raise
+
+    return job
+
+
+def _make_proactive_job(config):
+    async def job():
+        from pulse.jobs.proactive import run_proactive_review
+        from pulse.notifications.factory import build_notification_channel
+
+        try:
+            channel = build_notification_channel(config)
+            return await run_proactive_review(config, channel=channel)
+        except Exception as e:
+            await notify_scheduled_job_failure(config, "proactive", e)
+            logger.exception("Proactive review job failed")
             raise
 
     return job
