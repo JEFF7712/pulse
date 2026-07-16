@@ -68,6 +68,7 @@ class GitHubConnector(Connector):
     ) -> None:
         self._auth_manager = auth_manager
         self._http = http_client
+        self._username: str | None = None
 
     def get_source_name(self) -> str:
         return "github"
@@ -88,10 +89,20 @@ class GitHubConnector(Connector):
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
+    async def _resolve_username(self, client: httpx.AsyncClient) -> str:
+        """Look up the authenticated user's login (cached). The events feed lives at
+        /users/{login}/events — there is no /user/events endpoint (that path 404s)."""
+        if self._username is None:
+            resp = await client.get(f"{GITHUB_API}/user", headers=self._headers())
+            resp.raise_for_status()
+            self._username = str(resp.json().get("login", "")).strip()
+        return self._username
+
     async def pull(self, since: datetime | None = None) -> list[Event]:
         client = self._http or httpx.AsyncClient(timeout=60.0)
         owns = self._http is None
         try:
+            username = await self._resolve_username(client)
             events: list[Event] = []
             seen_ids: set[str] = set()
             cutoff = since.astimezone(UTC) if since is not None else None
@@ -100,7 +111,7 @@ class GitHubConnector(Connector):
             while True:
                 params: dict[str, str | int] = {"per_page": _MAX_EVENTS, "page": page}
                 resp = await client.get(
-                    f"{GITHUB_API}/user/events",
+                    f"{GITHUB_API}/users/{username}/events",
                     params=params,
                     headers=self._headers(),
                 )

@@ -24,7 +24,12 @@ def test_github_maps_push_event(tmp_path):
     ]
 
     async def run():
-        transport = httpx.MockTransport(lambda r: httpx.Response(200, json=sample))
+        def _route(r: httpx.Request) -> httpx.Response:
+            if r.url.path == "/user":
+                return httpx.Response(200, json={"login": "tester"})
+            return httpx.Response(200, json=sample)
+
+        transport = httpx.MockTransport(_route)
         client = httpx.AsyncClient(transport=transport)
         conn = GitHubConnector(auth_manager=auth, http_client=client)
         events = await conn.pull(since=None)
@@ -58,7 +63,12 @@ def test_github_respects_since_filter(tmp_path):
     ]
 
     async def run():
-        transport = httpx.MockTransport(lambda r: httpx.Response(200, json=sample))
+        def _route(r: httpx.Request) -> httpx.Response:
+            if r.url.path == "/user":
+                return httpx.Response(200, json={"login": "tester"})
+            return httpx.Response(200, json=sample)
+
+        transport = httpx.MockTransport(_route)
         client = httpx.AsyncClient(transport=transport)
         conn = GitHubConnector(auth_manager=auth, http_client=client)
         since = datetime(2026, 1, 1, tzinfo=UTC)
@@ -114,6 +124,8 @@ def test_github_pull_paginates_until_reaching_since(tmp_path):
     ]
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "tester"})
         requested_pages.append(int(request.url.params.get("page", "1")))
         page = requested_pages[-1]
         if page == 1:
@@ -175,6 +187,8 @@ def test_github_pull_deduplicates_overlapping_pages(tmp_path):
     ]
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "tester"})
         requested_pages.append(int(request.url.params.get("page", "1")))
         if requested_pages[-1] == 1:
             return httpx.Response(200, json=first_page)
@@ -243,6 +257,8 @@ def test_github_pull_handles_page_shift_from_newer_events(tmp_path):
     ]
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "tester"})
         requested_pages.append(int(request.url.params.get("page", "1")))
         if requested_pages[-1] == 1:
             return httpx.Response(200, json=first_page)
@@ -267,3 +283,46 @@ def test_github_pull_handles_page_shift_from_newer_events(tmp_path):
         *(f"github:{i}" for i in range(_MAX_EVENTS)),
         "github:100",
     }
+
+
+def test_github_pulls_from_users_login_events_not_user_events(tmp_path):
+    """Regression: the events feed is /users/{login}/events; /user/events 404s."""
+    auth = GitHubAuthManager(client_id="c", client_secret="s", token_path=tmp_path / "gh.json")
+    auth.save_tokens({"access_token": "tok", "expires_at": None})
+
+    requested_paths = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path == "/user":
+            return httpx.Response(200, json={"login": "octocat"})
+        if request.url.path == "/users/octocat/events":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "9",
+                        "type": "PushEvent",
+                        "created_at": "2026-07-15T12:00:00Z",
+                        "repo": {"name": "octocat/hello"},
+                        "payload": {"commits": [{"id": "a"}]},
+                    }
+                ],
+            )
+        return httpx.Response(404, json={"message": "Not Found"})
+
+    async def run():
+        transport = httpx.MockTransport(handler)
+        client = httpx.AsyncClient(transport=transport)
+        conn = GitHubConnector(auth_manager=auth, http_client=client)
+        events = await conn.pull(since=None)
+        await client.aclose()
+        return events
+
+    import asyncio
+
+    events = asyncio.run(run())
+    assert "/users/octocat/events" in requested_paths
+    assert "/user/events" not in requested_paths
+    assert len(events) == 1
+    assert events[0].data["repo"] == "octocat/hello"

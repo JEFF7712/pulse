@@ -1,4 +1,5 @@
 """Integration-style pull + DB persistence for GitHub connector."""
+
 from __future__ import annotations
 
 import asyncio
@@ -37,9 +38,12 @@ def test_github_pull_cycle_stores_dev_events(tmp_path):
             }
         ]
 
-        transport = httpx.MockTransport(
-            lambda r: httpx.Response(200, json=sample)
-        )
+        def _route(r: httpx.Request) -> httpx.Response:
+            if r.url.path == "/user":
+                return httpx.Response(200, json={"login": "tester"})
+            return httpx.Response(200, json=sample)
+
+        transport = httpx.MockTransport(_route)
         client = httpx.AsyncClient(transport=transport)
         connector = GitHubConnector(auth_manager=auth, http_client=client)
 
