@@ -67,3 +67,12 @@ poll_interval = "6h"
 # [semantic]
 # enabled = false
 # model = "minishlab/potion-base-32M"
+
+# --- Optional proactive review (off by default) ---
+# On a schedule, Pulse invokes YOUR agent (headless) to review recent data and
+# delivers the result to your notification channel (Telegram, ntfy, …). Uses your
+# agent subscription, not an API key. Requires a configured notification channel.
+# [proactive]
+# enabled = false
+# command = ["claude", "-p"]   # or your agent's headless command
+# at = "08:00"                 # local time, config timezone

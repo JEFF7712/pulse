@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional proactive review: scheduled headless-agent review delivered to your notification channel (`[proactive]`, `pulse review`).
+
 ## [3.0.0] - 2026-07-16
 
 Pulse is refocused as an **MCP-first personal-data context layer**: it ingests a curated set of

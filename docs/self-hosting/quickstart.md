@@ -219,9 +219,14 @@ pulse status
 | --- | --- |
 | `pulse pull [sources…]` | Immediate connector pulls |
 | `pulse discover [--date …]` | Manual day aggregation |
+| `pulse review` | On-demand proactive review (if configured) |
 | `pulse test-telegram` | One-off Telegram test |
 
 Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
+
+### Proactive review (optional)
+
+Enable `[proactive]` in `pulse.toml` (see `pulse.toml.example`). Ensure your agent CLI is on `PATH` and a notification channel is configured. Test with `pulse review`; once enabled, `pulse run` fires the review daily at `at` (config timezone). Each run spends your agent subscription.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
