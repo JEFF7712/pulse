@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Pulse is being refocused as an **MCP-first personal-data context layer**: it ingests a curated
-set of high-signal sources and exposes them to your own agent, which does the reasoning. Pulse no
-longer calls an LLM and needs no LLM API key. This release is the first phase (subtractive).
+## [3.0.0] - 2026-07-16
+
+Pulse is refocused as an **MCP-first personal-data context layer**: it ingests a curated set of
+high-signal sources and exposes them to your own agent, which does the reasoning. Pulse no longer
+calls an LLM and needs no LLM API key. This is a breaking release; the mobile companion app, the
+built-in discovery/corrections engines, and several connectors are removed.
 
 ### Added
 

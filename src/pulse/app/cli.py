@@ -172,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "embed",
         parents=[config_parent],
-        help="Backfill local semantic embeddings for events (requires [semantic])",
+        help="Backfill local semantic embeddings for events (requires the semantic extra)",
     )
     subparsers.add_parser(
         "test-telegram",
