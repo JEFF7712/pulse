@@ -20,7 +20,7 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
-<p align="center">Ingest curated sources into a local store and Obsidian-style vault, then expose them over <strong>MCP</strong> so <strong>your</strong> agent does the reasoning — all <strong>self-hosted</strong>. Pulse does not call an LLM itself.</p>
+<p align="center">Ingest curated sources into a local store and Obsidian-style vault, then expose them over <strong>MCP</strong> so <strong>your</strong> agent does the reasoning — all <strong>self-hosted</strong>. </p>
 
 <p align="center">Pulse is still experimental and in active testing, so expect some rough edges and occasional changes. It is best suited for early adopters who are comfortable self-hosting.</p>
 
