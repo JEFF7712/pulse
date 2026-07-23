@@ -26,7 +26,12 @@ def build_scheduler(
     if config is None:
         config = load_config()
 
-    scheduler = AsyncIOScheduler()
+    # coalesce: collapse a backlog of suspend-missed runs into one.
+    # misfire_grace_time: still fire a job that a laptop-sleep pushed past its
+    # scheduled time, instead of silently dropping it (APScheduler's default).
+    scheduler = AsyncIOScheduler(
+        job_defaults={"coalesce": True, "misfire_grace_time": 3600},
+    )
 
     # Pull connector jobs
     if registry is not None:
@@ -68,6 +73,9 @@ def build_scheduler(
             _make_proactive_job(config),
             trigger=CronTrigger(hour=int(hh), minute=int(mm), timezone=config.timezone),
             id="proactive",
+            # A review missed while the laptop slept through its cron time should
+            # still run on the next wake, however late — never skip a day.
+            misfire_grace_time=None,
         )
 
     return scheduler

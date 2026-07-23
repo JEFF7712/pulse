@@ -4,7 +4,7 @@ from datetime import timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from pulse.app.config import PulseConfig, ConnectorConfig
+from pulse.app.config import PulseConfig, ConnectorConfig, ProactiveConfig
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.connectors import Connector
 from pulse.jobs.intervals import parse_interval
@@ -57,6 +57,38 @@ def test_build_scheduler_keeps_analysis_jobs():
     assert "discovery_daily" not in jobs
     assert "discovery_weekly" not in jobs
     assert "discovery_monthly" not in jobs
+
+
+def test_jobs_coalesce_and_survive_suspend_misfire():
+    # A laptop that sleeps through a job's scheduled time must still run it on
+    # wake (coalesced), not silently drop it as APScheduler does by default.
+    from pulse.jobs.scheduler import build_scheduler
+
+    registry = ConnectorRegistry()
+    registry.register_pull("fake", lambda: FakeConnector())
+    config = PulseConfig(
+        connectors={"fake": ConnectorConfig(enabled=True, poll_interval="10m")},
+        proactive=ProactiveConfig(enabled=True, at="08:00"),
+    )
+
+    async def _collect():
+        await registry.build_active_connectors(config)
+        scheduler = build_scheduler(registry=registry, config=config)
+        # start(paused=True) applies job_defaults to pending jobs without running them.
+        scheduler.start(paused=True)
+        jobs = {job.id: job for job in scheduler.get_jobs()}
+        scheduler.shutdown(wait=False)
+        return jobs
+
+    jobs = asyncio.run(_collect())
+
+    for job in jobs.values():
+        assert job.coalesce is True
+
+    assert jobs["pull_fake"].misfire_grace_time == 3600
+    assert jobs["aggregation"].misfire_grace_time == 3600
+    # The daily review must fire on the next wake however late — never skipped.
+    assert jobs["proactive"].misfire_grace_time is None
 
 
 def test_parse_interval_handles_various_units():
