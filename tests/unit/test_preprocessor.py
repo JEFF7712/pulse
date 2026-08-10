@@ -234,3 +234,50 @@ def test_email_threads_flag_promotional_by_category_and_sort_signal_first():
     assert by_subject["Your receipt"].is_promotional is True  # fallback heuristic
     # real correspondence sorts ahead of promotional
     assert pp.email_threads[0].is_promotional is False
+
+
+def test_updates_category_keeps_transactional_mail_but_drops_bulk_alerts():
+    """Gmail files receipts and bank notices under 'updates' alongside job-alert
+    blasts. Category alone must not bin the transactional ones as promotional."""
+    from datetime import UTC, datetime
+
+    from pulse.analysis.preprocessor import EventPreprocessor
+    from pulse.domain.events import Event
+
+    def _email(i, subject, sender, category):
+        return Event(
+            id=f"gmail:{i}",
+            timestamp=datetime(2026, 8, 9, 9, i, tzinfo=UTC),
+            source="gmail",
+            event_type="email.received",
+            data={"subject": subject, "sender": sender, "category": category},
+        )
+
+    events = [
+        _email(1, "You paid Pandyan Ramar $1,500.00", "Venmo <venmo@venmo.com>", "updates"),
+        _email(
+            2,
+            "Confirmed: You added or changed someone's contact info",
+            "AssociatedBank@onlinebanking.associatedbank.com",
+            "updates",
+        ),
+        _email(
+            3,
+            "AI Cheminformatics Engineer I at Frontier Medicines",
+            "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+            "updates",
+        ),
+        _email(4, "Deals up to 35% off!", "Bose <email@email.bose.com>", "promotions"),
+        _email(5, "I want to connect", "Qifan Wen <invitations@linkedin.com>", "social"),
+    ]
+    by_subject = {t.subject: t for t in EventPreprocessor().preprocess(events).email_threads}
+
+    assert by_subject["You paid Pandyan Ramar $1,500.00"].is_promotional is False
+    assert (
+        by_subject["Confirmed: You added or changed someone's contact info"].is_promotional
+        is False
+    )
+    # bulk sender inside 'updates' still gets binned
+    assert by_subject["AI Cheminformatics Engineer I at Frontier Medicines"].is_promotional is True
+    assert by_subject["Deals up to 35% off!"].is_promotional is True
+    assert by_subject["I want to connect"].is_promotional is True

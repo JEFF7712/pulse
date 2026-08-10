@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urlparse
 
+from pulse.analysis.signal import (
+    BULK_CATEGORIES,
+    HIGH_SIGNAL_CATEGORIES,
+    is_bulk_email,
+)
 from pulse.domain.event_types import DEV_EVENT_TYPES
 from pulse.domain.events import Event
 
@@ -45,53 +50,16 @@ class EmailThread:
     is_promotional: bool = False  # bulk/marketing/social — low signal
 
 
-# Sender fragments that mark bulk/automated mail, used only as a fallback when the
-# event has no Gmail category label (e.g. events ingested before categories existed).
-_BULK_SENDER_HINTS = (
-    "noreply",
-    "no-reply",
-    "donotreply",
-    "do-not-reply",
-    "notify",
-    "notification",
-    "newsletter",
-    "mailer",
-    "marketing",
-    "updates@",
-    "info@",
-    "@e.",
-    "@m.",
-    "@a.",
-    "@e-",
-    "@reply.",
-    "@email.",
-    "@mail.",
-    "@news.",
-    "@newsletter.",
-    "@selections.",
-    "jobalert",
-    "noreply@",
-    "offers@",
-    "offers.",
-    "deals",
-    "promo",
-    "-noreply",
-    "customerservice",
-    "store-news",
-    "store-",
-)
-
-
 def _thread_is_promotional(thread_events: list[Event], senders: list[str]) -> bool:
-    categories = {
-        e.data.get("category") for e in thread_events if e.data.get("category")
-    }
+    categories = [
+        str(e.data.get("category")) for e in thread_events if e.data.get("category")
+    ]
     if categories:
-        # Trust Gmail's own classification: primary is the only high-signal category.
-        return categories.isdisjoint({"primary"})
-    # Fallback for events without a category: heuristic on the sender address.
-    low = " ".join(senders).lower()
-    return any(hint in low for hint in _BULK_SENDER_HINTS)
+        if not set(categories).isdisjoint(HIGH_SIGNAL_CATEGORIES):
+            return False
+        if not set(categories).isdisjoint(BULK_CATEGORIES):
+            return True
+    return is_bulk_email(categories[0] if categories else None, senders)
 
 
 @dataclass(slots=True)
