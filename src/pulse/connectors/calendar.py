@@ -13,6 +13,10 @@ from pulse.domain.events import Event
 _CALENDAR_UPDATED_MIN_WINDOW = timedelta(days=21)
 # When the cursor is too stale, refetch by event start time (bounded) without updatedMin.
 _CALENDAR_RESYNC_START_LOOKBACK = timedelta(days=365)
+# `singleEvents=True` expands recurring series into one instance per occurrence. Without
+# an upper bound a yearly event materialises decades of rows, which buries the real
+# calendar and pins `last_event` far in the future. Cap how far ahead we materialise.
+_CALENDAR_FUTURE_HORIZON = timedelta(days=180)
 _CALENDAR_RESYNC_PAGE_SIZE = 2500
 _CALENDAR_RESYNC_MAX_EVENTS = 10_000
 
@@ -31,7 +35,9 @@ def _is_updated_min_too_long_ago(exc: HttpError) -> bool:
 
 
 class GoogleCalendarConnector(Connector):
-    def __init__(self, auth_manager: GoogleAuthManager | None = None, client: Any = None) -> None:
+    def __init__(
+        self, auth_manager: GoogleAuthManager | None = None, client: Any = None
+    ) -> None:
         self._auth_manager = auth_manager
         self._client = client
 
@@ -55,7 +61,9 @@ class GoogleCalendarConnector(Connector):
     def get_default_interval(self) -> timedelta:
         return timedelta(minutes=30)
 
-    def _list_events(self, service: Any, since: datetime | None) -> list[dict[str, Any]]:
+    def _list_events(
+        self, service: Any, since: datetime | None
+    ) -> list[dict[str, Any]]:
         """List raw event dicts; on stale updatedMin, fall back to a start-time bounded resync."""
         now = datetime.now(UTC)
         kwargs: dict[str, Any] = {
@@ -63,6 +71,7 @@ class GoogleCalendarConnector(Connector):
             "maxResults": 250,
             "singleEvents": True,
             "orderBy": "updated",
+            "timeMax": (now + _CALENDAR_FUTURE_HORIZON).isoformat(),
         }
         if since is not None:
             su = since.astimezone(UTC) if since.tzinfo else since.replace(tzinfo=UTC)
@@ -83,12 +92,14 @@ class GoogleCalendarConnector(Connector):
         items: list[dict[str, Any]] = []
         page_token: str | None = None
         time_min = (now - _CALENDAR_RESYNC_START_LOOKBACK).isoformat()
+        time_max = (now + _CALENDAR_FUTURE_HORIZON).isoformat()
         while True:
             results = (
                 service.events()
                 .list(
                     calendarId="primary",
                     timeMin=time_min,
+                    timeMax=time_max,
                     maxResults=_CALENDAR_RESYNC_PAGE_SIZE,
                     singleEvents=True,
                     orderBy="startTime",
@@ -114,6 +125,7 @@ class GoogleCalendarConnector(Connector):
             raise RuntimeError("No auth_manager or client provided")
         creds = self._auth_manager.get_credentials()
         from googleapiclient.discovery import build
+
         return build("calendar", "v3", credentials=creds)
 
     def _to_event(self, row: dict[str, Any]) -> Event:

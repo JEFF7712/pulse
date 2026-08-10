@@ -223,3 +223,39 @@ def test_google_calendar_non_410_http_error_propagates():
         __import__("asyncio").run(
             connector.pull(since=datetime(2026, 3, 1, tzinfo=UTC))
         )
+
+
+def test_list_bounds_future_expansion_of_recurring_events():
+    """singleEvents=True expands a recurring series per occurrence. Without timeMax a
+    yearly event materialises decades of rows and pins last_event in 2055."""
+    from datetime import UTC, datetime, timedelta
+
+    from pulse.connectors.calendar import (
+        _CALENDAR_FUTURE_HORIZON,
+        GoogleCalendarConnector,
+    )
+
+    captured: list[dict] = []
+
+    class FakeListRequest:
+        def execute(self):
+            return {"items": []}
+
+    class FakeEvents:
+        def list(self, **kwargs):
+            captured.append(kwargs)
+            return FakeListRequest()
+
+    class FakeService:
+        def events(self):
+            return FakeEvents()
+
+    connector = GoogleCalendarConnector(client=FakeService())
+    __import__("asyncio").run(connector.pull(since=datetime(2026, 8, 1, tzinfo=UTC)))
+
+    assert "timeMax" in captured[0]
+    time_max = datetime.fromisoformat(captured[0]["timeMax"])
+    horizon = datetime.now(UTC) + _CALENDAR_FUTURE_HORIZON
+    assert abs((time_max - horizon).total_seconds()) < 60
+    # and it must actually be a bound, not decades out
+    assert time_max < datetime.now(UTC) + timedelta(days=400)
