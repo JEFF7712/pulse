@@ -26,7 +26,9 @@ Default install: pull connectors only unless you register push connectors with w
 
 `aggregation` (hourly), plus pull jobs for each enabled connector.
 
-When **`[proactive] enabled = true`**, a daily **`proactive_poke`** job runs at `at` (config timezone): headless agent subprocess → notification channel. Test on demand with **`pulse review`**. Requires the agent CLI on `PATH` and a configured notify channel — see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
+When **`[discovery] enabled = true`**, a daily **`discovery`** job runs at `at` (config timezone). It first computes a deterministic change surface; if nothing moved it exits without spawning anything. Otherwise it runs the headless agent subprocess and notifies only if the agent records a new or changed pattern in the vault. Force a pass with **`pulse review`**. Requires the agent CLI on `PATH` and a configured notify channel — see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
+
+With `[semantic]` also enabled, an **`embed`** job runs 6-hourly to embed newly ingested events. Without it `pulse embed` is only a one-off backfill, and novelty detection goes blind to recent data — the events any discovery pass is actually about.
 
 Cron uses **host** timezone; **`PULSE_TIMEZONE`** affects “today” inside jobs, not cron. Pull jobs only for enabled connectors.
 

@@ -219,18 +219,20 @@ pulse status
 | --- | --- |
 | `pulse pull [sources…]` | Immediate connector pulls |
 | `pulse discover [--date …]` | Manual day aggregation |
-| `pulse review` | On-demand proactive review (if configured) |
+| `pulse review` | Force a discovery pass now (if configured) |
 | `pulse test-telegram` | One-off Telegram test |
 
 Re-open **Configure → Connectors** anytime to re-auth or edit `pulse.toml`.
 
-### Proactive review (optional)
+### Pattern discovery (optional) {#pattern-discovery-optional}
 
-Enable `[proactive]` in `pulse.toml` (see `pulse.toml.example`). Ensure your agent CLI is on `PATH` and a notification channel is configured. Test with `pulse review`; once enabled, `pulse run` fires the review daily at `at` (config timezone). Each run spends your agent subscription.
+Enable `[discovery]` in `pulse.toml` (see `pulse.toml.example`). Ensure your agent CLI is on `PATH` and a notification channel is configured.
+
+Once enabled, `pulse run` performs a daily **change check** at `at` (config timezone). The check is deterministic and cheap: it compares the last week against your own trailing baseline. If nothing changed, nothing happens. When something has, your agent is invoked to investigate, and you are notified only if it records a genuinely new or changed pattern — so a quiet week is a quiet phone. Force a pass with `pulse review`. Each *agent* run spends your subscription; the check itself does not.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
-Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_query_events`, `pulse_digest`, `pulse_coverage`, the `pulse_vault_*` memory tools, …) against the same database and vault as this install.
+Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_query_events`, `pulse_digest`, `pulse_change_surface`, `pulse_coverage`, the `pulse_pattern_*` and `pulse_vault_*` tools, …) against the same database and vault as this install.
 
 **Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
 

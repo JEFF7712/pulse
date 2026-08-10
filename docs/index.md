@@ -2,7 +2,7 @@
 
 ## What is Pulse?
 
-Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, GitHub, browsing, and optional health/media/finance) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others), **local semantic search**, and **proactive review** via your agent CLI. **No app to open, no daily check-ins** — your data stays on your stack.
+Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, GitHub, browsing, and optional health/media/finance) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others), **local semantic search**, and **pattern discovery** via your agent CLI — which notifies you only when it finds something new, not on a schedule. **No app to open, no daily check-ins** — your data stays on your stack.
 
 ## How it works
 

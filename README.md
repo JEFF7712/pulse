@@ -58,7 +58,7 @@ Defaults (native install): config under `~/.config/pulse`, data under `~/.local/
 Documentation lives under `docs/` in this repository, or **[pulseagent.dev/docs](https://pulseagent.dev/docs/)**.
 **Paths and environment:** Standalone app, CLI commands, and the MCP server use `PULSE_DATABASE_PATH`. That variable selects the SQLite event store; use `PULSE_VAULT_PATH` for vault markdown. Override the config directory with `PULSE_CONFIG_DIR` (default finds `.config/pulse.toml` under `~/.config/pulse`). **`pulse` and `pulse-mcp`** read the same variables; day boundaries and scheduling use `PULSE_TIMEZONE` — see the [Operations runbook](https://pulseagent.dev/docs/operations/runbook.html).
 
-Optional: local semantic search (`pulse-agent[semantic]`, `pulse embed`) and scheduled proactive review (`[proactive]`, `pulse review`) — see the [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
+Optional: local semantic search (`pulse-agent[semantic]`, `pulse embed`) and pattern discovery that notifies only on new findings (`[discovery]`, `pulse review`) — see the [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
 
 ### MCP
 

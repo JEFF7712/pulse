@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The scheduled daily review is replaced by **change-triggered pattern discovery**. The old
+design woke a cold agent every morning with one day of data and pushed whatever prose came
+back. A day is too short a window for a pattern to exist in, and the agent had no access to
+what it had already concluded, so the only thing it could reliably produce was a restatement
+of the day — or a manufactured connection between unrelated events. Both halves are inverted:
+a deterministic check decides *whether* to wake an agent, and recorded vault state decides
+*whether to notify*.
+
+### Added
+
+- **`pulse_change_surface` (MCP tool) and the change-surface layer.** Deterministic, no LLM.
+  Reports entities that are new, returning after dormancy, or well off their usual rate versus
+  the user's own trailing baseline, plus clusters of events whose embeddings sit far from
+  anything in that baseline. The embedding lane is shape-agnostic: it can surface a kind of
+  activity no rule was written for. An empty surface is a normal result and means no agent runs.
+- **Pattern tools over MCP:** `pulse_pattern_list`, `pulse_pattern_read`, `pulse_pattern_upsert`,
+  `pulse_pattern_set_status`. `VaultMemory` had a full pattern lifecycle (evidence merging,
+  confidence, status, archiving) that was never exposed, so an agent had no way to know what it
+  had already recorded. It does now.
+- **Novelty gate on pattern writes.** `pulse_pattern_upsert` rejects a proposal too similar to an
+  existing pattern (duplicate) and an update that merely restates the current observation
+  (restatement), using the local embedder when present and token overlap otherwise.
+- **`[discovery]` config** replacing `[proactive]`, with `window_days` (default 7 — a pattern needs
+  repetition) and `baseline_days` (default 56).
+- **Scheduled embedding job.** `pulse embed` was a manual one-off backfill with nothing keeping it
+  current, so every event ingested after the last manual run was unembedded — including the recent
+  events any discovery pass is about. With `[semantic]` and `[discovery]` enabled, embeddings now
+  refresh every 6 hours.
+
+### Changed
+
+- **Notifications are derived from vault state, not agent output.** After a discovery run Pulse
+  diffs recorded patterns and notifies only on a genuine create or material change. An agent that
+  produces pages of prose and records nothing now produces silence. The volatile `Last updated`
+  field is excluded from the comparison so a re-save is not mistaken for a change.
+- **`pulse review`** forces a discovery pass (bypassing the change gate) rather than running a
+  daily review.
+- **Browsing entities keep their full host**, with same-status siblings collapsed under one
+  registrable domain. `parchment.com` + `auth.parchment.com` + `registration.parchment.com` going
+  new together report as one finding, while a genuinely new subdomain of a site whose parent is not
+  new still stands on its own.
+- **`pulse-review` skill** rewritten for discovery: start from what changed rather than from a
+  digest, check against recorded patterns, and record nothing when nothing is new.
+
+### Fixed
+
+- **Weekly baselines were never refreshed.** `aggregate_day` updated daily stats and time blocks but
+  not `weekly_baselines`, so on a live install the table stopped four months before the current day
+  and every "versus normal" comparison ran against stale numbers. It now refreshes the containing
+  ISO week.
+- **Transactional email was classified as promotional.** The digest treated every Gmail category
+  except `primary` as bulk, so payment confirmations and bank security notices were binned
+  alongside marketing. `updates` now falls through to the sender heuristic; on a real inbox this
+  moved a $1,500 payment notice and a bank contact-change alert from "promotional" to signal.
+- **GitHub pushes always reported "0 commits".** The user events feed omits or truncates
+  `payload.commits`; the authoritative count is `payload.size`.
+- **Calendar expanded recurring events without bound.** `singleEvents=True` with no `timeMax`
+  materialised one instance per year out to 2055, burying the real calendar and pinning
+  `pulse_coverage`'s `last_event` three decades in the future. Both the incremental and resync paths
+  are now capped at a 180-day horizon.
+
+### Removed
+
+- **`[proactive]` config and the scheduled daily review.** Pulse now fails to start with a migration
+  message if the section is still present, rather than silently ignoring it and leaving the user
+  believing a review is configured. Rename to `[discovery]`; `command`, `prompt`, `at` and
+  `timeout_seconds` carry over.
+- **Cross-source co-occurrence links.** Pairing same-day entities is a cartesian product: on real
+  data it produced 565 "links" for one week, none meaningful. Deciding that two changes are related
+  is interpretation, and that is the agent's job.
+
 ## [3.1.1] - 2026-07-16
 
 ### Fixed

@@ -79,15 +79,23 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 | Tool | Description |
 | --- | --- |
+| `pulse_change_surface` | What changed versus the user's own trailing baseline: new, returning and off-rate entities, plus clusters of events unlike anything in history |
 | `pulse_query_events` | Query events by time range, source(s), and text; newest-first, paginated, trimmed (pass `full=true` for raw) |
 | `pulse_digest` | Deterministic day digest: per-source counts + clustered activity (browsing, email, calendar, media, dev, health, finance) |
 | `pulse_coverage` | Per-source event count, last-event freshness, and connector sync state |
 | `pulse_events_for_day` | Query all events for a specific date, optionally filtered by source |
 | `pulse_ingest_event` | Manually push an event into the store |
+| `pulse_pattern_list` / `pulse_pattern_read` | List recorded patterns / read one in full |
+| `pulse_pattern_upsert` | Record a pattern, subject to duplicate and restatement checks |
+| `pulse_pattern_set_status` | Mark a pattern active or inactive (archives it) |
 | `pulse_vault_read` / `pulse_vault_list` | Read a vault note / list all vault notes |
 | `pulse_vault_write` / `pulse_vault_append_section` | Write a vault note / upsert a `## heading` section (agent memory) |
 
-Pulse does not reason: these tools expose your data so your agent can. Orient with `pulse_digest`, then drill in with `pulse_query_events`.
+Pulse does not reason: these tools expose your data so your agent can.
+
+**Looking for what's new?** Start with `pulse_change_surface`, then `pulse_pattern_list` to see what is already known, then `pulse_query_events` to investigate. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`. A digest tells you what happened; only a change can be new.
+
+`pulse_pattern_upsert` rejects a proposal that duplicates an existing pattern, or an update that merely restates the one on file. That is deliberate: it is what keeps recorded patterns meaningful rather than an append-only log of the same finding.
 
 #### Semantic search (optional)
 

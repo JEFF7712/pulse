@@ -6,7 +6,7 @@ agent that dumps raw events and one that surfaces something worth knowing.
 
 | Skill | Use for |
 | --- | --- |
-| [`pulse-review`](pulse-review/SKILL.md) | Reviewing recent data and surfacing only non-obvious, actionable insights. Also what the optional proactive poke invokes. |
+| [`pulse-review`](pulse-review/SKILL.md) | Finding genuinely new patterns and recording them, recording nothing when nothing is new. Also what the optional discovery pass invokes. |
 | [`pulse-recall`](pulse-recall/SKILL.md) | Answering ad-hoc "what did I / when did I / how often" questions from your history. |
 
 Each `SKILL.md` is portable Markdown with simple frontmatter (`name`, `description`); the body is

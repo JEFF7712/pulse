@@ -126,26 +126,35 @@ enabled = true
 
 After enabling, run **`pulse embed`** once to backfill embeddings for existing events (re-run after large pulls). When disabled or the extra is absent, `text=` falls back to substring match. See [MCP agent setup](https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html).
 
-## Optional `[proactive]`
+## Optional `[discovery]`
 
-Scheduled (or on-demand) review via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …) so the result can be delivered.
+Pattern discovery via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …).
+
+Discovery runs in two stages, and the first is deterministic:
+
+1. At `at`, Pulse computes a **change surface**: entities that are new, returning after dormancy, or well off their usual rate versus your own trailing baseline, plus clusters of events whose text is unlike anything in that baseline. If nothing moved, the pass ends here — no agent, no tokens, no notification.
+2. If something did move, your agent is invoked to investigate. You are notified **only** when it records a genuinely new or changed pattern in the vault. Prose that records nothing produces silence.
 
 | Field | Default | Notes |
 | --- | --- | --- |
-| `enabled` | `false` | When `true`, `pulse run` registers a daily poke job. |
+| `enabled` | `false` | When `true`, `pulse run` registers the daily change check. |
 | `command` | `["claude", "-p"]` | Headless agent argv; must be on `PATH`. |
-| `prompt` | (built-in review prompt) | Instructs the agent to use Pulse MCP tools / `pulse-review` skill. |
-| `at` | `"08:00"` | Local time in config `timezone`. |
-| `timeout_seconds` | `600` | Subprocess timeout. |
+| `prompt` | (built-in discovery prompt) | Points the agent at `pulse_change_surface` and `pulse_pattern_*`. |
+| `at` | `"09:00"` | Local time in config `timezone`; when the **check** runs. |
+| `timeout_seconds` | `900` | Subprocess timeout. |
+| `window_days` | `7` | Window analysed. A pattern needs repetition, so this is a week, not a day. |
+| `baseline_days` | `56` | History the window is compared against. |
 
 ```toml
-[proactive]
+[discovery]
 enabled = true
 command = ["claude", "-p"]
-at = "08:00"
+at = "09:00"
 ```
 
-Test with **`pulse review`**. Each run spends your agent subscription. See [Self-Hosting Quickstart](https://pulseagent.dev/docs/self-hosting/quickstart.html#proactive-review-optional).
+Force a pass with **`pulse review`** (skips the change gate). Each *agent* run spends your subscription; the daily check does not. Enabling `[discovery]` alongside `[semantic]` also registers a 6-hourly embedding job so novelty detection sees recent events.
+
+> **Migrating from `[proactive]`:** the section was removed in 4.0.0 and Pulse fails to start if it is still present. Rename it to `[discovery]`; `command`, `prompt`, `at` and `timeout_seconds` carry over. Replace a review-style prompt with a discovery-style one, or drop `prompt` to take the built-in default.
 
 ## Token files
 
