@@ -419,6 +419,61 @@ async def pulse_change_surface(
     return json.dumps(_dc(surface), indent=2, default=str)
 
 
+@mcp.tool()
+async def pulse_longitudinal_profile(
+    as_of: str | None = None,
+    history_days: int = 400,
+    ctx: Context = None,
+) -> str:
+    """Long-horizon structure: what has been true about the user over months.
+
+    This is the tool to use for finding things the user does not already know about
+    themselves. A week-scale change is something they did days ago and remember doing;
+    structure at this scale is invisible from the inside because nobody holds a year of
+    their own behaviour in their head. Returns:
+
+    - `entity_trends`: monthly share of activity per entity, with peak, current level
+      and a rise/decline/collapse classification. Shares, not counts, so a change in
+      how much data exists cannot masquerade as a change in behaviour. Reading the
+      monthly series across several entities at once is where rotation shows up: if
+      each interest peaks once and dies rather than accumulating, today's focus is
+      predictably temporary, and that is a fact about the person.
+    - `sleep_phases`: bedtime/wake proxies per quarter, from the daily silence. Phase
+      drift over a year is real and completely unobservable from inside.
+    - `attention`: how much of each entity's time is spent in deep sessions versus
+      glances. Not the same as where the hours go — an activity can absorb many hours
+      entirely in fragments, which is a different relationship from one that anchors.
+    - `dormant`: things that were sustained and then stopped. Stopping is not an event,
+      so it leaves no memory and never surfaces on its own.
+
+    Entities are raw domains and senders; grouping them into topics is your job, and
+    you can see titles to do it. Do not report a single row back as an insight — a
+    domain going quiet is a fact, not a finding. The value is in what several rows mean
+    together, and in what that implies the user should decide.
+
+    Args:
+        as_of: ISO date to analyse up to (defaults to today).
+        history_days: How far back to look. Structure needs a long horizon.
+    """
+    pulse_ctx = _get_pulse_ctx(ctx)
+    tz = _context_timezone(pulse_ctx)
+    if as_of is None:
+        as_of = _today_for_timezone(tz)
+    parsed = _parse_day(as_of)
+    if isinstance(parsed, str):
+        return parsed
+
+    from pulse.services.longitudinal_analysis import analyse_history
+
+    profile = await analyse_history(
+        pulse_ctx._db,
+        as_of=parsed,
+        timezone=tz,
+        history_days=max(60, history_days),
+    )
+    return json.dumps(_dc(profile), indent=2, default=str)
+
+
 # --- Patterns ---
 
 

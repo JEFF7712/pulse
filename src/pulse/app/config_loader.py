@@ -44,7 +44,7 @@ _PROACTIVE_REMOVED = (
     "Pulse now runs a deterministic change check first and only wakes an agent when "
     "the data actually moved, notifying you when a new pattern is recorded rather "
     "than every morning. Rename the section to [discovery] (command, prompt, at and "
-    "timeout_seconds carry over; window_days and baseline_days are new), or delete it "
+    "timeout_seconds carry over; interval_days and history_days are new), or delete it "
     "to turn the feature off."
 )
 

@@ -103,15 +103,17 @@ def _changed_store(tmp_path):
     asyncio.run(_seed(tmp_path / "pulse.db", events))
 
 
-def test_quiet_window_never_wakes_the_agent(tmp_path):
-    """The core fix: no change means no agent run at all, so silence costs nothing."""
+def test_a_quiet_week_still_runs_but_stays_silent(tmp_path):
+    """Findings here are structural and months old, so an uneventful week is no
+    reason to skip. Silence has to come from the output gate, not from an input gate,
+    or a real long-horizon shift would be missed whenever the week happened to be dull."""
     _quiet_store(tmp_path)
     called = False
 
     async def runner(argv, timeout):
         nonlocal called
         called = True
-        return "should not happen"
+        return "nothing structural to report"
 
     channel = _RecordingChannel()
     changes = asyncio.run(
@@ -123,7 +125,7 @@ def test_quiet_window_never_wakes_the_agent(tmp_path):
         )
     )
 
-    assert called is False
+    assert called is True
     assert changes.is_empty()
     assert channel.sent == []
 

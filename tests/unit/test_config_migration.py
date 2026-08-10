@@ -16,22 +16,22 @@ def test_removed_proactive_section_fails_loudly(tmp_path):
 
     message = str(exc.value)
     assert "[discovery]" in message
-    assert "window_days" in message
+    assert "interval_days" in message
 
 
 def test_discovery_section_loads(tmp_path):
     cfg = tmp_path / "pulse.toml"
     cfg.write_text(
         '[discovery]\nenabled = true\ncommand = ["claude", "-p"]\n'
-        'at = "09:00"\nwindow_days = 14\n'
+        'at = "09:00"\ninterval_days = 14\n'
     )
 
     config = load_config(config_path=cfg)
 
     assert config.discovery is not None
     assert config.discovery.enabled is True
-    assert config.discovery.window_days == 14
-    assert config.discovery.baseline_days == 56  # default
+    assert config.discovery.interval_days == 14
+    assert config.discovery.history_days == 400  # default
 
 
 def test_config_without_discovery_is_valid(tmp_path):

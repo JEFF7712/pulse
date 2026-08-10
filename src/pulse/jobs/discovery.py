@@ -1,17 +1,18 @@
-"""Pattern discovery: wake an agent only when something changed, notify only on findings.
+"""Discovery: look for structure the user cannot see, notify only on real findings.
 
-The old proactive review fired on a fixed daily schedule with a cold agent and one day
-of data, and it notified with whatever prose came back. That guarantees a message every
-day, and a day is too short a window for a pattern to exist in, so the message was
-necessarily a restatement of the day.
+The original daily review pushed prose about the day, which the user had just lived and
+already remembered. Gating it on "did anything change this week" fixed the volume but
+not the substance: a week-scale change is still something they did days ago, so
+reporting it is the same restatement wearing a different hat. Recent is not unknown.
 
-This inverts both halves:
+So this runs against long-horizon structure — composition drift over months, whether
+interests rotate rather than accumulate, circadian phase, what actually holds attention,
+what quietly stopped — on a weekly cadence, with no gate on recent activity. A quiet week
+is not a reason to skip, and a busy one is no evidence anything is newly knowable.
 
-* **Trigger** — a deterministic change surface runs first. No change, no agent, no
-  notification, no tokens. Silence is the default and costs nothing.
-* **Content** — the notification is derived from what the agent *recorded in the vault*,
-  not from what it said. If it wrote no new pattern, the user hears nothing, however
-  much prose it produced.
+What keeps the user from being spammed is the novelty gate on the *output*: the
+notification is derived from what the agent recorded in the vault, not from what it said.
+An agent that produces pages of prose and records nothing produces silence.
 """
 
 from __future__ import annotations
@@ -94,23 +95,19 @@ async def run_discovery(
     force: bool = False,
     window_end: date | None = None,
 ) -> PatternChanges:
-    """Run one discovery pass. Returns what changed (empty when nothing did).
+    """Run one discovery pass. Returns what patterns changed (empty when none did).
 
-    ``force`` skips the change-surface gate, for on-demand runs where the user has
-    explicitly asked for a pass regardless of whether anything moved.
+    There is deliberately no pre-run gate on recent activity. The findings worth
+    surfacing are structural and months old, so a quiet week is not a reason to skip:
+    the profile can shift while nothing notable happens, and something happening is no
+    evidence that anything is newly *knowable*. What protects the user from noise is
+    the novelty gate on the output, not a gate on the input.
     """
     dc = config.discovery
     if dc is None or not dc.enabled:
         return PatternChanges()
-
-    day = window_end or _today(config)
-
-    if not force:
-        surface = await _load_surface(config, day, dc)
-        if surface is None or surface.is_empty():
-            logger.info("discovery: no change surface for %s, skipping agent", day)
-            return PatternChanges()
-        logger.info("discovery: %d signals on %s", surface.signal_count(), day)
+    if not dc.command:
+        return PatternChanges()
 
     vault = VaultMemory(config.vault_path)
     before = snapshot_patterns(vault.read_patterns())
@@ -139,23 +136,3 @@ async def run_discovery(
     except Exception:
         logger.exception("failed to deliver discovery notification")
     return changes
-
-
-async def _load_surface(config: PulseConfig, day: date, dc):
-    from pulse.services.change_detection import detect_changes
-    from pulse.store.db import connect_db
-    from pulse.store.schema import bootstrap_schema
-
-    try:
-        async with connect_db(config.database_path) as db:
-            await bootstrap_schema(db)
-            return await detect_changes(
-                db,
-                window_end=day,
-                timezone=config.timezone,
-                window_days=dc.window_days,
-                baseline_days=dc.baseline_days,
-            )
-    except Exception:
-        logger.exception("discovery: change detection failed")
-        return None

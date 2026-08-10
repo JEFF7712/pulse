@@ -13,26 +13,33 @@ class SemanticConfig(BaseModel):
 
 
 _DEFAULT_DISCOVERY_PROMPT = (
-    "Look for patterns in my Pulse data that are not already recorded. Start with "
-    "pulse_change_surface to see what actually changed, then pulse_pattern_list to see "
-    "what is already known. Use pulse_query_events to investigate anything that looks "
-    "worth understanding. Record a finding with pulse_pattern_upsert only if it is new, "
-    "grounded in specific events, and would not be obvious to me. If nothing clears that "
-    "bar, record nothing and stop — that is a normal outcome, not a failure."
+    "Find things about me that I do not already know. Start with "
+    "pulse_longitudinal_profile for structure over months — composition drift, whether "
+    "my interests rotate rather than accumulate, sleep phase, what holds my attention "
+    "versus what I only touch in fragments, and what quietly stopped. Read "
+    "pulse_pattern_list first so you do not re-report a known finding, and "
+    "pulse_vault_read('04-Config/profile.md') for what I believe about myself; the gap "
+    "between that and the data is often the finding. Use pulse_query_events to check any "
+    "hypothesis. Do not tell me what I did recently — I remember. Record with "
+    "pulse_pattern_upsert only a finding I could not have seen myself. If nothing clears "
+    "that bar, record nothing and stop; that is a normal outcome, not a failure."
 )
 
 
 class DiscoveryConfig(BaseModel):
-    """Pattern discovery. The agent is woken only when the data actually moved."""
+    """Discovery of long-horizon structure the user cannot see about themselves."""
 
     enabled: bool = False
     command: list[str] = ["claude", "-p"]
     prompt: str = _DEFAULT_DISCOVERY_PROMPT
-    at: str = "09:00"  # local HH:MM in config timezone; when the *check* runs
+    at: str = "09:00"  # local HH:MM in config timezone
     timeout_seconds: int = 900
-    # A pattern needs repetition to exist, so the window is a week, not a day.
-    window_days: int = 7
-    baseline_days: int = 56
+    # Structure over months does not change daily, and re-deriving it every morning
+    # only rediscovers what is already on file. Weekly is the useful floor.
+    interval_days: int = 7
+    # How far back the profile reaches. A year lets rotation and seasonality show;
+    # a quarter is the practical minimum for any of it to exist.
+    history_days: int = 400
 
 
 class PulseConfig(BaseModel):

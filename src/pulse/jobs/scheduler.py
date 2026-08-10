@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -67,16 +67,18 @@ def build_scheduler(
     )
 
     if config.discovery is not None and config.discovery.enabled:
-        from apscheduler.triggers.cron import CronTrigger
-
         hh, mm = (config.discovery.at.split(":") + ["0"])[:2]
         scheduler.add_job(
             _make_discovery_job(config),
-            trigger=CronTrigger(hour=int(hh), minute=int(mm), timezone=config.timezone),
+            trigger=IntervalTrigger(
+                days=max(1, config.discovery.interval_days),
+                start_date=_next_local_time(config, int(hh), int(mm)),
+                timezone=config.timezone,
+            ),
             id="discovery",
-            # A check missed while the laptop slept should still run on the next wake.
-            # The check itself is cheap and usually finds nothing, so a late run costs
-            # nothing; skipping one could drop the day a pattern first became visible.
+            # A pass missed while the laptop slept should still run on the next wake.
+            # Structure barely moves in a day, so a late run loses nothing; skipping
+            # one entirely could drop a window's worth of drift.
             misfire_grace_time=None,
         )
 
@@ -92,6 +94,16 @@ def build_scheduler(
             )
 
     return scheduler
+
+
+def _next_local_time(config: PulseConfig, hour: int, minute: int) -> datetime:
+    """Next occurrence of ``hour:minute`` in the config timezone, from now."""
+    if ZoneInfo is None:  # pragma: no cover
+        return datetime.now()
+    tz = ZoneInfo(config.timezone)
+    now = datetime.now(tz)
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return target if target > now else target + timedelta(days=1)
 
 
 def _make_pull_job(connector, config):
