@@ -1,4 +1,4 @@
-# Pulse configuration — run `pulse configure` for interactive setup.
+# Pulse configuration - run `pulse configure` for interactive setup.
 # See docs/reference/configuration.md for all options.
 #
 # Pulse is MCP-first: it ingests your data and exposes it to your own agent
@@ -8,7 +8,7 @@
 timezone = "America/Chicago"
 
 # Send one alert per failing scheduler job (aggregation, connector pulls) at most
-# every `job_failure_alert_cooldown` per job — requires Telegram, ntfy, Pushover, etc.
+# every `job_failure_alert_cooldown` per job - requires Telegram, ntfy, Pushover, etc.
 # notify_on_job_failure = false
 # job_failure_alert_cooldown = "6h"
 
@@ -73,7 +73,7 @@ poll_interval = "6h"
 # structure in your data: how the mix of what you do has drifted over months, whether
 # your interests rotate rather than accumulate, sleep-phase drift, what holds your
 # attention versus what you only touch in fragments, and what quietly stopped. It is
-# deliberately not a report on your week — you already remember your week. You are
+# deliberately not a report on your week - you already remember your week. You are
 # notified only when the agent records a genuinely new pattern in the vault. Uses your
 # agent subscription, not an API key. Requires a configured notification channel.
 # [discovery]

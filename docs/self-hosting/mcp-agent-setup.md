@@ -32,7 +32,7 @@ When you are done:
 
 **Prerequisites**
 
-1. A real **`pulse.toml`** must exist where `load_config()` resolves (default **`~/.config/pulse/pulse.toml`**, repo-root **`pulse.toml`**, or **`PULSE_CONFIG_FILE`** / **`PULSE_CONFIG_DIR`**). MCP uses `load_config(require_files=True)` and **exits on startup** if the file is missing — env-only DB/vault paths are not enough without TOML on disk.
+1. A real **`pulse.toml`** must exist where `load_config()` resolves (default **`~/.config/pulse/pulse.toml`**, repo-root **`pulse.toml`**, or **`PULSE_CONFIG_FILE`** / **`PULSE_CONFIG_DIR`**). MCP uses `load_config(require_files=True)` and **exits on startup** if the file is missing - env-only DB/vault paths are not enough without TOML on disk.
 2. **`database_path`** and **`vault_path`** in that file (or **`PULSE_DATABASE_PATH`** / **`PULSE_VAULT_PATH`** in the MCP `env` block) must match the standalone app / scheduler.
 3. If the client’s working directory would not find config, set **`PULSE_CONFIG_FILE`** (absolute path) or **`PULSE_CONFIG_DIR`** in `env`.
 
@@ -94,7 +94,7 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 Pulse does not reason: these tools expose your data so your agent can.
 
-**Looking for something the user does not already know?** Start with `pulse_longitudinal_profile`, then `pulse_pattern_list` for what is already recorded, then `pulse_query_events` to test a hypothesis. Note that `pulse_change_surface` is the wrong tool for this: what it returns is by construction what the user just did, and they remember doing it. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`. A digest tells you what happened; only a change can be new.
+**Looking for something the user does not already know?** Start with `pulse_longitudinal_profile`, then `pulse_pattern_list` for what is already recorded, then `pulse_query_events` to test a hypothesis. Note that `pulse_change_surface` is the wrong tool for this: what it returns is by construction what the user just did, and they remember doing it. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`.
 
 `pulse_pattern_upsert` rejects a proposal that duplicates an existing pattern, or an update that merely restates the one on file. That is deliberate: it is what keeps recorded patterns meaningful rather than an append-only log of the same finding.
 

@@ -2,7 +2,7 @@
 
 ## What is Pulse?
 
-Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, GitHub, browsing, and optional health/media/finance) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself — your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others), **local semantic search**, and **pattern discovery** via your agent CLI — which notifies you only when it finds something new, not on a schedule. **No app to open, no daily check-ins** — your data stays on your stack.
+Self-hosted **MCP-first personal-data context layer**: ingests curated sources (email, calendar, GitHub, browsing, and optional health/media/finance) into a local store and **Obsidian-compatible markdown vault**, and exposes them to **your own agent** over MCP. Pulse does not call an LLM itself - your agent does the reasoning. Optional **notifications** (Telegram, ntfy, webhooks, email, and others), **local semantic search**, and **pattern discovery** via your agent CLI - which looks for long-horizon structure you cannot see about yourself and notifies you only when it records something new. **No app to open, no daily check-ins** - your data stays on your stack.
 
 ## How it works
 
@@ -25,18 +25,18 @@ Data Sources (Gmail, Calendar, GitHub, Oura, …)
 
 ## Design principles
 
-1. **MCP-first** — your agent reasons; Pulse holds the context.
-2. **Low-friction integration** — connect sources quickly.
-3. **Transparency** — vault markdown you can read and diff.
-4. **Extensible** — connectors and notification channels.
-5. **Self-hosted** — your hardware, your data.
+1. **MCP-first** - your agent reasons; Pulse holds the context.
+2. **Low-friction integration** - connect sources quickly.
+3. **Transparency** - vault markdown you can read and diff.
+4. **Extensible** - connectors and notification channels.
+5. **Self-hosted** - your hardware, your data.
 
 ## Quick Start
 
-1. [Run Pulse](https://pulseagent.dev/docs/self-hosting/quickstart.html) — install, configure, start the app  
-2. [Configure Pulse](https://pulseagent.dev/docs/reference/configuration.html) — env vars, `pulse.toml`, connectors  
-3. [Operate Pulse](https://pulseagent.dev/docs/operations/runbook.html) — health, recovery, day-two ops  
-4. [Connect Data Sources](https://pulseagent.dev/docs/connectors/) — per-connector setup  
+1. [Run Pulse](https://pulseagent.dev/docs/self-hosting/quickstart.html) - install, configure, start the app  
+2. [Configure Pulse](https://pulseagent.dev/docs/reference/configuration.html) - env vars, `pulse.toml`, connectors  
+3. [Operate Pulse](https://pulseagent.dev/docs/operations/runbook.html) - health, recovery, day-two ops  
+4. [Connect Data Sources](https://pulseagent.dev/docs/connectors/) - per-connector setup  
 
 <div class="pulse-home-grid">
   <a class="pulse-home-card" href="https://pulseagent.dev/docs/self-hosting/quickstart.html">
@@ -75,5 +75,5 @@ To have an **AI agent install and wire MCP for you**, use the one-liner in [Self
 
 ## Contributing and releases
 
-- **[Contributing](https://github.com/JEFF7712/pulse/blob/main/CONTRIBUTING.md)** — dev environment, tests, project layout.
-- **[Releases and versioning](https://pulseagent.dev/docs/operations/releases.html)** — semver, tags, PyPI.
+- **[Contributing](https://github.com/JEFF7712/pulse/blob/main/CONTRIBUTING.md)** - dev environment, tests, project layout.
+- **[Releases and versioning](https://pulseagent.dev/docs/operations/releases.html)** - semver, tags, PyPI.

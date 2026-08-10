@@ -13,7 +13,7 @@ The **`publish-pypi`** job uses [OIDC trusted publishing](https://docs.pypi.org/
 5. **Workflow name:** `release-publish.yml` (must match the file under `.github/workflows/`).
 6. **Environment name:** leave empty unless you use a [GitHub Environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) in the workflow; if you add `environment: …` to the `publish-pypi` job, set the **same** name here.
 
-After a failed run, open the **`publish-pypi`** log and copy the **claims** block PyPI prints (e.g. `sub`, `workflow_ref`, `ref`). Your PyPI publisher entry must match those claims. Tag pushes use `ref: refs/tags/vX.Y.Z` — if you only configured `refs/heads/main`, tag releases will not match.
+After a failed run, open the **`publish-pypi`** log and copy the **claims** block PyPI prints (e.g. `sub`, `workflow_ref`, `ref`). Your PyPI publisher entry must match those claims. Tag pushes use `ref: refs/tags/vX.Y.Z` - if you only configured `refs/heads/main`, tag releases will not match.
 
 ## Manual upload
 

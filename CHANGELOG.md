@@ -7,21 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The scheduled daily review is replaced by **change-triggered pattern discovery**. The old
+The scheduled daily review is replaced by **long-horizon pattern discovery**. The old
 design woke a cold agent every morning with one day of data and pushed whatever prose came
-back. A day is too short a window for a pattern to exist in, and the agent had no access to
-what it had already concluded, so the only thing it could reliably produce was a restatement
-of the day — or a manufactured connection between unrelated events. Both halves are inverted:
-a deterministic check decides *whether* to wake an agent, and recorded vault state decides
-*whether to notify*.
+back. A day is too short a window for a pattern to exist in, the user already remembers their
+week, and the agent had no access to what it had already concluded - so the only thing it
+could reliably produce was a restatement of the day. Discovery now points the agent at
+structure over months (`pulse_longitudinal_profile`) and notifies only when a genuinely new
+pattern is recorded in the vault.
 
 ### Added
 
+- **`pulse_longitudinal_profile` (MCP tool) and the longitudinal analysis layer.** Deterministic,
+  no LLM. Monthly composition shares per entity with rise/decline/collapse classification,
+  sleep-phase drift, deep-versus-fragmented attention, and dormancy - shares, not counts, so a
+  change in how much data exists cannot masquerade as a change in behaviour.
 - **`pulse_change_surface` (MCP tool) and the change-surface layer.** Deterministic, no LLM.
   Reports entities that are new, returning after dormancy, or well off their usual rate versus
   the user's own trailing baseline, plus clusters of events whose embeddings sit far from
-  anything in that baseline. The embedding lane is shape-agnostic: it can surface a kind of
-  activity no rule was written for. An empty surface is a normal result and means no agent runs.
+  anything in that baseline. Useful for recent-activity questions; not the primary discovery
+  input (recent and unknown are different things).
 - **Pattern tools over MCP:** `pulse_pattern_list`, `pulse_pattern_read`, `pulse_pattern_upsert`,
   `pulse_pattern_set_status`. `VaultMemory` had a full pattern lifecycle (evidence merging,
   confidence, status, archiving) that was never exposed, so an agent had no way to know what it
@@ -29,12 +33,12 @@ a deterministic check decides *whether* to wake an agent, and recorded vault sta
 - **Novelty gate on pattern writes.** `pulse_pattern_upsert` rejects a proposal too similar to an
   existing pattern (duplicate) and an update that merely restates the current observation
   (restatement), using the local embedder when present and token overlap otherwise.
-- **`[discovery]` config** replacing `[proactive]`, with `window_days` (default 7 — a pattern needs
-  repetition) and `baseline_days` (default 56).
+- **`[discovery]` config** replacing `[proactive]`, with `interval_days` (default 7) and
+  `history_days` (default 400). Structure over months does not change daily; re-deriving it
+  every morning only rediscovers what is already on file.
 - **Scheduled embedding job.** `pulse embed` was a manual one-off backfill with nothing keeping it
-  current, so every event ingested after the last manual run was unembedded — including the recent
-  events any discovery pass is about. With `[semantic]` and `[discovery]` enabled, embeddings now
-  refresh every 6 hours.
+  current, so every event ingested after the last manual run was unembedded. With `[semantic]`
+  and `[discovery]` enabled, embeddings now refresh every 6 hours.
 
 ### Changed
 
@@ -42,14 +46,14 @@ a deterministic check decides *whether* to wake an agent, and recorded vault sta
   diffs recorded patterns and notifies only on a genuine create or material change. An agent that
   produces pages of prose and records nothing now produces silence. The volatile `Last updated`
   field is excluded from the comparison so a re-save is not mistaken for a change.
-- **`pulse review`** forces a discovery pass (bypassing the change gate) rather than running a
-  daily review.
+- **`pulse review`** forces a discovery pass rather than running a daily review.
 - **Browsing entities keep their full host**, with same-status siblings collapsed under one
   registrable domain. `parchment.com` + `auth.parchment.com` + `registration.parchment.com` going
   new together report as one finding, while a genuinely new subdomain of a site whose parent is not
   new still stands on its own.
-- **`pulse-review` skill** rewritten for discovery: start from what changed rather than from a
-  digest, check against recorded patterns, and record nothing when nothing is new.
+- **`pulse-review` skill** rewritten for discovery: start from `pulse_longitudinal_profile`,
+  check against recorded patterns, and record nothing when nothing clears the bar. Narrating
+  recent activity is the primary anti-pattern.
 
 ### Fixed
 
@@ -67,6 +71,8 @@ a deterministic check decides *whether* to wake an agent, and recorded vault sta
   materialised one instance per year out to 2055, burying the real calendar and pinning
   `pulse_coverage`'s `last_event` three decades in the future. Both the incremental and resync paths
   are now capped at a 180-day horizon.
+- **Suspend-missed scheduler jobs were dropped.** Job defaults now use `misfire_grace_time=3600`
+  so laptop-suspend-missed runs fire on wake instead of being silently skipped.
 
 ### Removed
 
@@ -77,6 +83,8 @@ a deterministic check decides *whether* to wake an agent, and recorded vault sta
 - **Cross-source co-occurrence links.** Pairing same-day entities is a cartesian product: on real
   data it produced 565 "links" for one week, none meaningful. Deciding that two changes are related
   is interpretation, and that is the agent's job.
+- **Recent-activity gate on discovery.** An empty change surface no longer skips the agent. Findings
+  are structural and months old; a quiet week is not a reason to skip.
 
 ## [3.1.1] - 2026-07-16
 
@@ -134,7 +142,7 @@ built-in discovery/corrections engines, and several connectors are removed.
 
 ### Added
 
-- **Docker:** Multi-stage root `Dockerfile` — builds the `pulse_agent` wheel with **uv** inside the image (clone-only `docker build`, no local `dist/`).
+- **Docker:** Multi-stage root `Dockerfile` - builds the `pulse_agent` wheel with **uv** inside the image (clone-only `docker build`, no local `dist/`).
 - **`compose.yaml`** at repo root for `docker compose up --build` (port 8000, named volumes for config and data).
 - **CI:** `release-publish.yml` publishes the app image to **GitHub Container Registry** (`ghcr.io/<owner>/<repo>`, lowercase) on `v*` tags, with semver and `latest` tags via `docker/metadata-action`.
 - **Docs:** Docker pull/run, first-time `pulse onboard` / `pulse configure`, Compose, GHCR auth, and volume lifecycle in [self-hosting quickstart](docs/self-hosting/quickstart.md) and **README** Install section.
@@ -155,7 +163,7 @@ built-in discovery/corrections engines, and several connectors are removed.
 
 ### Added
 
-- **`pulse internal-install`** — Rich output hook for the curl installer (`ready` / `noninteractive` phases).
+- **`pulse internal-install`** - Rich output hook for the curl installer (`ready` / `noninteractive` phases).
 - **Install script (`scripts/install.sh`):** CLI-aligned colors/banner, step labels, quieter `pipx install`, automatic **`pulse onboard`** when a TTY is available (including **`curl | bash`** via `/dev/tty` when possible).
 
 ### Fixed
@@ -210,14 +218,14 @@ First stable release of **Pulse** (`pulse-agent` on PyPI).
 
 ### Added
 
-- **CLI** — `pulse configure` (hub-style menus for core, connectors, notifications, and model settings), `pulse onboard` (walkthrough plus connector auth), `pulse init` (vault profile, initial pulls, discovery when configured), `pulse run`, `pull`, `discover`, `status`, `insights`, `logs`, and related commands.
-- **Connectors** — Pluggable sources (e.g. Gmail, Calendar, YouTube, Spotify, Microsoft 365, GitHub, GitLab, Linear, Notion, Plaid, browser history, RSS/Atom, Oura) with OAuth / token flows where applicable.
-- **Event store** — SQLite-backed events and sync cursors.
-- **Vault** — Obsidian-compatible markdown output (insights, profile scaffolding).
-- **Notifications** — Multiple channels (Telegram, ntfy, webhooks, Discord, Slack, Pushover, Gotify, SMTP, companion/FCM, and related configuration).
-- **LLM** — Configurable providers and roles for summarization, discovery, and corrections; MCP-oriented tooling where documented.
-- **MCP server** — `pulse-mcp` for agent integration (tools and resources as documented in the README).
-- **Distribution** — PyPI package, Docker image workflow, and install script documented for self-hosting.
+- **CLI** - `pulse configure` (hub-style menus for core, connectors, notifications, and model settings), `pulse onboard` (walkthrough plus connector auth), `pulse init` (vault profile, initial pulls, discovery when configured), `pulse run`, `pull`, `discover`, `status`, `insights`, `logs`, and related commands.
+- **Connectors** - Pluggable sources (e.g. Gmail, Calendar, YouTube, Spotify, Microsoft 365, GitHub, GitLab, Linear, Notion, Plaid, browser history, RSS/Atom, Oura) with OAuth / token flows where applicable.
+- **Event store** - SQLite-backed events and sync cursors.
+- **Vault** - Obsidian-compatible markdown output (insights, profile scaffolding).
+- **Notifications** - Multiple channels (Telegram, ntfy, webhooks, Discord, Slack, Pushover, Gotify, SMTP, companion/FCM, and related configuration).
+- **LLM** - Configurable providers and roles for summarization, discovery, and corrections; MCP-oriented tooling where documented.
+- **MCP server** - `pulse-mcp` for agent integration (tools and resources as documented in the README).
+- **Distribution** - PyPI package, Docker image workflow, and install script documented for self-hosting.
 
 ### Notes for operators
 

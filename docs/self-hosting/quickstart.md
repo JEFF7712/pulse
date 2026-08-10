@@ -6,7 +6,7 @@
 
 Ships `pulse` and `pulse-mcp`.
 
-**One-liner** (installs [pipx](https://pipx.pypa.io/) if needed, then `pulse-agent`; prints CLI-matched styling; runs **`pulse onboard`** at the end when a real terminal is available — including **`curl | bash`**, by attaching stdin to `/dev/tty` when needed):
+**One-liner** (installs [pipx](https://pipx.pypa.io/) if needed, then `pulse-agent`; prints CLI-matched styling; runs **`pulse onboard`** at the end when a real terminal is available - including **`curl | bash`**, by attaching stdin to `/dev/tty` when needed):
 
 ```bash
 curl -fsSL https://pulseagent.dev/install.sh | bash
@@ -26,8 +26,8 @@ pipx install pulse-agent
 
 **Other methods**
 
-- **uv** — `uv tool install pulse-agent`
-- **pip** — use a virtualenv; `pip install pulse-agent`
+- **uv** - `uv tool install pulse-agent`
+- **pip** - use a virtualenv; `pip install pulse-agent`
 
 ### Docker
 
@@ -134,12 +134,12 @@ The flake exposes `nixosModules.default`, a systemd service that runs `pulse run
 }
 ```
 
-Before starting, place your `pulse.toml` (with secrets) in `services.pulse.stateDir` (default `/var/lib/pulse`), or run `pulse configure` against it — secrets are never put in the Nix store. The service binds `127.0.0.1:8000` by default and reads `PULSE_CONFIG_DIR` / `PULSE_DATABASE_PATH` / `PULSE_VAULT_PATH` from that directory.
+Before starting, place your `pulse.toml` (with secrets) in `services.pulse.stateDir` (default `/var/lib/pulse`), or run `pulse configure` against it - secrets are never put in the Nix store. The service binds `127.0.0.1:8000` by default and reads `PULSE_CONFIG_DIR` / `PULSE_DATABASE_PATH` / `PULSE_VAULT_PATH` from that directory.
 
 #### Data volumes and stopping
 
-- **`pulse-data`** — database and vault (`/data` in the container).
-- **`pulse-config`** — configuration (`/config` in the container).
+- **`pulse-data`** - database and vault (`/data` in the container).
+- **`pulse-config`** - configuration (`/config` in the container).
 
 Stop and remove the container:
 
@@ -153,9 +153,9 @@ With Compose: `docker compose down`. Named volumes **persist** until you remove 
 docker volume rm pulse-config pulse-data
 ```
 
-That deletes stored config and data — use only when you intend to reset.
+That deletes stored config and data - use only when you intend to reset.
 
-**Any Python 3.12+ base image** — install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host directories to match), then `pulse run --host 0.0.0.0 --port 8000`.
+**Any Python 3.12+ base image** - install `pulse-agent` with pip, set the same `PULSE_*` paths (or bind-mount host directories to match), then `pulse run --host 0.0.0.0 --port 8000`.
 
 Check with `pulse --help` after any install path.
 
@@ -205,7 +205,7 @@ Interactive **TTY** profile step: copy the plain-text export prompt (between rul
 pulse run
 ```
 
-Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** — operator page with Pull and Test Telegram (same pipelines as CLI where noted).
+Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to change). **`/`** - operator page with Pull and Test Telegram (same pipelines as CLI where noted).
 
 ## 4. Inspect
 
@@ -213,7 +213,7 @@ Serves on `0.0.0.0:8000` by default (`--host` / `--port` / `--log-level` to chan
 pulse status
 ```
 
-`status` — DB path, event counts, cursors.
+`status` - DB path, event counts, cursors.
 
 | Command | Purpose |
 | --- | --- |
@@ -230,13 +230,13 @@ Enable `[discovery]` in `pulse.toml` (see `pulse.toml.example`). Ensure your age
 
 Once enabled, `pulse run` invokes your agent every `interval_days` at `at` (config timezone) to look for long-horizon structure: how the mix of what you do has drifted over months, whether your interests rotate rather than accumulate, sleep-phase drift, what holds your attention versus what you only glance at, and what quietly stopped.
 
-It is deliberately **not** a report on your week — you already remember your week, so reading it back is worthless. You are notified only when the agent records a genuinely new pattern in the vault, which on real data is closer to monthly than weekly. Force a pass with `pulse review`. Each run spends your agent subscription.
+It is deliberately **not** a report on your week - you already remember your week, so reading it back is worthless. You are notified only when the agent records a genuinely new pattern in the vault, which on real data is closer to monthly than weekly. Force a pass with `pulse review`. Each run spends your agent subscription.
 
 ## Connect Pulse to your coding agent (MCP) {#mcp-agent-paste}
 
 Use the [Model Context Protocol](https://modelcontextprotocol.io/) so **Claude Code**, **OpenClaw**, **Cursor**, and other MCP clients can call Pulse tools (`pulse_query_events`, `pulse_digest`, `pulse_longitudinal_profile`, `pulse_change_surface`, `pulse_coverage`, the `pulse_pattern_*` and `pulse_vault_*` tools, …) against the same database and vault as this install.
 
-**Send your coding agent** — copy everything in the box into the agent chat (it will fetch the doc and do the work):
+**Send your coding agent** - copy everything in the box into the agent chat (it will fetch the doc and do the work):
 
 ```text
 Read https://pulseagent.dev/docs/self-hosting/mcp-agent-setup.html and follow every step to install Pulse (pulse-agent), ensure pulse.toml exists, and register pulse-mcp in my MCP settings for this machine.

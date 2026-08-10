@@ -1,10 +1,10 @@
 # Configuration Reference
 
-**`pulse.toml`** — root keys and `[connectors.*]`. Resolution: **`.config/pulse.toml`** first, else **`./pulse.toml`**, else create under `.config/`. Override path with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`** (file = `<dir>/pulse.toml`).
+**`pulse.toml`** - root keys and `[connectors.*]`. Resolution: **`.config/pulse.toml`** first, else **`./pulse.toml`**, else create under `.config/`. Override path with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`** (file = `<dir>/pulse.toml`).
 
 **Precedence:** XDG defaults → `pulse.toml` → **`PULSE_*`** (overrides file).
 
-**Secrets:** Keep OAuth/API values in gitignored `pulse.toml` or env. Connector tables are not overridden by env—edit TOML.
+**Secrets:** Keep OAuth/API values in gitignored `pulse.toml` or env. Connector tables are not overridden by env - edit TOML.
 
 ## Installed vs repo layout
 
@@ -23,7 +23,7 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 
 ## Top-level fields
 
-`src/pulse/app/config.py` — reference:
+`src/pulse/app/config.py` - reference:
 
 | Field | Env var | Default | Notes |
 | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ If `PULSE_CONFIG_DIR` is unset, repo-root `./pulse.toml` still works. Docker: en
 | `google_client_id` | `PULSE_GOOGLE_CLIENT_ID` | unset | Enables Google OAuth-backed connectors when paired with the secret. |
 | `google_client_secret` | `PULSE_GOOGLE_CLIENT_SECRET` | unset | OAuth secret (env or gitignored TOML). |
 
-**Google OAuth on a headless server or over SSH:** `pulse onboard` / `pulse configure` starts a small **localhost** redirect server. With no GUI, Pulse skips auto-opening a browser and prints the authorize URL. If you open that URL on your **laptop**, Google redirects to **your laptop’s** `localhost` — so you must **forward the callback port** to the server, e.g. `ssh -L 8765:localhost:8765 user@server` (use the port Pulse prints; default fallback is **8765** when no browser is found). Optional env: `PULSE_GOOGLE_OAUTH_PORT` (fixed port), `PULSE_GOOGLE_OAUTH_FALLBACK_PORT` (default `8765` when auto-detecting headless), `PULSE_OAUTH_NO_BROWSER=1` (never call `webbrowser`). If Google returns **redirect_uri_mismatch**, add the exact `http://localhost:<port>/` URI in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) for your OAuth client.
+**Google OAuth on a headless server or over SSH:** `pulse onboard` / `pulse configure` starts a small **localhost** redirect server. With no GUI, Pulse skips auto-opening a browser and prints the authorize URL. If you open that URL on your **laptop**, Google redirects to **your laptop’s** `localhost` - so you must **forward the callback port** to the server, e.g. `ssh -L 8765:localhost:8765 user@server` (use the port Pulse prints; default fallback is **8765** when no browser is found). Optional env: `PULSE_GOOGLE_OAUTH_PORT` (fixed port), `PULSE_GOOGLE_OAUTH_FALLBACK_PORT` (default `8765` when auto-detecting headless), `PULSE_OAUTH_NO_BROWSER=1` (never call `webbrowser`). If Google returns **redirect_uri_mismatch**, add the exact `http://localhost:<port>/` URI in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) for your OAuth client.
 | `spotify_client_id` | `PULSE_SPOTIFY_CLIENT_ID` | unset | Enables Spotify OAuth when paired with the secret. |
 | `spotify_client_secret` | `PULSE_SPOTIFY_CLIENT_SECRET` | unset | OAuth secret. |
 | `github_client_id` | `PULSE_GITHUB_CLIENT_ID` | unset | GitHub OAuth. |
@@ -128,7 +128,7 @@ After enabling, run **`pulse embed`** once to backfill embeddings for existing e
 
 ## Optional `[discovery]`
 
-Long-horizon pattern discovery via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …).
+Long-horizon pattern discovery via **your** agent CLI - Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …).
 
 Discovery looks for structure the user **cannot see about themselves**, not for a summary of the week. You already remember your week; what you cannot hold in your head is how the mix of what you do has drifted over a year, whether your interests rotate rather than accumulate, how far your sleep phase has moved, what actually holds your attention versus what you only ever touch in fragments, and what quietly stopped. `pulse_longitudinal_profile` computes all of that deterministically; the agent interprets it.
 
@@ -151,7 +151,7 @@ command = ["claude", "-p"]
 at = "09:00"
 ```
 
-There is deliberately **no gate on recent activity**. A quiet week is not a reason to skip a pass — the profile can shift while nothing notable happens, and a busy week is no evidence that anything is newly knowable. What keeps you from being spammed is the novelty check on the agent's output, not a check on its input.
+There is deliberately **no gate on recent activity**. A quiet week is not a reason to skip a pass - the profile can shift while nothing notable happens, and a busy week is no evidence that anything is newly knowable. What keeps you from being spammed is the novelty check on the agent's output, not a check on its input.
 
 Force a pass with **`pulse review`**. Each run spends your agent subscription. Enabling `[discovery]` alongside `[semantic]` also registers a 6-hourly embedding job.
 
@@ -159,7 +159,7 @@ Force a pass with **`pulse review`**. Each run spends your agent subscription. E
 
 ## Token files
 
-OAuth refresh tokens live next to the DB: `google_tokens.json`, `spotify_tokens.json`, `github_tokens.json`, `plaid_tokens.json`. Directory = parent of **`database_path`** — changing **`PULSE_DATABASE_PATH`** moves them.
+OAuth refresh tokens live next to the DB: `google_tokens.json`, `spotify_tokens.json`, `github_tokens.json`, `plaid_tokens.json`. Directory = parent of **`database_path`** - changing **`PULSE_DATABASE_PATH`** moves them.
 
 ## App, CLI, MCP
 
@@ -169,7 +169,7 @@ Same **`load_config()`**: `pulse.toml` + env. The standalone app, CLI, and MCP s
 
 ## Runtime notes
 
-- **`/health`** — process up; not connector proof.
+- **`/health`** - process up; not connector proof.
 - Scheduler registers hourly aggregation and per-connector pull jobs (see [Runbook](https://pulseagent.dev/docs/operations/runbook.html)).
 - Operations notifications: sent when a scheduled job fails and a notify channel is configured (`notify_on_job_failure`).
 

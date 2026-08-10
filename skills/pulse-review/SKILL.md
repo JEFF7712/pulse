@@ -49,7 +49,7 @@ hold in their head:
    finding. Several entities peaking and dying in sequence is a *rhythm*. Coursework
    platforms dying every December is a semester. Three unrelated things all collapsing
    in the same month is one event with a cause worth naming. **Grouping the raw domains
-   into topics is your job** — the tool deliberately does not do it, because hard-coding
+   into topics is your job** - the tool deliberately does not do it, because hard-coding
    categories would cap what can ever be found. You can see titles; use them.
 
 4. **Test the hypothesis before recording it** with `pulse_query_events`. A pattern you
@@ -63,7 +63,7 @@ hold in their head:
    Close faded patterns with `pulse_pattern_set_status`.
 
 `pulse_change_surface` exists for recent-activity questions. It is **not** the tool for
-discovery — what it returns is by construction what the user just did.
+discovery - what it returns is by construction what the user just did.
 
 ## Calibration
 

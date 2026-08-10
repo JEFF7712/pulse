@@ -14,7 +14,7 @@ plain instructions any capable agent can follow.
 
 ## Install
 
-**Claude Code** — copy or symlink into a skills directory it loads:
+**Claude Code** - copy or symlink into a skills directory it loads:
 
 ```bash
 # user-level (all projects)
@@ -25,7 +25,7 @@ ln -s "$(pwd)/skills/pulse-recall" ~/.claude/skills/pulse-recall
 Then invoke with `/pulse-review` or `/pulse-recall` once the `pulse-mcp` server is registered
 (see [MCP agent setup](../docs/self-hosting/mcp-agent-setup.md)).
 
-**Other agents (Cursor, etc.)** — these are just instructions. Paste the relevant `SKILL.md` body
+**Other agents (Cursor, etc.)** - these are just instructions. Paste the relevant `SKILL.md` body
 into your agent's rules/context, or point the agent at the file, alongside the `pulse-mcp` server
 connection.
 

@@ -613,7 +613,7 @@
         animation: fadeIn 0.9s var(--ease-out-expo) 1.35s forwards;
       }
 
-      /* About section — side gutters keep intel copy off the main column */
+      /* About section: side gutters keep intel copy off the main column */
       .about {
         position: relative;
         display: grid;
@@ -1541,25 +1541,26 @@
           Pulse connects the tools you already use, pulls high-signal events
           into a local store, and keeps an
           <strong>Obsidian-compatible vault</strong> in sync. It runs in the
-          background on your machine—scheduled syncs keep connectors fresh
+          background on your machine. Scheduled syncs keep connectors fresh
           without you watching a dashboard. Pulse holds the context;
           <strong>your agent</strong> does the reasoning.
         </p>
         <p>
-          Ask your agent what changed this week, when a habit slipped, or how
-          spending tracked against late meetings—grounded in the same timeline
-          Pulse already ingested. Optional pattern discovery watches for what
-          changed against your own baseline and pokes your agent only then,
-          notifying Telegram, ntfy, or another channel you configure when it
-          finds something new—and staying quiet when it does not.
+          Ask your agent for a day digest, dig into a thread, or read the
+          long-horizon profile, grounded in the same timeline Pulse already
+          ingested. Optional pattern discovery looks for structure you cannot
+          see about yourself: how the mix of what you do has drifted over months,
+          what quietly stopped. It notifies Telegram, ntfy, or another channel
+          you configure only when it records something new, staying quiet when
+          it does not.
         </p>
         <p>
           Everything stays as readable notes in your
-          <strong>Obsidian vault</strong>—yours to inspect, edit, or delete. A
+          <strong>Obsidian vault</strong>, yours to inspect, edit, or delete. A
           <strong>Model Context Protocol</strong> server lets
           <strong>Claude Code</strong>, <strong>Codex</strong>,
           <strong>OpenClaw</strong>, and other MCP-capable tools query digests,
-          events, coverage, and vault memory.
+          events, patterns, coverage, and vault memory.
         </p>
       </div>
       <div class="about-gutter about-gutter--right" aria-hidden="true">
@@ -2084,7 +2085,7 @@
           return a + Math.random() * (b - a);
         }
 
-        /* 0–1 from integers — stable jitter inside each slot. */
+        /* 0-1 from integers: stable jitter inside each slot. */
         function bandHash(moveGen, slotIndex, salt) {
           var x =
             Math.sin(moveGen * 12.9898 + slotIndex * 78.233 + salt * 31.374) *

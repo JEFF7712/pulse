@@ -32,7 +32,7 @@ Use **Configure → Connectors** for each source: credentials, enable (●), the
 
 ## Oura
 
-**PAT:** `PULSE_OURA_PERSONAL_ACCESS_TOKEN` — no OAuth.
+**PAT:** `PULSE_OURA_PERSONAL_ACCESS_TOKEN` - no OAuth.
 
 **OAuth:** App → **`http://localhost:8894/callback`**, client id/secret. Re-auth if workouts were added later (needs workout scope).
 
@@ -40,7 +40,7 @@ Use **Configure → Connectors** for each source: credentials, enable (●), the
 
 ## Browser
 
-Local only. **`[connectors.browser]`** — `chrome` or `firefox`; process must read history DB (optional `db_path`).
+Local only. **`[connectors.browser]`** - `chrome` or `firefox`; process must read history DB (optional `db_path`).
 
 **Pulls:** URL, title, timestamps, browser name.
 
