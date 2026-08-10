@@ -25,7 +25,7 @@ dependencies = [
     "aiosqlite",
     "apscheduler",
     "httpx",
-    "mcp[cli]",
+    "mcp[cli]>=1.26,<2",
     "google-auth-oauthlib",
     "google-api-python-client",
     "plaid-python>=24",

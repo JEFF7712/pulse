@@ -909,7 +909,7 @@ requires-dist = [
     { name = "google-api-python-client" },
     { name = "google-auth-oauthlib" },
     { name = "httpx" },
-    { name = "mcp", extras = ["cli"] },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.26,<2" },
     { name = "model2vec", marker = "extra == 'semantic'", specifier = ">=0.8" },
     { name = "plaid-python", specifier = ">=24" },
     { name = "pydantic" },
