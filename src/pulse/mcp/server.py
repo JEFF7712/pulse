@@ -377,6 +377,195 @@ async def pulse_vault_append_section(
         return f"Error: {exc}"
 
 
+@mcp.tool()
+async def pulse_change_surface(
+    window_end: str | None = None,
+    window_days: int = 7,
+    baseline_days: int = 56,
+    ctx: Context = None,
+) -> str:
+    """What is different about a window versus the user's own trailing baseline.
+
+    Deterministic, no LLM. Returns entities that are new, returning after dormancy,
+    or off their usual rate, plus clusters of events whose text is unlike anything in
+    the baseline. Start here rather than with a full digest: the digest tells you what
+    happened, this tells you what changed, and only the latter can be new.
+
+    An empty result is a normal and common outcome. It means nothing notable happened,
+    and the correct response is to report nothing.
+
+    Args:
+        window_end: ISO date, last day of the window (defaults to today).
+        window_days: Length of the window in days.
+        baseline_days: Days of history before the window to compare against.
+    """
+    pulse_ctx = _get_pulse_ctx(ctx)
+    tz = _context_timezone(pulse_ctx)
+    if window_end is None:
+        window_end = _today_for_timezone(tz)
+    parsed = _parse_day(window_end)
+    if isinstance(parsed, str):
+        return parsed
+
+    from pulse.services.change_detection import detect_changes
+
+    surface = await detect_changes(
+        pulse_ctx._db,
+        window_end=parsed,
+        timezone=tz,
+        window_days=max(1, window_days),
+        baseline_days=max(1, baseline_days),
+    )
+    return json.dumps(_dc(surface), indent=2, default=str)
+
+
+# --- Patterns ---
+
+
+@mcp.tool()
+async def pulse_pattern_list(ctx: Context = None) -> str:
+    """List recorded patterns with status, confidence and observation.
+
+    Read this before proposing anything. A finding already on file is not a discovery,
+    and re-reporting one is the single most common way these reviews become noise.
+    """
+    from pulse.analysis.pattern_gate import snapshot_patterns
+
+    vault = _vault(_get_pulse_ctx(ctx))
+    snaps = snapshot_patterns(vault.read_patterns())
+    return json.dumps(
+        [
+            {
+                "slug": slug,
+                "title": snap.title,
+                "status": snap.status,
+                "observation": snap.observation,
+                "evidence_count": len(snap.evidence),
+            }
+            for slug, snap in sorted(snaps.items())
+        ],
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def pulse_pattern_read(slug: str, ctx: Context = None) -> str:
+    """Read one pattern's full markdown (returns '' if absent)."""
+    try:
+        return _vault(_get_pulse_ctx(ctx)).read_pattern_by_slug(slug) or (
+            f"(no pattern: {slug})"
+        )
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool()
+async def pulse_pattern_upsert(
+    slug: str,
+    title: str,
+    observation: str,
+    evidence: list[str],
+    confidence: float = 0.5,
+    status: str = "active",
+    trend: str = "stable",
+    ctx: Context = None,
+) -> str:
+    """Record a pattern, subject to a novelty check.
+
+    The check is the point: a proposal too close to an existing pattern is rejected as
+    a duplicate, and an update that merely restates the pattern's current observation
+    is rejected as a restatement. Do not work around a rejection by rewording — a
+    rejection means the finding is already on file.
+
+    Never pass the *absence* of activity as evidence ("no such activity today"). A
+    pattern that is not showing up should have its status set to inactive via
+    pulse_pattern_set_status, not be fed negative evidence.
+
+    Args:
+        slug: Stable kebab-case identifier; reuse it to update an existing pattern.
+        title: Short human-readable name.
+        observation: What the pattern is, in a few sentences.
+        evidence: Concrete grounding — counts, dates, entity names.
+        confidence: 0.0-1.0.
+        status: active | inactive.
+        trend: increasing | decreasing | stable.
+    """
+    from pulse.analysis.pattern_gate import (
+        find_duplicate,
+        is_restatement,
+        snapshot_patterns,
+    )
+
+    pulse_ctx = _get_pulse_ctx(ctx)
+    vault = _vault(pulse_ctx)
+    embedder = getattr(pulse_ctx, "embedder", None)
+    existing = snapshot_patterns(vault.read_patterns())
+    today = _today_for_timezone(_context_timezone(pulse_ctx))
+
+    if not evidence:
+        return "Rejected: a pattern needs at least one concrete piece of evidence."
+
+    prior = existing.get(slug)
+    if prior is None:
+        duplicate = find_duplicate(title, observation, existing, embedder=embedder)
+        if duplicate is not None:
+            other, score = duplicate
+            return (
+                f"Rejected as duplicate of '{other}' (similarity {score:.2f}). "
+                "Update that pattern instead, or drop this finding."
+            )
+    elif is_restatement(observation, prior.observation, embedder=embedder):
+        return (
+            f"Rejected as a restatement: '{slug}' already says this. Record an update "
+            "only when the pattern has genuinely changed."
+        )
+
+    try:
+        if prior is None:
+            path = vault.write_pattern(
+                slug=slug,
+                title=title,
+                status=status,
+                confidence=confidence,
+                first_seen=today,
+                last_updated=today,
+                observation=observation,
+                evidence_log=list(evidence),
+                trend=trend,
+            )
+            return f"Created pattern '{slug}' at {path}."
+        path = vault.update_pattern(
+            slug=slug,
+            title=title,
+            status=status,
+            confidence=confidence,
+            first_seen=today,
+            last_updated=today,
+            observation=observation,
+            evidence_log=list(evidence),
+            trend=trend,
+        )
+        return f"Updated pattern '{slug}' at {path}."
+    except (ValueError, OSError) as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool()
+async def pulse_pattern_set_status(slug: str, status: str, ctx: Context = None) -> str:
+    """Set a pattern's status (active | inactive).
+
+    Use this when a pattern stops showing up, instead of appending evidence that it
+    was absent. Inactive patterns are moved to the vault archive.
+    """
+    try:
+        path = _vault(_get_pulse_ctx(ctx)).update_pattern_status(slug, status)
+        return f"Pattern '{slug}' is now {status} ({path})."
+    except FileNotFoundError:
+        return f"No pattern '{slug}'."
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+
 # --- Resources ---
 
 
