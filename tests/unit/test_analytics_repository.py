@@ -437,3 +437,42 @@ def test_aggregate_weekly_baselines_use_local_timezone_window(tmp_path):
     assert len(baselines) == 1
     assert baselines[0]["total"] == 1
     assert abs(baselines[0]["avg_daily"] - (1 / 7)) < 1e-9
+
+
+def test_aggregate_day_refreshes_the_weekly_baseline():
+    """Baselines are what 'unusual' is measured against; if aggregate_day does not
+    refresh them they freeze and every comparison runs against stale numbers."""
+    import asyncio
+    from datetime import UTC, datetime
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    from pulse.store.analytics import AnalyticsRepository, week_start_for
+    from pulse.store.db import connect_db
+    from pulse.store.events import EventRepository
+    from pulse.store.schema import bootstrap_schema
+
+    assert week_start_for("2026-08-09") == "2026-08-03"  # Sunday → preceding Monday
+
+    async def exercise():
+        with TemporaryDirectory() as tmp:
+            async with connect_db(Path(tmp) / "t.db") as db:
+                await bootstrap_schema(db)
+                await EventRepository(db).upsert_events(
+                    [
+                        _make_event(
+                            "e1",
+                            datetime(2026, 8, 5, 15, 0, tzinfo=UTC),
+                            "gmail",
+                            "email.received",
+                        )
+                    ]
+                )
+                analytics = AnalyticsRepository(db)
+                await analytics.aggregate_day("2026-08-05", timezone="UTC")
+                return await analytics.get_weekly_baselines("2026-08-03")
+
+    baselines = asyncio.run(exercise())
+
+    assert len(baselines) == 1
+    assert baselines[0]["total"] == 1

@@ -14,6 +14,12 @@ def _local_day_bounds(day: str, timezone: str) -> tuple[str, str]:
     return start.isoformat(), end.isoformat()
 
 
+def week_start_for(day: str) -> str:
+    """Return the ISO date of the Monday of the week containing ``day``."""
+    day_date = date.fromisoformat(day)
+    return (day_date - timedelta(days=day_date.weekday())).isoformat()
+
+
 def _local_window_bounds(start_day: str, days: int, timezone: str) -> tuple[str, str]:
     day_date = date.fromisoformat(start_day)
     tz = ZoneInfo(timezone)
@@ -251,3 +257,7 @@ class AnalyticsRepository:
     async def aggregate_day(self, day: str, timezone: str = "UTC") -> None:
         await self.aggregate_daily_stats(day, timezone=timezone)
         await self.aggregate_time_blocks(day, timezone=timezone)
+        # Baselines are what "unusual" is measured against, so they have to move with
+        # the day. Refresh the ISO week containing it; the row is deleted and rebuilt,
+        # so re-running mid-week is idempotent.
+        await self.aggregate_weekly_baselines(week_start_for(day), timezone=timezone)
