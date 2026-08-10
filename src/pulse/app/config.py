@@ -12,20 +12,27 @@ class SemanticConfig(BaseModel):
     model: str = "minishlab/potion-base-32M"
 
 
-_DEFAULT_PROACTIVE_PROMPT = (
-    "Use the Pulse MCP tools (pulse_digest, pulse_query_events, pulse_coverage, and the "
-    "pulse_vault_* memory tools) to review my last day of data. If the pulse-review skill "
-    "is available, follow it. Surface only non-obvious, actionable insights, each grounded "
-    "in specific events; if nothing clears that bar, say 'Nothing notable.' Keep it short."
+_DEFAULT_DISCOVERY_PROMPT = (
+    "Look for patterns in my Pulse data that are not already recorded. Start with "
+    "pulse_change_surface to see what actually changed, then pulse_pattern_list to see "
+    "what is already known. Use pulse_query_events to investigate anything that looks "
+    "worth understanding. Record a finding with pulse_pattern_upsert only if it is new, "
+    "grounded in specific events, and would not be obvious to me. If nothing clears that "
+    "bar, record nothing and stop — that is a normal outcome, not a failure."
 )
 
 
-class ProactiveConfig(BaseModel):
+class DiscoveryConfig(BaseModel):
+    """Pattern discovery. The agent is woken only when the data actually moved."""
+
     enabled: bool = False
     command: list[str] = ["claude", "-p"]
-    prompt: str = _DEFAULT_PROACTIVE_PROMPT
-    at: str = "08:00"  # local HH:MM in config timezone
-    timeout_seconds: int = 600
+    prompt: str = _DEFAULT_DISCOVERY_PROMPT
+    at: str = "09:00"  # local HH:MM in config timezone; when the *check* runs
+    timeout_seconds: int = 900
+    # A pattern needs repetition to exist, so the window is a week, not a day.
+    window_days: int = 7
+    baseline_days: int = 56
 
 
 class PulseConfig(BaseModel):
@@ -67,7 +74,7 @@ class PulseConfig(BaseModel):
     oura_personal_access_token: str | None = None
     connectors: dict[str, ConnectorConfig] = {}
     semantic: SemanticConfig | None = None
-    proactive: ProactiveConfig | None = None
+    discovery: DiscoveryConfig | None = None
 
 
 # Backward compatibility alias

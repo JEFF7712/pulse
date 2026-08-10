@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover
     ZoneInfo = None
 
 from pulse.app import cli_ui as ui
-from pulse.app.config import ProactiveConfig, PulseConfig
+from pulse.app.config import DiscoveryConfig, PulseConfig
 from pulse.app.config_loader import PulseConfigNotFoundError, load_config
 from pulse.domain.notifications import NotificationChannel
 
@@ -95,22 +95,9 @@ def status(config_dir: Path | None = None) -> None:
 
 async def _backfill_embeddings(db, embedder) -> int:
     """Embed every event that has no stored embedding yet. Returns the count embedded."""
-    from pulse.semantic.embedder import event_text
-    from pulse.store.embeddings import EmbeddingRepository
-    from pulse.store.events import EventRepository
+    from pulse.services.embedding import embed_missing
 
-    events_repo = EventRepository(db)
-    emb_repo = EmbeddingRepository(db)
-
-    missing = await emb_repo.missing_ids(await events_repo.all_ids())
-    if not missing:
-        return 0
-
-    by_id = await events_repo.get_events_by_ids(missing)
-    ordered = [by_id[i] for i in missing if i in by_id]
-    vectors = embedder.embed([event_text(e) for e in ordered])
-    await emb_repo.upsert_embeddings([(e.id, vec) for e, vec in zip(ordered, vectors)])
-    return len(ordered)
+    return await embed_missing(db, embedder)
 
 
 def embed(args) -> None:
@@ -286,22 +273,24 @@ async def _run_review(
     channel: NotificationChannel | None,
     runner=None,
 ) -> tuple[bool, str]:
-    """On-demand review: force-enable proactive even when the schedule is off.
+    """On-demand discovery pass: runs even when the schedule is off.
 
-    Returns ``(delivered, message)`` where ``message`` is the delivered body,
-    a clear error (e.g. empty command), or a not-delivered note.
+    Unlike the scheduled job this bypasses the change-surface gate — the user asked
+    for a pass explicitly, so run one whether or not the data moved.
+
+    Returns ``(recorded, message)``.
     """
-    from pulse.jobs.proactive import run_proactive_review
+    from pulse.jobs.discovery import run_discovery
 
-    pc = config.proactive if config.proactive is not None else ProactiveConfig()
-    if not pc.command:
+    dc = config.discovery if config.discovery is not None else DiscoveryConfig()
+    if not dc.command:
         return (
             False,
-            "No proactive command configured. Set [proactive].command in pulse.toml.",
+            "No discovery command configured. Set [discovery].command in pulse.toml.",
         )
 
     forced = config.model_copy(
-        update={"proactive": pc.model_copy(update={"enabled": True})}
+        update={"discovery": dc.model_copy(update={"enabled": True})}
     )
 
     class _CaptureChannel:
@@ -316,16 +305,16 @@ async def _run_review(
             return True
 
     capture = _CaptureChannel(channel)
-    kwargs: dict = {"channel": capture}
+    kwargs: dict = {"channel": capture, "force": True}
     if runner is not None:
         kwargs["runner"] = runner
 
-    delivered = await run_proactive_review(forced, **kwargs)
-    if delivered and capture.sent:
+    changes = await run_discovery(forced, **kwargs)
+    if capture.sent:
         return True, capture.sent[-1].body
-    if delivered:
-        return True, "Delivered."
-    return False, "Nothing notable / not delivered."
+    if not changes.is_empty():
+        return True, f"Recorded: {', '.join(changes.all_slugs())}"
+    return False, "No new patterns recorded."
 
 
 def review(args) -> None:
@@ -341,7 +330,7 @@ def review(args) -> None:
         sys.exit(1)
 
     ui.rule("pulse review")
-    ui.say("[accent]Running proactive review[/]…")
+    ui.say("[accent]Running discovery pass[/]…")
 
     delivered, message = asyncio.run(_run_review(config, channel=channel))
     if not delivered and "command" in message.lower():

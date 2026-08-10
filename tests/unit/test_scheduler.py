@@ -4,7 +4,7 @@ from datetime import timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from pulse.app.config import PulseConfig, ConnectorConfig, ProactiveConfig
+from pulse.app.config import PulseConfig, ConnectorConfig, DiscoveryConfig
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.domain.connectors import Connector
 from pulse.jobs.intervals import parse_interval
@@ -68,7 +68,7 @@ def test_jobs_coalesce_and_survive_suspend_misfire():
     registry.register_pull("fake", lambda: FakeConnector())
     config = PulseConfig(
         connectors={"fake": ConnectorConfig(enabled=True, poll_interval="10m")},
-        proactive=ProactiveConfig(enabled=True, at="08:00"),
+        discovery=DiscoveryConfig(enabled=True, at="09:00"),
     )
 
     async def _collect():
@@ -87,8 +87,8 @@ def test_jobs_coalesce_and_survive_suspend_misfire():
 
     assert jobs["pull_fake"].misfire_grace_time == 3600
     assert jobs["aggregation"].misfire_grace_time == 3600
-    # The daily review must fire on the next wake however late — never skipped.
-    assert jobs["proactive"].misfire_grace_time is None
+    # The change check must fire on the next wake however late — never skipped.
+    assert jobs["discovery"].misfire_grace_time is None
 
 
 def test_parse_interval_handles_various_units():

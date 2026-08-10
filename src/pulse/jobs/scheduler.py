@@ -9,6 +9,7 @@ from pulse.app.config_loader import load_config
 from pulse.connectors.registry import ConnectorRegistry
 from pulse.jobs.failure_notifications import notify_scheduled_job_failure
 from pulse.jobs.intervals import parse_interval
+from pulse.semantic.factory import semantic_enabled
 
 try:
     from zoneinfo import ZoneInfo
@@ -65,18 +66,30 @@ def build_scheduler(
         id="aggregation",
     )
 
-    if config.proactive is not None and config.proactive.enabled:
+    if config.discovery is not None and config.discovery.enabled:
         from apscheduler.triggers.cron import CronTrigger
 
-        hh, mm = (config.proactive.at.split(":") + ["0"])[:2]
+        hh, mm = (config.discovery.at.split(":") + ["0"])[:2]
         scheduler.add_job(
-            _make_proactive_job(config),
+            _make_discovery_job(config),
             trigger=CronTrigger(hour=int(hh), minute=int(mm), timezone=config.timezone),
-            id="proactive",
-            # A review missed while the laptop slept through its cron time should
-            # still run on the next wake, however late — never skip a day.
+            id="discovery",
+            # A check missed while the laptop slept should still run on the next wake.
+            # The check itself is cheap and usually finds nothing, so a late run costs
+            # nothing; skipping one could drop the day a pattern first became visible.
             misfire_grace_time=None,
         )
+
+        # Novelty detection compares against embeddings, so they have to keep up with
+        # ingest. `pulse embed` alone is a one-off backfill: without this job the
+        # newest events — the ones any discovery pass is about — are never embedded.
+        if semantic_enabled(config):
+            scheduler.add_job(
+                _make_embed_job(config),
+                "interval",
+                hours=6,
+                id="embed",
+            )
 
     return scheduler
 
@@ -159,17 +172,31 @@ def _make_aggregation_job(config):
     return job
 
 
-def _make_proactive_job(config):
+def _make_discovery_job(config):
     async def job():
-        from pulse.jobs.proactive import run_proactive_review
+        from pulse.jobs.discovery import run_discovery
         from pulse.notifications.factory import build_notification_channel
 
         try:
             channel = build_notification_channel(config)
-            return await run_proactive_review(config, channel=channel)
+            return await run_discovery(config, channel=channel)
         except Exception as e:
-            await notify_scheduled_job_failure(config, "proactive", e)
-            logger.exception("Proactive review job failed")
+            await notify_scheduled_job_failure(config, "discovery", e)
+            logger.exception("Discovery job failed")
+            raise
+
+    return job
+
+
+def _make_embed_job(config):
+    async def job():
+        from pulse.jobs.runners import run_embed_job
+
+        try:
+            return await run_embed_job(config)
+        except Exception as e:
+            await notify_scheduled_job_failure(config, "embed", e)
+            logger.exception("Embedding job failed")
             raise
 
     return job

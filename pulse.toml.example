@@ -68,11 +68,17 @@ poll_interval = "6h"
 # enabled = false
 # model = "minishlab/potion-base-32M"
 
-# --- Optional proactive review (off by default) ---
-# On a schedule, Pulse invokes YOUR agent (headless) to review recent data and
-# delivers the result to your notification channel (Telegram, ntfy, …). Uses your
-# agent subscription, not an API key. Requires a configured notification channel.
-# [proactive]
+# --- Optional pattern discovery (off by default) ---
+# At `at`, Pulse computes a deterministic change surface: what is new, returning after
+# dormancy, or off its usual rate versus your own trailing baseline. If nothing moved,
+# nothing else happens — no agent, no tokens, no notification. If something did, Pulse
+# invokes YOUR agent (headless) to investigate, and notifies you only when the agent
+# records a genuinely new or changed pattern in the vault. Uses your agent
+# subscription, not an API key. Requires a configured notification channel.
+# [discovery]
 # enabled = false
 # command = ["claude", "-p"]   # or your agent's headless command
-# at = "08:00"                 # local time, config timezone
+# at = "09:00"                 # local time, config timezone; when the *check* runs
+# timeout_seconds = 900
+# window_days = 7              # a pattern needs repetition, so the window is a week
+# baseline_days = 56           # history to compare that week against

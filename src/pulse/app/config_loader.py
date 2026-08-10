@@ -39,6 +39,21 @@ class PulseConfigNotFoundError(FileNotFoundError):
     pass
 
 
+_PROACTIVE_REMOVED = (
+    "[proactive] was replaced by [discovery]. The scheduled daily review is gone: "
+    "Pulse now runs a deterministic change check first and only wakes an agent when "
+    "the data actually moved, notifying you when a new pattern is recorded rather "
+    "than every morning. Rename the section to [discovery] (command, prompt, at and "
+    "timeout_seconds carry over; window_days and baseline_days are new), or delete it "
+    "to turn the feature off."
+)
+
+
+def _reject_removed_sections(file_values: dict) -> None:
+    if "proactive" in file_values:
+        raise ValueError(_PROACTIVE_REMOVED)
+
+
 def _env_vars_for_config(environ: dict[str, str]) -> dict:
     """Extract PULSE_* keys from an env-like mapping, returning config field names."""
     result = {}
@@ -76,6 +91,7 @@ def load_config(
             with open(config_path, "rb") as f:
                 file_values = tomllib.load(f)
 
+        _reject_removed_sections(file_values)
         env_values = _env_vars_for_config(os.environ)
         merged = {**file_values, **env_values}
         return PulseConfig(**merged)
@@ -93,6 +109,7 @@ def load_config(
         with open(paths.toml_path, "rb") as f:
             file_values = tomllib.load(f)
 
+    _reject_removed_sections(file_values)
     env_values = _env_vars_for_config(os.environ)
 
     defaults = {
