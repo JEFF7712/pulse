@@ -52,6 +52,10 @@ def registrable_domain(host: str) -> str:
     labels = host.split(".")
     if len(labels) <= 2:
         return host
+    # An IPv4 literal has no registrable domain; truncating 192.168.1.10 to "1.10"
+    # invents a host and merges unrelated homelab machines into one entity.
+    if all(label.isdigit() for label in labels):
+        return host
     last_two = ".".join(labels[-2:])
     if last_two in _MULTI_PART_SUFFIXES:
         return ".".join(labels[-3:])
