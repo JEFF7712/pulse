@@ -287,7 +287,9 @@ def test_github_pull_handles_page_shift_from_newer_events(tmp_path):
 
 def test_github_pulls_from_users_login_events_not_user_events(tmp_path):
     """Regression: the events feed is /users/{login}/events; /user/events 404s."""
-    auth = GitHubAuthManager(client_id="c", client_secret="s", token_path=tmp_path / "gh.json")
+    auth = GitHubAuthManager(
+        client_id="c", client_secret="s", token_path=tmp_path / "gh.json"
+    )
     auth.save_tokens({"access_token": "tok", "expires_at": None})
 
     requested_paths = []
@@ -326,3 +328,54 @@ def test_github_pulls_from_users_login_events_not_user_events(tmp_path):
     assert "/user/events" not in requested_paths
     assert len(events) == 1
     assert events[0].data["repo"] == "octocat/hello"
+
+
+def test_push_title_states_no_count_when_the_feed_omits_one():
+    """The live /users/{login}/events feed carries only ref/before/head for a push.
+    Reading len([]) off the absent commits array reported '0 commits' on every push,
+    which is a fabricated number — state no count instead."""
+    from pulse.connectors.github import _push_refs, _title_for_event
+
+    row = {
+        "type": "PushEvent",
+        "repo": {"name": "JEFF7712/nixos-config"},
+        "payload": {
+            "ref": "refs/heads/main",
+            "before": "d2e1bca",
+            "head": "836eac0",
+            "push_id": 39567938640,
+        },
+    }
+    assert _title_for_event(row) == "Push to main — JEFF7712/nixos-config"
+    # the SHAs are kept so the real range stays recoverable
+    assert _push_refs(row) == {"before": "d2e1bca", "head": "836eac0"}
+
+    # when a count *is* present it is still reported
+    sized = {
+        "type": "PushEvent",
+        "repo": {"name": "o/r"},
+        "payload": {"ref": "refs/heads/main", "size": 3},
+    }
+    assert _title_for_event(sized) == "Push to main (3 commits) — o/r"
+
+    single = {
+        "type": "PushEvent",
+        "repo": {"name": "o/r"},
+        "payload": {"ref": "refs/heads/main", "size": 1},
+    }
+    assert _title_for_event(single) == "Push to main (1 commit) — o/r"
+
+    legacy = {
+        "type": "PushEvent",
+        "repo": {"name": "o/r"},
+        "payload": {"ref": "refs/heads/main", "commits": [{"id": "a"}, {"id": "b"}]},
+    }
+    assert _title_for_event(legacy) == "Push to main (2 commits) — o/r"
+
+    # a genuinely empty push reports zero rather than hiding the count
+    empty = {
+        "type": "PushEvent",
+        "repo": {"name": "o/r"},
+        "payload": {"ref": "refs/heads/main", "commits": []},
+    }
+    assert _title_for_event(empty) == "Push to main (0 commits) — o/r"

@@ -15,6 +15,15 @@ GITHUB_API = "https://api.github.com"
 _MAX_EVENTS = 50
 
 
+def _maybe_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _map_event_type(gh_type: str) -> str:
     if gh_type == "PushEvent":
         return "dev.push"
@@ -33,8 +42,17 @@ def _title_for_event(row: dict[str, Any]) -> str:
     repo = (row.get("repo") or {}).get("name", "")
     if t == "PushEvent":
         ref = (payload.get("ref") or "").split("/")[-1]
-        commits = payload.get("commits") or []
-        return f"Push to {ref} ({len(commits)} commits) — {repo}"
+        # The user events feed carries only `ref`/`before`/`head` for a push — no
+        # `size`, no `commits`. Reporting "0 commits" from the missing array was a
+        # fabricated number, so state no count rather than a wrong one. The SHAs are
+        # kept in the event data, which is enough to resolve the real count on demand.
+        count = _maybe_int(payload.get("size"))
+        if count is None and payload.get("commits") is not None:
+            count = len(payload["commits"])
+        if count is None:
+            return f"Push to {ref} — {repo}"
+        plural = "commit" if count == 1 else "commits"
+        return f"Push to {ref} ({count} {plural}) — {repo}"
     if t == "IssuesEvent":
         issue = payload.get("issue") or {}
         return issue.get("title") or f"Issue in {repo}"
@@ -46,6 +64,15 @@ def _title_for_event(row: dict[str, Any]) -> str:
     if t == "CreateEvent":
         return f"Created {payload.get('ref_type', 'ref')} in {repo}"
     return f"{t} — {repo}"
+
+
+def _push_refs(row: dict[str, Any]) -> dict[str, str]:
+    """Carry a push's before/head SHAs so the commit range stays recoverable."""
+    if row.get("type") != "PushEvent":
+        return {}
+    payload = row.get("payload") or {}
+    refs = {k: payload.get(k) for k in ("before", "head")}
+    return {k: str(v) for k, v in refs.items() if v}
 
 
 def _url_for_event(row: dict[str, Any]) -> str:
@@ -143,6 +170,7 @@ class GitHubConnector(Connector):
                                 "title": _title_for_event(row),
                                 "url": _url_for_event(row),
                                 "provider": "github",
+                                **_push_refs(row),
                             },
                         )
                     )
