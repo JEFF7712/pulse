@@ -26,7 +26,7 @@ Default install: pull connectors only unless you register push connectors with w
 
 `aggregation` (hourly), plus pull jobs for each enabled connector.
 
-When **`[discovery] enabled = true`**, a daily **`discovery`** job runs at `at` (config timezone). It first computes a deterministic change surface; if nothing moved it exits without spawning anything. Otherwise it runs the headless agent subprocess and notifies only if the agent records a new or changed pattern in the vault. Force a pass with **`pulse review`**. Requires the agent CLI on `PATH` and a configured notify channel — see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
+When **`[discovery] enabled = true`**, a **`discovery`** job runs every `interval_days` starting at `at` (config timezone). It runs the headless agent subprocess against the long-horizon profile and notifies only if the agent records a new or changed pattern in the vault. There is no gate on recent activity: findings are structural and months old, so a quiet week is not a reason to skip. Force a pass with **`pulse review`**. Requires the agent CLI on `PATH` and a configured notify channel — see [configuration reference](https://pulseagent.dev/docs/reference/configuration.html).
 
 With `[semantic]` also enabled, an **`embed`** job runs 6-hourly to embed newly ingested events. Without it `pulse embed` is only a one-off backfill, and novelty detection goes blind to recent data — the events any discovery pass is actually about.
 

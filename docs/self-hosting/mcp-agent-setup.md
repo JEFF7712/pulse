@@ -79,6 +79,7 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 | Tool | Description |
 | --- | --- |
+| `pulse_longitudinal_profile` | Long-horizon structure: monthly composition drift per entity, sleep-phase drift, deep-versus-fragmented attention, and what quietly stopped |
 | `pulse_change_surface` | What changed versus the user's own trailing baseline: new, returning and off-rate entities, plus clusters of events unlike anything in history |
 | `pulse_query_events` | Query events by time range, source(s), and text; newest-first, paginated, trimmed (pass `full=true` for raw) |
 | `pulse_digest` | Deterministic day digest: per-source counts + clustered activity (browsing, email, calendar, media, dev, health, finance) |
@@ -93,7 +94,7 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 
 Pulse does not reason: these tools expose your data so your agent can.
 
-**Looking for what's new?** Start with `pulse_change_surface`, then `pulse_pattern_list` to see what is already known, then `pulse_query_events` to investigate. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`. A digest tells you what happened; only a change can be new.
+**Looking for something the user does not already know?** Start with `pulse_longitudinal_profile`, then `pulse_pattern_list` for what is already recorded, then `pulse_query_events` to test a hypothesis. Note that `pulse_change_surface` is the wrong tool for this: what it returns is by construction what the user just did, and they remember doing it. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`. A digest tells you what happened; only a change can be new.
 
 `pulse_pattern_upsert` rejects a proposal that duplicates an existing pattern, or an update that merely restates the one on file. That is deliberate: it is what keeps recorded patterns meaningful rather than an append-only log of the same finding.
 

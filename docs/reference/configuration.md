@@ -128,22 +128,21 @@ After enabling, run **`pulse embed`** once to backfill embeddings for existing e
 
 ## Optional `[discovery]`
 
-Pattern discovery via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …).
+Long-horizon pattern discovery via **your** agent CLI — Pulse does not call an LLM API. Requires a configured notification channel (Telegram, ntfy, …).
 
-Discovery runs in two stages, and the first is deterministic:
+Discovery looks for structure the user **cannot see about themselves**, not for a summary of the week. You already remember your week; what you cannot hold in your head is how the mix of what you do has drifted over a year, whether your interests rotate rather than accumulate, how far your sleep phase has moved, what actually holds your attention versus what you only ever touch in fragments, and what quietly stopped. `pulse_longitudinal_profile` computes all of that deterministically; the agent interprets it.
 
-1. At `at`, Pulse computes a **change surface**: entities that are new, returning after dormancy, or well off their usual rate versus your own trailing baseline, plus clusters of events whose text is unlike anything in that baseline. If nothing moved, the pass ends here — no agent, no tokens, no notification.
-2. If something did move, your agent is invoked to investigate. You are notified **only** when it records a genuinely new or changed pattern in the vault. Prose that records nothing produces silence.
+You are notified **only** when the agent records a genuinely new or changed pattern in the vault. Prose that records nothing produces silence.
 
 | Field | Default | Notes |
 | --- | --- | --- |
-| `enabled` | `false` | When `true`, `pulse run` registers the daily change check. |
+| `enabled` | `false` | When `true`, `pulse run` schedules the discovery pass. |
 | `command` | `["claude", "-p"]` | Headless agent argv; must be on `PATH`. |
-| `prompt` | (built-in discovery prompt) | Points the agent at `pulse_change_surface` and `pulse_pattern_*`. |
-| `at` | `"09:00"` | Local time in config `timezone`; when the **check** runs. |
+| `prompt` | (built-in discovery prompt) | Points the agent at `pulse_longitudinal_profile` and `pulse_pattern_*`. |
+| `at` | `"09:00"` | Local time in config `timezone`. |
 | `timeout_seconds` | `900` | Subprocess timeout. |
-| `window_days` | `7` | Window analysed. A pattern needs repetition, so this is a week, not a day. |
-| `baseline_days` | `56` | History the window is compared against. |
+| `interval_days` | `7` | Structure over months does not change daily; re-deriving it every morning only rediscovers what is already on file. |
+| `history_days` | `400` | How far back the profile reaches. A year lets rotation and seasonality show; a quarter is the practical minimum. |
 
 ```toml
 [discovery]
@@ -152,9 +151,11 @@ command = ["claude", "-p"]
 at = "09:00"
 ```
 
-Force a pass with **`pulse review`** (skips the change gate). Each *agent* run spends your subscription; the daily check does not. Enabling `[discovery]` alongside `[semantic]` also registers a 6-hourly embedding job so novelty detection sees recent events.
+There is deliberately **no gate on recent activity**. A quiet week is not a reason to skip a pass — the profile can shift while nothing notable happens, and a busy week is no evidence that anything is newly knowable. What keeps you from being spammed is the novelty check on the agent's output, not a check on its input.
 
-> **Migrating from `[proactive]`:** the section was removed in 4.0.0 and Pulse fails to start if it is still present. Rename it to `[discovery]`; `command`, `prompt`, `at` and `timeout_seconds` carry over. Replace a review-style prompt with a discovery-style one, or drop `prompt` to take the built-in default.
+Force a pass with **`pulse review`**. Each run spends your agent subscription. Enabling `[discovery]` alongside `[semantic]` also registers a 6-hourly embedding job.
+
+> **Migrating from `[proactive]`:** the section was removed and Pulse fails to start if it is still present. Rename it to `[discovery]`; `command`, `prompt`, `at` and `timeout_seconds` carry over. Replace a review-style prompt with a discovery-style one, or drop `prompt` to take the built-in default.
 
 ## Token files
 
