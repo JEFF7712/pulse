@@ -14,7 +14,7 @@ Use **Configure → Connectors** for each source: credentials, enable (●), the
 
 ## Spotify
 
-**Need:** Spotify OAuth app, client id/secret, `[connectors.spotify]` enabled, OAuth on **`localhost:8888`**.
+**Need:** Spotify OAuth app, client id/secret, `[connectors.spotify]` enabled, OAuth on **`127.0.0.1:8888`** — register exactly `http://127.0.0.1:8888/callback` as the redirect URI. Spotify rejects `localhost` as insecure; only a literal loopback IP is allowed over plain HTTP.
 
 **Pulls:** Recent plays, saved + top tracks/artists (short/medium/long windows).
 

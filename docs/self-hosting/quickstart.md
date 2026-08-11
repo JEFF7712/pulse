@@ -185,7 +185,7 @@ pulse configure
 
 **Config file:** Prefer **`.config/pulse.toml`** or repo-root **`pulse.toml`**. Override with **`PULSE_CONFIG_FILE`** or **`PULSE_CONFIG_DIR`**. Start from `pulse.toml.example`; connectors default to disabled until you enable them.
 
-There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (localhost callbacks on `8888`, `8891`, `8893`, `8894` as applicable). Complete this **before** `pulse init` if the first pull should hit those APIs. Browser history skips browser OAuth here.
+There is no separate `pulse auth` command. In **Configure → Connectors**, open each enabled OAuth/Plaid/Oura source and finish the browser flow (loopback callbacks on `8888`, `8891`, `8893`, `8894` as applicable; Spotify's redirect URI must be registered as `http://127.0.0.1:8888/callback`, since Spotify rejects the `localhost` hostname as insecure). Complete this **before** `pulse init` if the first pull should hit those APIs. Browser history skips browser OAuth here.
 
 **Shortcut:** `pulse onboard` walks through the same configure areas as [cmd]pulse configure[/] (core → connectors → notifications), then runs connector OAuth / Plaid / Oura when credentials and enabled connectors allow it. Use `pulse onboard --strict` to fail if any auth step fails. Profile flags match `pulse init` (`-f`, `--profile-text`); server: `--host`, `--port`, `--log-level`.
 

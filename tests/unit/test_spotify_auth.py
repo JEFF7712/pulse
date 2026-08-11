@@ -115,3 +115,30 @@ def test_refresh_access_token_calls_token_endpoint(tmp_path):
     call_kwargs = mock_post.call_args
     assert call_kwargs.kwargs["data"]["grant_type"] == "refresh_token"
     assert call_kwargs.kwargs["data"]["refresh_token"] == "my_refresh"
+
+
+def test_redirect_uri_uses_the_loopback_ip_not_localhost():
+    """Spotify rejects `localhost` outright ("This redirect URI is not secure") and
+    allows plain HTTP only for a literal loopback IP, so a hostname here makes the
+    connector unregisterable on any new app."""
+    from pulse.connectors.spotify_auth import REDIRECT_URI
+
+    assert REDIRECT_URI.startswith("http://127.0.0.1:")
+    assert "localhost" not in REDIRECT_URI
+
+
+def test_callback_server_binds_the_same_host_the_redirect_names():
+    """Binding "localhost" can listen on ::1 while the browser follows the redirect
+    to 127.0.0.1, so the callback would hit a socket nothing is on."""
+    import inspect
+
+    from pulse.app.commands import auth
+    from pulse.connectors.spotify_auth import (
+        REDIRECT_URI,
+        SPOTIFY_OAUTH_HOST,
+        SPOTIFY_OAUTH_PORT,
+    )
+
+    source = inspect.getsource(auth.auth_spotify)
+    assert "HTTPServer((SPOTIFY_OAUTH_HOST, SPOTIFY_OAUTH_PORT)" in source
+    assert f"{SPOTIFY_OAUTH_HOST}:{SPOTIFY_OAUTH_PORT}" in REDIRECT_URI

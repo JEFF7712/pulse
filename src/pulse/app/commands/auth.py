@@ -20,7 +20,12 @@ from pulse.connectors.github_auth import (
 from pulse.connectors.google_auth import SCOPES_BY_CONNECTOR, GoogleAuthManager
 from pulse.connectors.oura_auth import OURA_AUTH_PORT, OURA_SCOPES, OuraAuthManager
 from pulse.connectors.plaid_link import run_plaid_link_flow
-from pulse.connectors.spotify_auth import SPOTIFY_SCOPES, SpotifyAuthManager
+from pulse.connectors.spotify_auth import (
+    SPOTIFY_OAUTH_HOST,
+    SPOTIFY_OAUTH_PORT,
+    SPOTIFY_SCOPES,
+    SpotifyAuthManager,
+)
 
 
 def test_telegram() -> None:
@@ -142,7 +147,10 @@ def auth_spotify(*, show_rule: bool = True) -> None:
         def log_message(self, format, *args):
             pass  # Suppress request logging
 
-    server = HTTPServer(("localhost", 8888), CallbackHandler)
+    # Bind the same literal loopback IP that the redirect URI names. Binding
+    # "localhost" can resolve to ::1 while the browser follows the redirect to
+    # 127.0.0.1, leaving the callback hitting a socket nothing is listening on.
+    server = HTTPServer((SPOTIFY_OAUTH_HOST, SPOTIFY_OAUTH_PORT), CallbackHandler)
     server.handle_request()  # Handle single callback request
 
     if not received_code:

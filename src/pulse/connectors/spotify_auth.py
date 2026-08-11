@@ -12,16 +12,20 @@ SPOTIFY_SCOPES = [
     "user-top-read",
 ]
 
-REDIRECT_URI = "http://localhost:8888/callback"
+# Spotify requires HTTPS redirect URIs, with one exception: a loopback address, which
+# must be the literal IP. The hostname `localhost` is rejected outright ("This redirect
+# URI is not secure"), so it cannot be registered on an app at all. Keep the port and
+# the URI defined together so the callback server can never drift from what is sent.
+SPOTIFY_OAUTH_HOST = "127.0.0.1"
+SPOTIFY_OAUTH_PORT = 8888
+REDIRECT_URI = f"http://{SPOTIFY_OAUTH_HOST}:{SPOTIFY_OAUTH_PORT}/callback"
 
 
 class SpotifyAuthManager(OAuthManager):
     AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
     TOKEN_URL = "https://accounts.spotify.com/api/token"
 
-    def __init__(
-        self, client_id: str, client_secret: str, token_path: Path
-    ) -> None:
+    def __init__(self, client_id: str, client_secret: str, token_path: Path) -> None:
         super().__init__(token_path)
         self._client_id = client_id
         self._client_secret = client_secret
