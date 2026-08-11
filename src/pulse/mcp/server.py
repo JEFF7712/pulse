@@ -495,10 +495,13 @@ async def pulse_self_model(ctx: Context = None) -> str:
     rule out the second.
     """
     from pulse.analysis.self_model import (
+        FACTS_FILE,
         OBSERVED_FILE,
         PROFILE_FILE,
         assess_profile,
+        parse_facts,
     )
+    from pulse.store.proposals import FactProposalRepository
 
     pulse_ctx = _get_pulse_ctx(ctx)
     vault = _vault(pulse_ctx)
@@ -508,12 +511,15 @@ async def pulse_self_model(ctx: Context = None) -> str:
     stated = vault.read_config_file(PROFILE_FILE)
     mtime = _config_file_mtime(pulse_ctx, PROFILE_FILE)
     freshness = assess_profile(stated, as_of=today, file_mtime=mtime)
+    pending = await FactProposalRepository(pulse_ctx._db).list_pending()
 
     return json.dumps(
         {
             "stated": stated or None,
             "freshness": freshness.as_dict(),
+            "facts": parse_facts(vault.read_config_file(FACTS_FILE)),
             "observed": vault.read_config_file(OBSERVED_FILE) or None,
+            "pending_fact_proposals": [p.as_dict() for p in pending],
         },
         indent=2,
     )
@@ -527,6 +533,57 @@ def _config_file_mtime(pulse_ctx: PulseContext, filename: str) -> date | None:
     if not path.exists():
         return None
     return _dt.fromtimestamp(path.stat().st_mtime).date()
+
+
+@mcp.tool()
+async def pulse_fact_propose(
+    field: str,
+    proposed_value: str,
+    evidence: str,
+    ctx: Context = None,
+) -> str:
+    """Propose a correction to a plain fact about the user. Applied only if they confirm.
+
+    For facts with a truth value the data can check — where they live, where they study
+    or work, what year they graduate. **Not** for anything interpretive: what they are
+    "focused on", what they care about, what they are becoming. Those are self-concept,
+    only the user can author them, and proposing them here would quietly convert their
+    self-description into a summary of their own data.
+
+    Propose only when the data genuinely contradicts what is on file, and put the
+    grounding in `evidence`. Re-proposing the same field replaces the earlier pending
+    suggestion rather than stacking a second one.
+
+    Args:
+        field: Short fact name, e.g. "Location". Case-insensitive on update.
+        proposed_value: The corrected value.
+        evidence: Why — counts, dates, sources. The user sees this before deciding.
+    """
+    from pulse.analysis.self_model import FACTS_FILE, parse_facts
+    from pulse.store.proposals import FactProposalRepository
+
+    if not field.strip() or not proposed_value.strip() or not evidence.strip():
+        return "Rejected: field, proposed_value and evidence are all required."
+
+    pulse_ctx = _get_pulse_ctx(ctx)
+    vault = _vault(pulse_ctx)
+    facts = parse_facts(vault.read_config_file(FACTS_FILE))
+    current = next(
+        (v for k, v in facts.items() if k.lower() == field.strip().lower()), None
+    )
+    if current is not None and current.strip() == proposed_value.strip():
+        return f"No change: {field!r} is already {proposed_value!r}."
+
+    proposal = await FactProposalRepository(pulse_ctx._db).propose(
+        field=field.strip(),
+        proposed_value=proposed_value.strip(),
+        evidence=evidence.strip(),
+        current_value=current,
+    )
+    return (
+        f"Proposed {field.strip()!r} -> {proposed_value.strip()!r} (id {proposal.id}). "
+        "Pending the user's confirmation; nothing has changed yet."
+    )
 
 
 @mcp.tool()

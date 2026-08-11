@@ -2,7 +2,7 @@ from typing import Protocol
 
 import httpx
 
-from pulse.domain.notifications import Notification
+from pulse.domain.notifications import Notification, append_reply_context
 
 
 class TelegramClient(Protocol):
@@ -31,6 +31,9 @@ class TelegramChannel:
         self.client: TelegramClient = client or _TokenBackedTelegramClient(bot_token)
 
     def send(self, notification: Notification) -> bool:
-        text = f"{notification.title}\n\n{notification.body}"
-        self.client.send_message(self.chat_id, text)
+        # Carry the reply handle in the message body. A Telegram reply quotes the
+        # original, so this is what lets an inbound "yes" be matched back to the
+        # specific thing it is answering.
+        body = append_reply_context(notification.body, notification.context_id)
+        self.client.send_message(self.chat_id, f"{notification.title}\n\n{body}")
         return True

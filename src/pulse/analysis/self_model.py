@@ -32,6 +32,7 @@ from datetime import date
 
 PROFILE_FILE = "profile.md"
 OBSERVED_FILE = "observed.md"
+FACTS_FILE = "facts.md"
 
 # Past this age a stated profile is a historical document, not a current claim.
 STALE_AFTER_DAYS = 120
@@ -149,6 +150,50 @@ def stamp_last_confirmed(content: str, day: str) -> str:
         head, rest = lines[0], lines[1:]
         return "\n".join([head, "", f"**Last confirmed:** {day}", *rest]) + "\n"
     return f"**Last confirmed:** {day}\n\n{body}".rstrip() + "\n"
+
+
+# ----------------------------------------------------------------------
+# Facts
+# ----------------------------------------------------------------------
+
+FACTS_HEADER = """# Facts
+
+Plain facts about you — where you live, where you study or work, what year you
+graduate. Kept here rather than in `profile.md` so that confirming a correction never
+rewrites a word you wrote yourself.
+
+Pulse only changes a line here after you confirm it. Edit or delete anything freely.
+"""
+
+_FACT_RE = re.compile(
+    r"^- \*\*(?P<field>[^*]+):\*\*\s*(?P<value>.*?)\s*$", re.MULTILINE
+)
+
+
+def parse_facts(content: str) -> dict[str, str]:
+    """Read `- **field:** value` lines into a mapping."""
+    return {
+        m.group("field").strip(): m.group("value").strip()
+        for m in _FACT_RE.finditer(content or "")
+    }
+
+
+def upsert_fact(content: str, field: str, value: str, *, confirmed_on: str) -> str:
+    """Set one fact, leaving every other line byte-identical.
+
+    Rewriting the whole file from a parsed mapping would silently discard anything the
+    user added by hand that does not match the expected shape, so edit in place.
+    """
+    field = field.strip()
+    line = f"- **{field}:** {value.strip()}  _(confirmed {confirmed_on})_"
+    body = content if (content or "").strip() else FACTS_HEADER
+
+    pattern = re.compile(
+        rf"^- \*\*{re.escape(field)}:\*\*.*$", re.MULTILINE | re.IGNORECASE
+    )
+    if pattern.search(body):
+        return pattern.sub(line, body, count=1)
+    return body.rstrip() + "\n" + line + "\n"
 
 
 OBSERVED_HEADER = """# Observed

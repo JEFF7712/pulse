@@ -121,6 +121,10 @@ async def run_discovery(
     after = snapshot_patterns(vault.read_patterns())
     changes = diff_patterns(before, after)
 
+    # Fact proposals are a separate stream from findings: they are questions, not
+    # insights, and they must reach the user even on a run that recorded no pattern.
+    await _deliver_fact_proposals(config, channel)
+
     if changes.is_empty():
         logger.info("discovery: agent recorded no new patterns, nothing to send")
         return changes
@@ -136,3 +140,36 @@ async def run_discovery(
     except Exception:
         logger.exception("failed to deliver discovery notification")
     return changes
+
+
+async def _deliver_fact_proposals(
+    config: PulseConfig, channel: NotificationChannel | None
+) -> int:
+    """Push any pending fact proposals the agent queued, one message each.
+
+    Batching several questions into one message makes a reply ambiguous, and the
+    confirmation loop depends on an unambiguous reply, so they go separately.
+    """
+    if channel is None:
+        return 0
+    from pulse.services.fact_confirmation import format_proposal_notification
+    from pulse.store.db import connect_db
+    from pulse.store.proposals import FactProposalRepository
+    from pulse.store.schema import bootstrap_schema
+
+    try:
+        async with connect_db(config.database_path) as db:
+            await bootstrap_schema(db)
+            pending = await FactProposalRepository(db).list_pending()
+    except Exception:
+        logger.exception("discovery: could not load fact proposals")
+        return 0
+
+    sent = 0
+    for proposal in pending:
+        try:
+            channel.send(format_proposal_notification(proposal))
+            sent += 1
+        except Exception:
+            logger.exception("failed to deliver fact proposal %s", proposal.id)
+    return sent

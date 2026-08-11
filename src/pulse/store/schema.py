@@ -86,5 +86,24 @@ async def bootstrap_schema(db: aiosqlite.Connection) -> None:
         )
         """
     )
+    # Proposed corrections to the factual half of the user's profile. Nothing is
+    # applied until the user confirms, so this is a queue, not a cache.
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fact_proposals (
+            id           TEXT PRIMARY KEY,
+            field        TEXT NOT NULL,
+            current_value TEXT,
+            proposed_value TEXT NOT NULL,
+            evidence     TEXT NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'pending',
+            created_at   TEXT NOT NULL,
+            decided_at   TEXT
+        )
+        """
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_fact_proposals_status ON fact_proposals(status)"
+    )
 
     await db.commit()

@@ -88,6 +88,7 @@ Exact client file locations differ (Claude Code, OpenClaw, Cursor, etc.); merge 
 | `pulse_ingest_event` | Manually push an event into the store |
 | `pulse_self_model` | The user's stated profile with a freshness assessment, plus agent-maintained observations |
 | `pulse_observation_record` | Record a durable observation about the user (never touches the stated profile) |
+| `pulse_fact_propose` | Propose a correction to a plain fact; applied only after the user confirms |
 | `pulse_pattern_list` / `pulse_pattern_read` | List recorded patterns / read one in full |
 | `pulse_pattern_upsert` | Record a pattern, subject to duplicate and restatement checks |
 | `pulse_pattern_set_status` | Mark a pattern active or inactive (archives it) |
@@ -99,6 +100,8 @@ Pulse does not reason: these tools expose your data so your agent can.
 **Looking for something the user does not already know?** Start with `pulse_longitudinal_profile`, then `pulse_pattern_list` for what is already recorded, then `pulse_query_events` to test a hypothesis. Note that `pulse_change_surface` is the wrong tool for this: what it returns is by construction what the user just did, and they remember doing it. **Answering a question about a specific time?** Orient with `pulse_digest`, then drill in with `pulse_query_events`.
 
 `pulse_pattern_upsert` rejects a proposal that duplicates an existing pattern, or an update that merely restates the one on file. That is deliberate: it is what keeps recorded patterns meaningful rather than an append-only log of the same finding.
+
+Three separate files, deliberately never merged: `profile.md` is what the user says about themselves (never written by an agent), `facts.md` holds plain facts and changes only on user confirmation via `pulse_fact_propose`, and `observed.md` is yours via `pulse_observation_record`.
 
 **Never write to `04-Config/profile.md`.** It is the user's own words about themselves and the reference point for "what they say versus what they do". An agent that edits it toward the data destroys that comparison permanently. `pulse_self_model` reports how old it is; check that before reading a divergence as a finding, and use `pulse_observation_record` for anything you derive yourself.
 
