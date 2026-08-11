@@ -474,6 +474,91 @@ async def pulse_longitudinal_profile(
     return json.dumps(_dc(profile), indent=2, default=str)
 
 
+@mcp.tool()
+async def pulse_self_model(ctx: Context = None) -> str:
+    """The user's stated self-description, with how far it can be trusted, plus what
+    has been observed about them from data.
+
+    Two separate things, deliberately never merged:
+
+    - `stated`: `04-Config/profile.md`, written by the user. **Never edit it.** It is
+      the measurement instrument for "what they say versus what they do"; an agent that
+      corrects it toward the data destroys that comparison permanently and will then
+      find perfect agreement forever.
+    - `observed`: `04-Config/observed.md`, maintained by you via
+      `pulse_observation_record`.
+
+    `freshness` tells you the profile's age. Read `guidance` before concluding anything
+    from a divergence: against a stale profile, "what you say does not match what you
+    do" has two indistinguishable readings — a real self-narrative gap, or a document
+    that correctly described an earlier period. Do not assert the first when you cannot
+    rule out the second.
+    """
+    from pulse.analysis.self_model import (
+        OBSERVED_FILE,
+        PROFILE_FILE,
+        assess_profile,
+    )
+
+    pulse_ctx = _get_pulse_ctx(ctx)
+    vault = _vault(pulse_ctx)
+    tz = _context_timezone(pulse_ctx)
+    today = date.fromisoformat(_today_for_timezone(tz))
+
+    stated = vault.read_config_file(PROFILE_FILE)
+    mtime = _config_file_mtime(pulse_ctx, PROFILE_FILE)
+    freshness = assess_profile(stated, as_of=today, file_mtime=mtime)
+
+    return json.dumps(
+        {
+            "stated": stated or None,
+            "freshness": freshness.as_dict(),
+            "observed": vault.read_config_file(OBSERVED_FILE) or None,
+        },
+        indent=2,
+    )
+
+
+def _config_file_mtime(pulse_ctx: PulseContext, filename: str) -> date | None:
+    from datetime import datetime as _dt
+    from pathlib import Path
+
+    path = Path(pulse_ctx.vault_path) / "04-Config" / filename
+    if not path.exists():
+        return None
+    return _dt.fromtimestamp(path.stat().st_mtime).date()
+
+
+@mcp.tool()
+async def pulse_observation_record(heading: str, body: str, ctx: Context = None) -> str:
+    """Record something observed about the user into `04-Config/observed.md`.
+
+    Use this for durable, data-derived facts about who the user is — rhythms, habits,
+    how they actually spend attention. Use `pulse_pattern_upsert` instead for a specific
+    finding with evidence; this file is the standing picture, not the findings log.
+
+    This never touches `profile.md`. The user's own words about themselves stay theirs.
+
+    Args:
+        heading: Section name, e.g. "Working rhythm". Re-using one replaces it.
+        body: Markdown body for that section.
+    """
+    from pulse.analysis.self_model import OBSERVED_FILE, observed_scaffold
+
+    vault = _vault(_get_pulse_ctx(ctx))
+    if not heading.strip() or not body.strip():
+        return "Rejected: heading and body are both required."
+    try:
+        if not vault.config_file_exists(OBSERVED_FILE):
+            vault.write_config_file(OBSERVED_FILE, observed_scaffold())
+        existing = vault.read_config_file(OBSERVED_FILE)
+        updated = VaultMemory._upsert_section(existing, f"## {heading.strip()}", body)
+        path = vault.write_config_file(OBSERVED_FILE, updated)
+        return f"Recorded observation {heading.strip()!r} in {path}."
+    except (ValueError, OSError) as exc:
+        return f"Error: {exc}"
+
+
 # --- Patterns ---
 
 

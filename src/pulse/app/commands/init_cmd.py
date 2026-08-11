@@ -265,5 +265,14 @@ def _collect_profile(
         ui.warning("No profile text provided; skipping profile write.")
         return
 
-    vault.write_config_file("profile.md", raw)
+    # Date the profile on write. Without a marker an agent has no way to tell a
+    # current self-description from a year-old one, and will read any divergence
+    # from the data as a self-narrative gap it has not earned.
+    from datetime import date as _date
+
+    from pulse.analysis.self_model import stamp_last_confirmed
+
+    vault.write_config_file(
+        "profile.md", stamp_last_confirmed(raw, _date.today().isoformat())
+    )
     ui.success("Profile saved.")

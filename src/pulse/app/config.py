@@ -18,11 +18,13 @@ _DEFAULT_DISCOVERY_PROMPT = (
     "my interests rotate rather than accumulate, sleep phase, what holds my attention "
     "versus what I only touch in fragments, and what quietly stopped. Read "
     "pulse_pattern_list first so you do not re-report a known finding, and "
-    "pulse_vault_read('04-Config/profile.md') for what I believe about myself; the gap "
-    "between that and the data is often the finding. Use pulse_query_events to check any "
-    "hypothesis. Do not tell me what I did recently — I remember. Record with "
-    "pulse_pattern_upsert only a finding I could not have seen myself. If nothing clears "
-    "that bar, record nothing and stop; that is a normal outcome, not a failure."
+    "pulse_self_model for what I say about myself — check its freshness before treating "
+    "any gap between that and the data as a finding, because a stale profile diverges "
+    "for boring reasons. Never edit my stated profile; record durable observations with "
+    "pulse_observation_record instead. Use pulse_query_events to check any hypothesis. "
+    "Do not tell me what I did recently — I remember. Record with pulse_pattern_upsert "
+    "only a finding I could not have seen myself. If nothing clears that bar, record "
+    "nothing and stop; that is a normal outcome, not a failure."
 )
 
 

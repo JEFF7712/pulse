@@ -213,3 +213,102 @@ def test_change_surface_rejects_a_bad_date(tmp_path: Path) -> None:
         assert "Invalid date" in result
 
     _run(tmp_path, body)
+
+
+# ----------------------------------------------------------------------
+# self model
+# ----------------------------------------------------------------------
+
+
+def test_self_model_reports_stated_observed_and_freshness(tmp_path: Path) -> None:
+    from pulse.mcp.server import pulse_observation_record, pulse_self_model
+
+    async def body(pulse_ctx):
+        ctx = _ctx(pulse_ctx)
+        cfg = Path(pulse_ctx.vault_path) / "04-Config"
+        cfg.mkdir(parents=True, exist_ok=True)
+        (cfg / "profile.md").write_text("# User Profile\n\n**Current Projects:** A, B\n")
+
+        payload = json.loads(await pulse_self_model(ctx=ctx))
+        assert "Current Projects" in payload["stated"]
+        assert payload["observed"] is None
+        # no marker in the file, so it falls back to mtime and is dated, not "fresh"
+        assert payload["freshness"]["exists"] is True
+
+        result = await pulse_observation_record(
+            heading="Working rhythm",
+            body="Deep sessions cluster after 22:00; coursework stays fragmented.",
+            ctx=ctx,
+        )
+        assert "Recorded observation" in result
+
+        payload = json.loads(await pulse_self_model(ctx=ctx))
+        assert "Working rhythm" in payload["observed"]
+        assert "after 22:00" in payload["observed"]
+
+    _run(tmp_path, body)
+
+
+def test_observations_never_touch_the_stated_profile(tmp_path: Path) -> None:
+    """The stated profile is the measurement instrument for stated-versus-actual.
+    An agent that edits it toward the data destroys that comparison for good."""
+    from pulse.mcp.server import pulse_observation_record, pulse_self_model
+
+    async def body(pulse_ctx):
+        ctx = _ctx(pulse_ctx)
+        cfg = Path(pulse_ctx.vault_path) / "04-Config"
+        cfg.mkdir(parents=True, exist_ok=True)
+        original = "# User Profile\n\n**Current Projects:** A, B\n"
+        (cfg / "profile.md").write_text(original)
+
+        await pulse_observation_record(
+            heading="Actual projects",
+            body="Only C shows any activity in the last quarter.",
+            ctx=ctx,
+        )
+
+        assert (cfg / "profile.md").read_text() == original
+        payload = json.loads(await pulse_self_model(ctx=ctx))
+        assert payload["stated"] == original
+        assert "Only C shows" in payload["observed"]
+
+    _run(tmp_path, body)
+
+
+def test_re_recording_a_heading_replaces_rather_than_appends(tmp_path: Path) -> None:
+    from pulse.mcp.server import pulse_observation_record, pulse_self_model
+
+    async def body(pulse_ctx):
+        ctx = _ctx(pulse_ctx)
+        (Path(pulse_ctx.vault_path) / "04-Config").mkdir(parents=True, exist_ok=True)
+        await pulse_observation_record(heading="Rhythm", body="first", ctx=ctx)
+        await pulse_observation_record(heading="Rhythm", body="second", ctx=ctx)
+
+        observed = json.loads(await pulse_self_model(ctx=ctx))["observed"]
+        assert observed.count("## Rhythm") == 1
+        assert "second" in observed and "first" not in observed
+
+    _run(tmp_path, body)
+
+
+def test_observation_requires_content(tmp_path: Path) -> None:
+    from pulse.mcp.server import pulse_observation_record
+
+    async def body(pulse_ctx):
+        result = await pulse_observation_record(
+            heading="  ", body="something", ctx=_ctx(pulse_ctx)
+        )
+        assert "Rejected" in result
+
+    _run(tmp_path, body)
+
+
+def test_missing_profile_is_reported_as_missing(tmp_path: Path) -> None:
+    from pulse.mcp.server import pulse_self_model
+
+    async def body(pulse_ctx):
+        payload = json.loads(await pulse_self_model(ctx=_ctx(pulse_ctx)))
+        assert payload["stated"] is None
+        assert payload["freshness"]["staleness"] == "missing"
+
+    _run(tmp_path, body)

@@ -155,6 +155,8 @@ There is deliberately **no gate on recent activity**. A quiet week is not a reas
 
 Force a pass with **`pulse review`**. Each run spends your agent subscription. Enabling `[discovery]` alongside `[semantic]` also registers a 6-hourly embedding job.
 
+**Your profile stays yours.** `04-Config/profile.md` is written only by `pulse init` and is never edited by the agent — it is the reference point for "what you say about yourself versus what your data shows", and that comparison only works while the two stay independent. Since it is written once, it goes stale; `pulse_self_model` reports its age so the agent hedges instead of asserting a self-narrative gap that is really just a four-month-old document. Re-run `pulse init` to refresh it. Agent-derived observations go to `04-Config/observed.md`.
+
 > **Migrating from `[proactive]`:** the section was removed and Pulse fails to start if it is still present. Rename it to `[discovery]`; `command`, `prompt`, `at` and `timeout_seconds` carry over. Replace a review-style prompt with a discovery-style one, or drop `prompt` to take the built-in default.
 
 ## Token files

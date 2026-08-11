@@ -42,8 +42,20 @@ hold in their head:
    much data exists cannot masquerade as a change in behaviour.
 
 2. **`pulse_pattern_list`** so you do not re-report a known finding, and
-   **`pulse_vault_read("04-Config/profile.md")`** for what the user believes about
-   themselves. Compare the two against the data.
+   **`pulse_self_model`** for what the user says about themselves.
+
+   **Read the `freshness` field before drawing any conclusion from a divergence.** The
+   stated profile is written once at setup and is often months old. Against a stale one,
+   "what you say does not match what you do" has two readings that cannot be told apart:
+   a real self-narrative gap, or a document that correctly described an earlier period.
+   Asserting the first without ruling out the second is a fabricated finding. When the
+   profile is stale, the honest output is usually "this needs refreshing", not a claim
+   about the user's self-image.
+
+   **Never edit the stated profile.** It is the measurement instrument for this whole
+   comparison; an agent that corrects it toward the data destroys the signal permanently
+   and will then find perfect agreement forever. Record durable data-derived facts with
+   **`pulse_observation_record`**, which writes to a separate file.
 
 3. **Read across rows, not down them.** A single entity's decline is a fact, not a
    finding. Several entities peaking and dying in sequence is a *rhythm*. Coursework
@@ -88,4 +100,7 @@ Drawn from real failures in this vault:
   alongside four other rows is a finding.
 - **Manufacturing a correlation** from same-day co-occurrence. Without a mechanism, it
   is a coincidence.
+- **Reading a stale profile as a current claim.** "Your profile says X but the data says
+  Y" is only a finding if the profile is current. Check `freshness` first; a four-month
+  gap is a filing problem, not a self-knowledge problem.
 - **Padding.** If the honest answer is nothing, the answer is nothing.
