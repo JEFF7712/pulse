@@ -184,8 +184,32 @@ _CONFIGURE_ENV_KEY_ORDER: list[str] = (
 # Map non-PULSE_ configure env keys to ``PulseConfig`` root field names (pulse.toml).
 _ENV_KEY_TO_CONFIG_FIELD: dict[str, str] = {}
 
+
+def _is_nested_model_field(name: str) -> bool:
+    """True when a PulseConfig field holds a sub-model rather than a scalar."""
+    import typing
+
+    from pydantic import BaseModel
+
+    annotation = PulseConfig.model_fields[name].annotation
+    candidates = typing.get_args(annotation) or (annotation,)
+    return any(isinstance(c, type) and issubclass(c, BaseModel) for c in candidates)
+
+
+# Root *scalars* only. Sub-model fields ([semantic], [discovery], …) are tables and
+# must be excluded: treating one as a root field stringifies it through `str(model)`
+# and writes the Python repr into pulse.toml as a quoted scalar, which then fails to
+# load. Deriving this from the model keeps a newly added sub-model from repeating it.
+_PULSE_NESTED_FIELD_NAMES: frozenset[str] = frozenset(
+    k
+    for k in PulseConfig.model_fields
+    if k != "connectors" and _is_nested_model_field(k)
+)
+
 _PULSE_ROOT_FIELD_NAMES: frozenset[str] = frozenset(
-    k for k in PulseConfig.model_fields if k != "connectors"
+    k
+    for k in PulseConfig.model_fields
+    if k != "connectors" and k not in _PULSE_NESTED_FIELD_NAMES
 )
 
 _CONNECTOR_DEFS: list[tuple[str, str, str]] = [

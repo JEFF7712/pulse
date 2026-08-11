@@ -83,8 +83,18 @@ def _toml_inline_value(v: object) -> str:
     if isinstance(v, float):
         return repr(v)
     if isinstance(v, str):
-        esc = v.replace("\\", "\\\\").replace('"', '\\"')
+        # A TOML basic string cannot contain a raw newline or tab, so escape them
+        # rather than emitting a document that will not parse back.
+        esc = (
+            v.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        )
         return f'"{esc}"'
+    if isinstance(v, list):
+        return "[" + ", ".join(_toml_inline_value(item) for item in v) + "]"
     raise TypeError(f"Unsupported TOML value type: {type(v)!r}")
 
 
