@@ -82,6 +82,10 @@ def run_server(args) -> None:
 
     app = create_app(settings=config, registry=registry)
 
+    from pulse.jobs.telegram_poll import TelegramPoller
+
+    poller = TelegramPoller(config)
+
     @app.on_event("startup")
     async def _start_scheduler():
         scheduler.start()
@@ -90,8 +94,12 @@ def run_server(args) -> None:
         for job in jobs:
             logger.info("  - %s (trigger: %s)", job.id, job.trigger)
 
+        if await poller.start():
+            logger.info("Telegram: long-polling for replies")
+
     @app.on_event("shutdown")
     async def _stop_scheduler():
+        await poller.stop()
         scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
 

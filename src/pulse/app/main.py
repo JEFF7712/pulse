@@ -19,11 +19,6 @@ from pulse.store.db import connect_db
 from pulse.store.events import EventRepository
 from pulse.store.schema import bootstrap_schema
 
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:  # pragma: no cover
-    ZoneInfo = None
-
 logger = logging.getLogger(__name__)
 
 # Backward compat alias
@@ -110,7 +105,9 @@ def create_app(
         if isinstance(quoted, dict) and isinstance(quoted.get("text"), str):
             text = f"{text}\n{quoted['text']}"
 
-        result = await _handle_inbound_reply(s, text)
+        from pulse.services.inbound import handle_inbound_text
+
+        result = await handle_inbound_text(s, text)
         if result is None:
             return {"status": "accepted"}
         return {"status": "accepted", "result": result}
@@ -121,29 +118,6 @@ def create_app(
             _register_push_route(app, push_conn, settings_dependency)
 
     return app
-
-
-async def _handle_inbound_reply(config: PulseConfig, text: str) -> str | None:
-    """Resolve an inbound chat message against pending fact proposals.
-
-    Returns None when the message was not a decision, which is the normal case on a
-    chat channel: an ordinary message must not look like a failure.
-    """
-    from datetime import datetime
-
-    from pulse.services.fact_confirmation import apply_reply
-
-    try:
-        tz = ZoneInfo(config.timezone) if ZoneInfo is not None else None
-        today = (datetime.now(tz) if tz else datetime.now()).date().isoformat()
-        async with connect_db(config.database_path) as db:
-            await bootstrap_schema(db)
-            return await apply_reply(
-                db, vault_path=config.vault_path, text=text, today=today
-            )
-    except Exception:
-        logger.exception("failed to handle inbound reply")
-        return None
 
 
 def _register_push_route(app: FastAPI, push_conn, settings_dependency) -> None:
