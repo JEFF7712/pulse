@@ -265,3 +265,35 @@ def test_thin_history_reports_a_note_instead_of_trends():
     p = build_longitudinal_profile(events, as_of=date(2026, 8, 31))
     assert p.entity_trends == []
     assert any("history" in n for n in p.notes)
+
+
+def test_sleep_buckets_are_monthly_so_a_regime_change_is_not_smeared():
+    """A quarter that straddles a real schedule change blends two regimes into one
+    median and invents an asymmetry that is really a bucket-boundary artifact."""
+    events = []
+    eid = 0
+    # June: late schedule. July: abruptly early. A quarterly bucket would merge them.
+    for month, (bed_hour, wake_hour) in ((6, (2, 11)), (7, (22, 7))):
+        for day in range(1, 25):
+            d = datetime(2026, month, day, tzinfo=UTC)
+            if bed_hour < 12:  # after midnight → belongs to the previous night
+                events.append(_visit(eid, "a.com", d.replace(hour=bed_hour)))
+            else:
+                events.append(_visit(eid, "a.com", d.replace(hour=bed_hour)))
+            eid += 1
+            events.append(_visit(eid, "a.com", (d + timedelta(days=1)).replace(hour=wake_hour)))
+            eid += 1
+
+    phases = {p.period: p for p in sleep_phases(events)}
+    assert "2026-06" in phases and "2026-07" in phases
+    # the two regimes stay distinguishable
+    assert phases["2026-06"].wake_hour > phases["2026-07"].wake_hour + 2
+
+
+def test_thin_months_are_dropped_rather_than_reported():
+    events = []
+    for day in range(1, 4):
+        d = datetime(2026, 6, day, tzinfo=UTC)
+        events.append(_visit(day * 2, "a.com", d.replace(hour=23)))
+        events.append(_visit(day * 2 + 1, "a.com", (d + timedelta(days=1)).replace(hour=9)))
+    assert sleep_phases(events) == []

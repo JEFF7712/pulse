@@ -69,6 +69,8 @@ NIGHT_BOUNDARY_HOUR = 5
 # Plausible bounds for an inferred sleep gap, in hours.
 MIN_SLEEP_GAP = 3.0
 MAX_SLEEP_GAP = 14.0
+# Nights needed before a bucket's median means anything.
+MIN_NIGHTS_PER_BUCKET = 8
 
 
 @dataclass(slots=True)
@@ -264,12 +266,19 @@ def _night_of(d: datetime) -> date:
     return (d - timedelta(hours=NIGHT_BOUNDARY_HOUR)).date()
 
 
-def sleep_phases(events: list[Event], *, period_months: int = 3) -> list[SleepPhase]:
-    """Infer bedtime/wake from the daily silence, bucketed into periods.
+def sleep_phases(events: list[Event], *, period_months: int = 1) -> list[SleepPhase]:
+    """Infer bedtime/wake from the daily silence, bucketed by month.
 
     This is a proxy: the last event before a long silence and the first after it. It
     cannot see sleep, only the absence of activity, so it is directional evidence
     about *phase drift* rather than a measurement of sleep.
+
+    Buckets are monthly rather than quarterly on purpose. A real change of regime — a
+    job starting, a term beginning, travel ending — lands on whatever date it lands on,
+    and a coarse bucket that straddles it blends two schedules into one median and
+    invents an asymmetry that is really a boundary artifact. Read the shape of the
+    series and line it up against known life events; do not treat any single bucket
+    boundary as a change point. `nights` is reported so thin buckets can be discounted.
     """
     by_night: dict[date, list[datetime]] = defaultdict(list)
     for event in events:
@@ -291,13 +300,16 @@ def sleep_phases(events: list[Event], *, period_months: int = 3) -> list[SleepPh
         bed = last.hour + last.minute / 60
         bed = bed + 24 if bed < 12 else bed
         wake = first.hour + first.minute / 60
-        quarter = (a.month - 1) // period_months + 1
-        buckets[f"{a.year}P{quarter}"].append((bed, wake, gap))
+        if period_months <= 1:
+            label = f"{a.year}-{a.month:02d}"
+        else:
+            label = f"{a.year}P{(a.month - 1) // period_months + 1}"
+        buckets[label].append((bed, wake, gap))
 
     out: list[SleepPhase] = []
     for period in sorted(buckets):
         rows = buckets[period]
-        if len(rows) < 10:
+        if len(rows) < MIN_NIGHTS_PER_BUCKET:
             continue
         out.append(
             SleepPhase(
