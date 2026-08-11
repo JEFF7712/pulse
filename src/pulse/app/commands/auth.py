@@ -1,4 +1,4 @@
-"""Per-connector OAuth / link / test handlers for `pulse auth-*` and `pulse test-telegram`."""
+"""Per-connector OAuth / link / test handlers behind `pulse auth` and `pulse test-telegram`."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from pulse.app import cli_ui as ui
-from pulse.app.config import PulseConfig
 from pulse.app.config_loader import load_config
 from pulse.connectors.github_auth import (
     GITHUB_AUTH_PORT,
@@ -170,7 +169,7 @@ def auth_github(*, show_rule: bool = True) -> None:
     gh = config.connectors.get("github")
     if gh is None or not gh.enabled:
         ui.error(
-            "Enable [connectors.github] in pulse.toml before running GitHub OAuth."
+            r"Enable \[connectors.github] in pulse.toml before running GitHub OAuth."
         )
         sys.exit(1)
 
@@ -229,7 +228,9 @@ def auth_plaid(*, show_rule: bool = True) -> None:
         sys.exit(1)
     pl = config.connectors.get("plaid")
     if pl is None or not pl.enabled:
-        ui.error("Enable [connectors.plaid] in pulse.toml before running Plaid Link.")
+        ui.error(
+            r"Enable \[connectors.plaid] in pulse.toml before running Plaid Link."
+        )
         sys.exit(1)
     if show_rule:
         ui.rule("Plaid Link")
@@ -255,7 +256,9 @@ def auth_oura(*, show_rule: bool = True) -> None:
         sys.exit(1)
     ou = config.connectors.get("oura")
     if ou is None or not ou.enabled:
-        ui.error("Enable [connectors.oura] in pulse.toml before running Oura OAuth.")
+        ui.error(
+            r"Enable \[connectors.oura] in pulse.toml before running Oura OAuth."
+        )
         sys.exit(1)
 
     token_path = Path(config.database_path).parent / "oura_tokens.json"
@@ -307,3 +310,88 @@ def auth_oura(*, show_rule: bool = True) -> None:
     tokens = auth_manager._exchange_code(received_code[0])
     auth_manager.save_tokens(tokens)
     ui.success("Oura authorization complete!")
+
+
+# ----------------------------------------------------------------------
+# `pulse auth` — direct entry point
+# ----------------------------------------------------------------------
+
+_AUTH_RUNNERS = {
+    "google": auth_google,
+    "github": auth_github,
+    "spotify": auth_spotify,
+    "plaid": auth_plaid,
+    "oura": auth_oura,
+}
+
+
+def _print_auth_status(config) -> None:
+    from pulse.app.commands.auth_registry import all_status
+
+    ui.rule("pulse auth")
+    for st in all_status(config):
+        src = st.source
+        mark = {"authorized": "✓", "needs credentials": "✗", "not authorized": "○"}[
+            st.state
+        ]
+        covered = ", ".join(st.enabled_connectors) or "no enabled connectors"
+        ui.say(f"  [bold]{mark} {src.name:8}[/] {st.state:18} {src.label}")
+        ui.muted_line(f"      serves: {covered}")
+        if st.missing_config:
+            ui.muted_line(f"      set in pulse.toml: {', '.join(st.missing_config)}")
+        if src.redirect_uri:
+            ui.muted_line(f"      redirect URI: {src.redirect_uri}")
+        if src.notes:
+            ui.muted_line(f"      note: {src.notes}")
+    ui.muted_line("")
+    ui.muted_line("Run 'pulse auth <source>' to authorize one.")
+
+
+def auth(args) -> None:
+    """`pulse auth [source]` — status with no argument, run one flow with an argument."""
+    from pulse.app.commands.auth_registry import resolve, source_names, status_for
+
+    config = load_config(config_dir=getattr(args, "config_dir", None))
+    requested = getattr(args, "source", None)
+
+    if not requested:
+        _print_auth_status(config)
+        return
+
+    source = resolve(requested)
+    if source is None:
+        ui.error(
+            f"Unknown source {requested!r}. Choose from: {', '.join(source_names())}."
+        )
+        sys.exit(1)
+
+    st = status_for(source, config)
+    # Check prerequisites before opening a browser: failing after the tab opens is
+    # confusing, and the useful message (what to set, what URI to register) is
+    # exactly what the user needs before visiting the provider's dashboard.
+    if st.missing_config:
+        ui.error(
+            f"{source.label} needs these set in pulse.toml first: "
+            f"{', '.join(st.missing_config)}"
+        )
+        if source.redirect_uri:
+            ui.muted_line(f"Register redirect URI: {source.redirect_uri}")
+        sys.exit(1)
+
+    if source.needs_enabled:
+        cc = config.connectors.get(source.needs_enabled)
+        if cc is None or not cc.enabled:
+            ui.error(
+                rf"Enable \[connectors.{source.needs_enabled}] in pulse.toml before "
+                f"running this flow."
+            )
+            sys.exit(1)
+
+    if st.authorized:
+        ui.warning(f"{source.label} is already authorized ({st.token_path}).")
+        ui.muted_line("Continuing will replace the stored tokens.")
+
+    if source.redirect_uri:
+        ui.muted_line(f"Redirect URI registered on the provider must be: {source.redirect_uri}")
+
+    _AUTH_RUNNERS[source.name]()

@@ -16,6 +16,7 @@ from rich_argparse import RichHelpFormatter
 
 from pulse.app.cli_ui import SITE_ACCENT, SITE_CREAM, SITE_MUTED_FG
 from pulse.app.commands import configure as configure_cmd
+from pulse.app.commands import auth as auth_cmd
 from pulse.app.commands import init_cmd, onboard as onboard_cmd, ops, serve
 from pulse.app.commands.auth import (
     auth_github,
@@ -211,6 +212,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the proactive review now (on demand; works even if schedule is off)",
     )
 
+    auth_parser = subparsers.add_parser(
+        "auth",
+        parents=[config_parent],
+        help="Show authorization status, or authorize one source: pulse auth <source>",
+    )
+    auth_parser.add_argument(
+        "source",
+        nargs="?",
+        default=None,
+        help=(
+            "google (gmail/calendar/youtube), github, spotify, plaid, oura. "
+            "Omit to list status for all."
+        ),
+    )
+
     return parser
 
 
@@ -238,6 +254,8 @@ def main() -> None:
             profile_text=getattr(args, "profile_text", None),
             config_dir=getattr(args, "config_dir", None),
         )
+    elif args.command == "auth":
+        auth_cmd.auth(args)
     elif args.command == "status":
         ops.status(config_dir=getattr(args, "config_dir", None))
     elif args.command == "embed":

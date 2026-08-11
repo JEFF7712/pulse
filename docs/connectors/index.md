@@ -1,4 +1,6 @@
-# Connectors Index
+# Connectors
+
+Run **`pulse auth`** for a status view of every source (authorized / needs credentials / not authorized) and **`pulse auth <source>`** to authorize one. Index
 
 Google (Gmail, Calendar, YouTube), Spotify, GitHub, Plaid, Oura, browser history. Template: **`pulse.toml.example`**; interactive setup: **`pulse configure`** (writes **`.config/pulse.toml`** by default).
 
