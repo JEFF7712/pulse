@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 
 from pulse.analysis.preprocessor import EventPreprocessor
 from pulse.analysis.vault_memory import VaultMemory
@@ -23,23 +23,37 @@ def _parse_day(day: str) -> date | str:
         return f"Invalid date '{day}'. Expected ISO format YYYY-MM-DD."
 
 
+_lifespan_ctx: PulseContext | None = None
+
+
 @asynccontextmanager
-async def pulse_lifespan(server: FastMCP) -> AsyncIterator[PulseContext]:
+async def pulse_lifespan(server: MCPServer) -> AsyncIterator[PulseContext]:
     config = load_config(require_files=True)
+    global _lifespan_ctx
     async with open_pulse_context(
         db_path=config.database_path,
         vault_path=config.vault_path,
         config=config,
     ) as ctx:
-        yield ctx
+        _lifespan_ctx = ctx
+        try:
+            yield ctx
+        finally:
+            _lifespan_ctx = None
 
 
-mcp = FastMCP("pulse", lifespan=pulse_lifespan)
+mcp = MCPServer("pulse", lifespan=pulse_lifespan)
 
 
-def _get_pulse_ctx(ctx: Context) -> PulseContext:
+def _get_pulse_ctx(ctx: Context | None = None) -> PulseContext:
     """Extract PulseContext from the MCP request context's lifespan state."""
-    return ctx.request_context.lifespan_context
+    if ctx is not None:
+        return ctx.request_context.lifespan_context
+    if _lifespan_ctx is None:
+        raise RuntimeError(
+            "Pulse context unavailable: the server lifespan is not running."
+        )
+    return _lifespan_ctx
 
 
 def _context_timezone(pulse_ctx: PulseContext) -> str:
@@ -769,22 +783,19 @@ async def pulse_pattern_set_status(slug: str, status: str, ctx: Context = None) 
 @mcp.resource("pulse://digest/today")
 async def digest_today_resource() -> str:
     """Today's deterministic digest (per-source counts + clusters)."""
-    ctx = mcp.get_context()
-    return await pulse_digest(ctx=ctx)
+    return await pulse_digest(ctx=None)
 
 
 @mcp.resource("pulse://coverage")
 async def coverage_resource() -> str:
     """Per-source coverage: last sync, event count, and freshness."""
-    ctx = mcp.get_context()
-    return await pulse_coverage(ctx=ctx)
+    return await pulse_coverage(ctx=None)
 
 
 @mcp.resource("pulse://vault/index")
 async def vault_index_resource() -> str:
     """Index of markdown notes in the vault."""
-    ctx = mcp.get_context()
-    return await pulse_vault_list(ctx=ctx)
+    return await pulse_vault_list(ctx=None)
 
 
 def main() -> None:

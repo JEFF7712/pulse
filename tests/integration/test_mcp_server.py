@@ -528,7 +528,7 @@ def test_mcp_resources_digest_coverage_and_vault_index(
             ctx = SimpleNamespace(
                 request_context=SimpleNamespace(lifespan_context=pulse_ctx)
             )
-            monkeypatch.setattr(server_module.mcp, "get_context", lambda: ctx)
+            monkeypatch.setattr(server_module, "_lifespan_ctx", pulse_ctx)
 
             await server_module.pulse_vault_write(
                 path="notes/today.md",
