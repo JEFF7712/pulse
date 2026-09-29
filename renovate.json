@@ -12,8 +12,7 @@
         "pin",
         "digest"
       ],
-      "automerge": true,
-      "automergeType": "branch"
+      "automerge": true
     },
     {
       "description": "Never automerge major updates",
