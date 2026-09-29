@@ -227,7 +227,9 @@ def test_self_model_reports_stated_observed_and_freshness(tmp_path: Path) -> Non
         ctx = _ctx(pulse_ctx)
         cfg = Path(pulse_ctx.vault_path) / "04-Config"
         cfg.mkdir(parents=True, exist_ok=True)
-        (cfg / "profile.md").write_text("# User Profile\n\n**Current Projects:** A, B\n")
+        (cfg / "profile.md").write_text(
+            "# User Profile\n\n**Current Projects:** A, B\n"
+        )
 
         payload = json.loads(await pulse_self_model(ctx=ctx))
         assert "Current Projects" in payload["stated"]
