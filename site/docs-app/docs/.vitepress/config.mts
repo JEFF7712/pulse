@@ -13,6 +13,15 @@ export default defineConfig({
       { id: "pulse-docs-dark" },
       "document.documentElement.classList.add('dark')"
     ],
+    [
+      "script",
+      {
+        defer: "",
+        src: "https://tally.rupan.dev/t.js",
+        "data-website-id": "__ID_pulse__",
+        "data-domains": "pulseagent.dev,www.pulseagent.dev"
+      }
+    ],
     ["link", { rel: "icon", href: "/docs/favicon.ico", sizes: "any" }],
     [
       "link",
